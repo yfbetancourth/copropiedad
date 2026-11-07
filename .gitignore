@@ -1,0 +1,14 @@
+/vendor/
+/.env
+/.env.*
+!.env.example
+/var/log/
+/var/cache/
+/public/uploads/
+/composer.phar
+/.phpunit.cache/
+/coverage/
+/.idea/
+/.vscode/
+/.DS_Store
+/Thumbs.db

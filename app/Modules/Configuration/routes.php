@@ -1,0 +1,19 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Core\Router;
+use App\Modules\Configuration\ConfigurationController;
+
+/** @var Router $router */
+$configuration = new ConfigurationController();
+$router->get('/configuracion/parametrizacion', [$configuration, 'parametrization']);
+$router->post('/configuracion/parametrizacion/guardar', [$configuration, 'saveParametrization']);
+$router->get('/configuracion/financiera', [$configuration, 'financial']);
+$router->post('/configuracion/financiera/guardar', [$configuration, 'saveFinancial']);
+$router->get('/configuracion/equipo', [$configuration, 'team']);
+$router->post('/configuracion/equipo/guardar', [$configuration, 'saveUser']);
+$router->post('/configuracion/equipo/estado', [$configuration, 'setUserStatus']);
+$router->get('/configuracion/roles', [$configuration, 'roles']);
+$router->post('/configuracion/roles/guardar', [$configuration, 'saveRole']);
+$router->post('/configuracion/roles/eliminar', [$configuration, 'deleteRole']);
