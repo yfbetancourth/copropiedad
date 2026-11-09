@@ -16,6 +16,7 @@ final class RoleService
         'configuracion.parametrizacion' => 'Configuracion / Parametrizacion',
         'configuracion.financiera' => 'Configuracion / Financiera',
         'configuracion.caracterizacion' => 'Configuracion / Caracterizacion',
+        'configuracion.conformacion' => 'Configuracion / Conformacion de la copropiedad',
     ];
 
     public const LEVELS = [

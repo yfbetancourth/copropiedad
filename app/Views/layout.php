@@ -14,6 +14,11 @@ $canSeeRoles = $authUser !== null && Authorization::hasPermission($authUser, 'co
 $canSeeParametrization = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.parametrizacion', 1);
 $canSeeFinancial = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.financiera', 1);
 $canSeeCharacterization = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.caracterizacion', 1);
+$canSeeComposition = false;
+if ($authUser !== null && Authorization::hasPermission($authUser, 'configuracion.conformacion', 1)) {
+    $compositionHousingType = (new \App\Modules\Configuration\SettingsService())->current()['housing_type'] ?? '';
+    $canSeeComposition = in_array($compositionHousingType, ['casa', 'torres_apartamento', 'mixto'], true);
+}
 $inConfiguration = str_starts_with($currentPath, '/configuracion/');
 
 ?>
@@ -76,7 +81,7 @@ $inConfiguration = str_starts_with($currentPath, '/configuracion/');
                                 </a>
                             </li>
                         <?php endif; ?>
-                        <?php if ($canSeeTeam || $canSeeRoles || $canSeeParametrization || $canSeeFinancial || $canSeeCharacterization): ?>
+                        <?php if ($canSeeTeam || $canSeeRoles || $canSeeParametrization || $canSeeFinancial || $canSeeCharacterization || $canSeeComposition): ?>
                             <li class="nav-item<?= $inConfiguration ? ' menu-open' : '' ?>">
                                 <a href="#" class="nav-link<?= $inConfiguration ? ' active' : '' ?>" aria-expanded="<?= $inConfiguration ? 'true' : 'false' ?>">
                                     <i class="nav-icon bi bi-gear" aria-hidden="true"></i>
@@ -107,6 +112,14 @@ $inConfiguration = str_starts_with($currentPath, '/configuracion/');
                                             <a href="<?= $escape($basePath) ?>/configuracion/caracterizacion" class="nav-link<?= $currentPath === '/configuracion/caracterizacion' ? ' active' : '' ?>">
                                                 <i class="nav-icon bi bi-buildings" aria-hidden="true"></i>
                                                 <p>Caracterizacion</p>
+                                            </a>
+                                        </li>
+                                    <?php endif; ?>
+                                    <?php if ($canSeeComposition): ?>
+                                        <li class="nav-item">
+                                            <a href="<?= $escape($basePath) ?>/configuracion/conformacion" class="nav-link<?= $currentPath === '/configuracion/conformacion' ? ' active' : '' ?>">
+                                                <i class="nav-icon bi bi-diagram-3" aria-hidden="true"></i>
+                                                <p>Conformación de la copropiedad</p>
                                             </a>
                                         </li>
                                     <?php endif; ?>
