@@ -11,6 +11,8 @@ $router->get('/configuracion/parametrizacion', [$configuration, 'parametrization
 $router->post('/configuracion/parametrizacion/guardar', [$configuration, 'saveParametrization']);
 $router->get('/configuracion/financiera', [$configuration, 'financial']);
 $router->post('/configuracion/financiera/guardar', [$configuration, 'saveFinancial']);
+$router->get('/configuracion/caracterizacion', [$configuration, 'characterization']);
+$router->post('/configuracion/caracterizacion/guardar', [$configuration, 'saveCharacterization']);
 $router->get('/configuracion/equipo', [$configuration, 'team']);
 $router->post('/configuracion/equipo/guardar', [$configuration, 'saveUser']);
 $router->post('/configuracion/equipo/estado', [$configuration, 'setUserStatus']);

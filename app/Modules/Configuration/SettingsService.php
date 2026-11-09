@@ -22,7 +22,7 @@ final class SettingsService
         $settings = Database::connection()->query(
             'SELECT property_name, address, tax_id, account_holder, bank_name, account_type, account_number,
                     administration_fee, effective_date, early_payment_discount,
-                    late_fee_type, late_fee_value, late_fee_days, fine_amount
+                    late_fee_type, late_fee_value, late_fee_days, fine_amount, housing_type
              FROM copropiedad_settings
              WHERE id = 1'
         )->fetch();
@@ -42,7 +42,17 @@ final class SettingsService
             'late_fee_value' => '',
             'late_fee_days' => 0,
             'fine_amount' => '',
+            'housing_type' => '',
         ];
+    }
+
+    public function saveCharacterization(string $housingType): void
+    {
+        Database::connection()->prepare(
+            'INSERT INTO copropiedad_settings (id, housing_type)
+             VALUES (1, ?)
+             ON DUPLICATE KEY UPDATE housing_type = VALUES(housing_type)'
+        )->execute([$housingType]);
     }
 
     public function saveParametrization(

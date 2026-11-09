@@ -13,6 +13,7 @@ $canSeeTeam = $authUser !== null && Authorization::hasPermission($authUser, 'con
 $canSeeRoles = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.roles', 1);
 $canSeeParametrization = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.parametrizacion', 1);
 $canSeeFinancial = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.financiera', 1);
+$canSeeCharacterization = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.caracterizacion', 1);
 $inConfiguration = str_starts_with($currentPath, '/configuracion/');
 
 ?>
@@ -53,7 +54,7 @@ $inConfiguration = str_starts_with($currentPath, '/configuracion/');
                     </li>
                 </ul>
             <?php else: ?>
-                <a class="navbar-brand fw-semibold" href="<?= $escape($basePath) ?>/login">Copropiedad</a>
+                <a class="navbar-brand fw-semibold text-wrap text-break mw-100" href="<?= $escape($basePath) ?>/login"><?= $escape($propertyName) ?></a>
             <?php endif; ?>
         </div>
     </nav>
@@ -75,7 +76,7 @@ $inConfiguration = str_starts_with($currentPath, '/configuracion/');
                                 </a>
                             </li>
                         <?php endif; ?>
-                        <?php if ($canSeeTeam || $canSeeRoles || $canSeeParametrization || $canSeeFinancial): ?>
+                        <?php if ($canSeeTeam || $canSeeRoles || $canSeeParametrization || $canSeeFinancial || $canSeeCharacterization): ?>
                             <li class="nav-item<?= $inConfiguration ? ' menu-open' : '' ?>">
                                 <a href="#" class="nav-link<?= $inConfiguration ? ' active' : '' ?>" aria-expanded="<?= $inConfiguration ? 'true' : 'false' ?>">
                                     <i class="nav-icon bi bi-gear" aria-hidden="true"></i>
@@ -98,6 +99,14 @@ $inConfiguration = str_starts_with($currentPath, '/configuracion/');
                                             <a href="<?= $escape($basePath) ?>/configuracion/financiera" class="nav-link<?= $currentPath === '/configuracion/financiera' ? ' active' : '' ?>">
                                                 <i class="nav-icon bi bi-cash-coin" aria-hidden="true"></i>
                                                 <p>Financiera</p>
+                                            </a>
+                                        </li>
+                                    <?php endif; ?>
+                                    <?php if ($canSeeCharacterization): ?>
+                                        <li class="nav-item">
+                                            <a href="<?= $escape($basePath) ?>/configuracion/caracterizacion" class="nav-link<?= $currentPath === '/configuracion/caracterizacion' ? ' active' : '' ?>">
+                                                <i class="nav-icon bi bi-buildings" aria-hidden="true"></i>
+                                                <p>Caracterizacion</p>
                                             </a>
                                         </li>
                                     <?php endif; ?>

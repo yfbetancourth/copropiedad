@@ -92,6 +92,13 @@ Aplica la migracion una sola vez con una cuenta MySQL administradora:
 Get-Content .\database\migrations\003_create_property_settings.sql | & C:\xampp\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
 ```
 
-En **Configuracion / Parametrizacion** se guardan el nombre, direccion, NIT y, opcionalmente, los datos completos del titular, banco, tipo y numero de cuenta. En bases donde ya se aplico la migracion 003, aplica una sola vez la migracion adicional `004_add_bank_account_number.sql` para agregar el campo bancario sin afectar los demas datos. En **Configuracion / Financiera** se guardan el valor de administracion, su fecha de vigencia, el descuento fijo por pronto pago, la mora en porcentaje o valor fijo con sus dias de espera, y el valor base de las multas. Los valores monetarios se guardan en COP con dos decimales; el porcentaje de mora admite hasta 100%.
+En **Configuracion / Parametrizacion** se guardan el nombre, direccion, NIT y, opcionalmente, los datos completos del titular, banco, tipo y numero de cuenta. En bases donde ya se aplico la migracion 003, aplica una sola vez la migracion adicional `004_add_bank_account_number.sql` para agregar el campo bancario sin afectar los demas datos. En **Configuracion / Financiera** se guardan el valor de administracion, su fecha de vigencia, el descuento fijo por pronto pago, la mora en porcentaje o valor fijo con sus dias de espera, y el valor base de las multas. En **Configuracion / Caracterizacion** se define si la copropiedad es una casa o un conjunto de torres de apartamentos.
 
-La migracion agrega permisos independientes para ambas subsecciones y conserva los permisos actuales al inicializarlos. Guardar parametros no emite facturas, crea cobros ni aplica mora o multas automaticamente.
+Aplica tambien las migraciones `004_add_bank_account_number.sql` (si aun no se ha aplicado) y `005_add_housing_type.sql` una sola vez:
+
+```powershell
+Get-Content .\database\migrations\004_add_bank_account_number.sql | & C:\xampp\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+Get-Content .\database\migrations\005_add_housing_type.sql | & C:\xampp\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+```
+
+La migracion agrega el tipo de vivienda como un dato opcional y un permiso independiente para Caracterizacion; los roles existentes no reciben acceso inicialmente y el Superadmin conserva acceso total. Los permisos se pueden ajustar en **Configuracion / Roles y permisos**. Guardar parametros no emite facturas, crea cobros ni aplica mora o multas automaticamente.

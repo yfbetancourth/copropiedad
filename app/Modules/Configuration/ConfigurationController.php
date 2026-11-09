@@ -381,6 +381,38 @@ final class ConfigurationController
         $this->redirect('/configuracion/financiera');
     }
 
+    public function characterization(): void
+    {
+        $actor = Authorization::requirePermission('configuracion.caracterizacion', 'read');
+        if ($actor === null) {
+            return;
+        }
+
+        $this->render('characterization', 'Configuracion / Caracterizacion', [
+            'actor' => $actor,
+            'settings' => (new SettingsService())->current(),
+        ]);
+    }
+
+    public function saveCharacterization(): void
+    {
+        $actor = Authorization::requirePermission('configuracion.caracterizacion', 'write');
+        if ($actor === null) {
+            return;
+        }
+        $this->requireCsrf();
+
+        $housingType = $this->stringInput($_POST['housing_type'] ?? null);
+        if (!in_array($housingType, ['casa', 'torres_apartamento'], true)) {
+            $this->flash('error', 'Selecciona un tipo de vivienda valido.');
+            $this->redirect('/configuracion/caracterizacion');
+        }
+
+        (new SettingsService())->saveCharacterization($housingType);
+        $this->flash('success', 'La caracterizacion se guardo correctamente.');
+        $this->redirect('/configuracion/caracterizacion');
+    }
+
     private function requireAction(string $moduleKey, string $level): ?array
     {
         return Authorization::requirePermission($moduleKey, $level);
