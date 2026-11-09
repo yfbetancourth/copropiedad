@@ -36,6 +36,7 @@ $housingType = in_array($settings['housing_type'] ?? null, ['casa', 'torres_apar
                                 <option value="">Selecciona una opcion</option>
                                 <option value="casa" <?= $housingType === 'casa' ? 'selected' : '' ?>>Casa</option>
                                 <option value="torres_apartamento" <?= $housingType === 'torres_apartamento' ? 'selected' : '' ?>>Torres de apartamentos</option>
+                                <option value="mixto" <?= $housingType === 'mixto' ? 'selected' : '' ?>>Mixto</option>
                             </select>
                             <?php if (!$canWrite && $housingType !== ''): ?>
                                 <input type="hidden" name="housing_type" value="<?= $escape($housingType) ?>">
