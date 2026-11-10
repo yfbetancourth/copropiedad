@@ -16,4 +16,7 @@ $router->get('/reset-password', [$auth, 'resetPasswordForm']);
 $router->post('/reset-password', [$auth, 'resetPassword']);
 $router->get('/admin', [$auth, 'adminPanel']);
 $router->get('/usuario', [$auth, 'userPanel']);
+$router->get('/usuario/mensajes', [$auth, 'userMessages']);
+$router->post('/usuario/mensajes/leer', [$auth, 'markMessageRead']);
+$router->post('/usuario/notificaciones/cobro', [$auth, 'markBillingNotificationRead']);
 $router->post('/usuario/perfil', [$auth, 'updateOwnProfile']);

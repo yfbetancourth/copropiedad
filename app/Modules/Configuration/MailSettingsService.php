@@ -88,8 +88,14 @@ final class MailSettingsService
         string $fromAddress,
         string $fromName
     ): void {
-        $current = $this->credentials();
-        $password = $password !== '' ? $password : $current['password'];
+        if ($password === '') {
+            $current = $this->current();
+            if (!$current['password_configured']) {
+                throw new RuntimeException('Ingresa la contrasena SMTP del proveedor.');
+            }
+
+            $password = $this->credentials()['password'];
+        }
         if ($password === '') {
             throw new RuntimeException('Ingresa la contrasena SMTP del proveedor.');
         }

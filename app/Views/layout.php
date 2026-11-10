@@ -21,9 +21,13 @@ if ($authUser !== null && Authorization::hasPermission($authUser, 'configuracion
     $canSeeComposition = in_array($compositionHousingType, ['casa', 'torres_apartamento', 'mixto'], true);
 }
 $canSeeUnitAssignments = $authUser !== null && Authorization::hasPermission($authUser, 'inmuebles.asignaciones', 1);
+$canSeeBilling = $authUser !== null && Authorization::hasPermission($authUser, 'cartera.cobros', 1);
+$canSeeMessages = $authUser !== null && Authorization::hasPermission($authUser, 'mensajes', 1);
 $canSeeUserPortal = $authUser !== null && Authorization::hasPermission($authUser, 'usuario.portal', 1);
 $inConfiguration = str_starts_with($currentPath, '/configuracion/');
 $inUnitAssignments = str_starts_with($currentPath, '/inmuebles/');
+$inBilling = str_starts_with($currentPath, '/cartera/');
+$inMessages = $currentPath === '/mensajes';
 
 ?>
 <!doctype html>
@@ -166,6 +170,22 @@ $inUnitAssignments = str_starts_with($currentPath, '/inmuebles/');
                                 <a href="<?= $escape($basePath) ?>/inmuebles/asignaciones" class="nav-link<?= $inUnitAssignments ? ' active' : '' ?>">
                                     <i class="nav-icon bi bi-person-vcard" aria-hidden="true"></i>
                                     <p>Asignación de inmuebles</p>
+                                </a>
+                            </li>
+                        <?php endif; ?>
+                        <?php if ($canSeeBilling): ?>
+                            <li class="nav-item">
+                                <a href="<?= $escape($basePath) ?>/cartera/cobros" class="nav-link<?= $inBilling ? ' active' : '' ?>">
+                                    <i class="nav-icon bi bi-receipt" aria-hidden="true"></i>
+                                    <p>Cartera / Cobros</p>
+                                </a>
+                            </li>
+                        <?php endif; ?>
+                        <?php if ($canSeeMessages): ?>
+                            <li class="nav-item">
+                                <a href="<?= $escape($basePath) ?>/mensajes" class="nav-link<?= $inMessages ? ' active' : '' ?>">
+                                    <i class="nav-icon bi bi-envelope" aria-hidden="true"></i>
+                                    <p>Mensajes</p>
                                 </a>
                             </li>
                         <?php endif; ?>

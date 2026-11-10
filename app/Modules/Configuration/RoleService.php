@@ -19,6 +19,8 @@ final class RoleService
         'configuracion.caracterizacion' => 'Configuracion / Caracterizacion',
         'configuracion.conformacion' => 'Configuracion / Conformacion de la copropiedad',
         'inmuebles.asignaciones' => 'Inmuebles / Asignacion de usuarios',
+        'cartera.cobros' => 'Cartera / Cobros',
+        'mensajes' => 'Mensajes internos',
         'usuario.portal' => 'Usuario / Portal de inmuebles asignados',
     ];
 

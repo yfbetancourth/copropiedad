@@ -21,6 +21,7 @@ final class SettingsService
     {
         $settings = Database::connection()->query(
             'SELECT property_name, address, tax_id, account_holder, bank_name, account_type, account_number,
+                    early_payment_day, payment_due_day,
                     administration_fee, effective_date, early_payment_discount,
                     late_fee_type, late_fee_value, late_fee_days, fine_amount, housing_type, tower_nomenclature
              FROM copropiedad_settings
@@ -35,6 +36,8 @@ final class SettingsService
             'bank_name' => '',
             'account_type' => '',
             'account_number' => '',
+            'early_payment_day' => null,
+            'payment_due_day' => null,
             'administration_fee' => '',
             'effective_date' => '',
             'early_payment_discount' => '',
@@ -65,12 +68,15 @@ final class SettingsService
         string $accountHolder,
         string $bankName,
         string $accountType,
-        string $accountNumber
+        string $accountNumber,
+        ?int $earlyPaymentDay,
+        ?int $paymentDueDay
     ): void {
         Database::connection()->prepare(
             'INSERT INTO copropiedad_settings
-                (id, property_name, address, tax_id, account_holder, bank_name, account_type, account_number)
-             VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+                (id, property_name, address, tax_id, account_holder, bank_name, account_type, account_number,
+                 early_payment_day, payment_due_day)
+             VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 property_name = VALUES(property_name),
                 address = VALUES(address),
@@ -78,8 +84,20 @@ final class SettingsService
                 account_holder = VALUES(account_holder),
                 bank_name = VALUES(bank_name),
                 account_type = VALUES(account_type),
-                account_number = VALUES(account_number)'
-        )->execute([$name, $address, $taxId, $accountHolder, $bankName, $accountType ?: null, $accountNumber]);
+                account_number = VALUES(account_number),
+                early_payment_day = VALUES(early_payment_day),
+                payment_due_day = VALUES(payment_due_day)'
+        )->execute([
+            $name,
+            $address,
+            $taxId,
+            $accountHolder,
+            $bankName,
+            $accountType ?: null,
+            $accountNumber,
+            $earlyPaymentDay,
+            $paymentDueDay,
+        ]);
     }
 
     public function saveFinancial(

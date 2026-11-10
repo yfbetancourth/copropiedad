@@ -2,25 +2,34 @@
 
 declare(strict_types=1);
 
-$escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-$canWrite = (bool) ($actor['is_system'] ?? false);
+$escape = static fn (mixed $value): string => htmlspecialchars(
+    is_scalar($value) ? (string) $value : '',
+    ENT_QUOTES | ENT_SUBSTITUTE,
+    'UTF-8'
+);
+$canWrite = \App\Core\Authorization::hasPermission($actor, 'configuracion.parametrizacion', 2);
 
 ?>
 <section class="content">
-    <div class="mb-3">
-        <h1 class="h3 mb-1">Configuracion</h1>
-        <p class="text-secondary mb-0">Parametrizacion · datos generales y bancarios de la copropiedad.</p>
-    </div>
+    <form id="parametrization-form" method="post" action="<?= $escape($basePath) ?>/configuracion/parametrizacion/guardar">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+            <div>
+                <h1 class="h3 mb-1">Configuracion</h1>
+                <p class="text-secondary mb-0">Parametrizacion · datos generales y bancarios de la copropiedad.</p>
+            </div>
+            <?php if ($canWrite): ?>
+                <button class="btn btn-primary" type="submit">Guardar parametrizacion</button>
+            <?php endif; ?>
+        </div>
 
     <?php if (is_array($flash)): ?>
         <div class="alert alert-<?= $flash['type'] === 'success' ? 'success' : 'danger' ?>" role="status"><?= $escape($flash['message']) ?></div>
     <?php endif; ?>
 
     <?php if (!$canWrite): ?>
-        <div class="alert alert-info" role="status">Solo el usuario Superadmin puede modificar estos datos.</div>
+        <div class="alert alert-info" role="status">Tu cuenta tiene acceso de solo lectura a estos datos.</div>
     <?php endif; ?>
 
-    <form method="post" action="<?= $escape($basePath) ?>/configuracion/parametrizacion/guardar">
         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
         <div class="row g-3">
             <div class="col-lg-6">
@@ -70,6 +79,25 @@ $canWrite = (bool) ($actor['is_system'] ?? false);
                             <input id="account_number" name="account_number" type="text" inputmode="numeric" pattern="[0-9]{1,34}" maxlength="34" class="form-control" value="<?= $escape($settings['account_number']) ?>" <?= $canWrite ? '' : 'readonly' ?>>
                             <small class="text-secondary">Ingresa solo numeros, sin espacios ni guiones.</small>
                         </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header"><h2 class="card-title">Fechas de cobro mensual</h2></div>
+                    <div class="card-body">
+                        <p class="text-secondary">Configura los días de cada mes. Se usan para calcular las fechas límite en las notas de cobro; el día 28 evita fechas inexistentes en febrero.</p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="early_payment_day" class="form-label">Día límite para pronto pago</label>
+                                <input id="early_payment_day" name="early_payment_day" type="number" class="form-control" min="1" max="28" step="1" value="<?= $escape($settings['early_payment_day'] ?? '') ?>" <?= $canWrite ? '' : 'readonly' ?>>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="payment_due_day" class="form-label">Día de vencimiento ordinario</label>
+                                <input id="payment_due_day" name="payment_due_day" type="number" class="form-control" min="1" max="28" step="1" value="<?= $escape($settings['payment_due_day'] ?? '') ?>" <?= $canWrite ? '' : 'readonly' ?>>
+                            </div>
+                        </div>
+                        <small class="text-secondary">Configura ambos días o deja ambos vacíos. El pronto pago debe vencer el mismo día o antes del vencimiento ordinario.</small>
                     </div>
                 </div>
             </div>

@@ -283,13 +283,8 @@ final class ConfigurationController
 
     public function saveParametrization(): void
     {
-        $actor = Authorization::requirePermission('configuracion.parametrizacion', 'read');
+        $actor = Authorization::requirePermission('configuracion.parametrizacion', 'write');
         if ($actor === null) {
-            return;
-        }
-        if (!(bool) ($actor['is_system'] ?? false)) {
-            http_response_code(403);
-            echo 'Solo el usuario Superadmin puede modificar la parametrizacion.';
             return;
         }
         $this->requireCsrf();
@@ -301,6 +296,8 @@ final class ConfigurationController
         $bankName = trim($this->stringInput($_POST['bank_name'] ?? null));
         $accountType = $this->stringInput($_POST['account_type'] ?? null);
         $accountNumber = trim($this->stringInput($_POST['account_number'] ?? null));
+        $earlyPaymentDay = $this->integerInput($_POST['early_payment_day'] ?? null);
+        $paymentDueDay = $this->integerInput($_POST['payment_due_day'] ?? null);
 
         if ($name === '' || strlen($name) > 160 || strlen($address) > 255
             || strlen($taxId) > 32 || strlen($accountHolder) > 160
@@ -310,8 +307,13 @@ final class ConfigurationController
             || (($accountHolder === '') !== ($bankName === ''))
             || (($accountHolder === '') !== ($accountType === ''))
             || (($accountHolder === '') !== ($accountNumber === ''))
+            || $earlyPaymentDay === false || $paymentDueDay === false
+            || ($earlyPaymentDay !== null && ($earlyPaymentDay < 1 || $earlyPaymentDay > 28))
+            || ($paymentDueDay !== null && ($paymentDueDay < 1 || $paymentDueDay > 28))
+            || (($earlyPaymentDay === null) !== ($paymentDueDay === null))
+            || ($earlyPaymentDay !== null && $paymentDueDay !== null && $earlyPaymentDay > $paymentDueDay)
         ) {
-            $this->flash('error', 'Verifica los datos de la copropiedad y completa juntos el titular, banco, tipo y numero de cuenta.');
+            $this->flash('error', 'Verifica los datos de la copropiedad, completa juntos los datos bancarios y revisa los dias de pronto pago y vencimiento (1 a 28).');
             $this->redirect('/configuracion/parametrizacion');
         }
 
@@ -322,7 +324,9 @@ final class ConfigurationController
             $accountHolder,
             $bankName,
             $accountType,
-            $accountNumber
+            $accountNumber,
+            $earlyPaymentDay,
+            $paymentDueDay
         );
         $this->flash('success', 'Los datos de parametrizacion se guardaron correctamente.');
         $this->redirect('/configuracion/parametrizacion');
@@ -411,14 +415,15 @@ final class ConfigurationController
         $fromAddress = trim($this->stringInput($_POST['from_address'] ?? null));
         $fromName = trim($this->stringInput($_POST['from_name'] ?? null));
 
-        if (preg_match('/^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/D', $host) !== 1
+        if (preg_match('/^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/D', $host) !== 1
             || $port === false || $port === null || $port < 1 || $port > 65535
             || $username === '' || strlen($username) > 254 || strlen($password) > 512
+            || preg_match('/[\x00-\x1F\x7F]/', $username) === 1
             || !in_array($encryption, ['tls', 'ssl'], true)
             || !filter_var($fromAddress, FILTER_VALIDATE_EMAIL)
-            || strlen($fromName) > 160
+            || strlen($fromName) > 160 || preg_match('/[\x00-\x1F\x7F]/', $fromName) === 1
         ) {
-            $this->flash('error', 'Revisa el servidor, puerto, cifrado, usuario y dirección remitente.');
+            $this->flash('error', 'Revisa el servidor, puerto, cifrado, usuario y datos del remitente.');
             $this->redirect('/configuracion/correo');
         }
 

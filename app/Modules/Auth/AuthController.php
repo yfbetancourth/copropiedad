@@ -199,11 +199,78 @@ final class AuthController
             'title' => 'Panel de Usuario',
             'user' => $user,
             'units' => $assignedUnits,
+            'notifications' => (new PortalNotificationService())->unreadForUser((int) $user['id']),
             'settings' => (new \App\Modules\Configuration\SettingsService())->current(),
             'flash' => $_SESSION['user_profile_flash'] ?? null,
             'csrfToken' => Session::csrfToken(),
         ]);
         unset($_SESSION['user_profile_flash']);
+    }
+
+    public function userMessages(): void
+    {
+        $user = Authorization::requirePermission('usuario.portal', 'read');
+        if ($user === null) {
+            return;
+        }
+
+        View::renderPortal('Auth/messages', [
+            'title' => 'Mis mensajes',
+            'user' => $user,
+            'notifications' => (new PortalNotificationService())->unreadForUser((int) $user['id']),
+            'messages' => (new PortalNotificationService())->messagesForUser((int) $user['id']),
+            'csrfToken' => Session::csrfToken(),
+        ]);
+    }
+
+    public function markBillingNotificationRead(): void
+    {
+        $user = Authorization::requirePermission('usuario.portal', 'read');
+        if ($user === null) {
+            return;
+        }
+        $this->requireCsrf();
+
+        $statementId = filter_var($_POST['statement_id'] ?? null, FILTER_VALIDATE_INT);
+        if ($statementId === false || $statementId < 1) {
+            http_response_code(400);
+            echo 'La notificación seleccionada no es válida.';
+            return;
+        }
+
+        try {
+            (new PortalNotificationService())->markBillingRead($statementId, (int) $user['id']);
+        } catch (RuntimeException) {
+            http_response_code(404);
+            echo 'La notificación no existe o no está disponible.';
+            return;
+        }
+        $this->redirect('/usuario#notificaciones');
+    }
+
+    public function markMessageRead(): void
+    {
+        $user = Authorization::requirePermission('usuario.portal', 'read');
+        if ($user === null) {
+            return;
+        }
+        $this->requireCsrf();
+
+        $messageId = filter_var($_POST['message_id'] ?? null, FILTER_VALIDATE_INT);
+        if ($messageId === false || $messageId < 1) {
+            http_response_code(400);
+            echo 'El mensaje seleccionado no es válido.';
+            return;
+        }
+
+        try {
+            (new PortalNotificationService())->markMessageRead($messageId, (int) $user['id']);
+        } catch (RuntimeException) {
+            http_response_code(404);
+            echo 'El mensaje no existe o no está disponible.';
+            return;
+        }
+        $this->redirect('/usuario/mensajes');
     }
 
     public function updateOwnProfile(): void

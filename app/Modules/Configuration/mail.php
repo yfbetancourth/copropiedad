@@ -8,6 +8,14 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
     'UTF-8'
 );
 $canWrite = \App\Core\Authorization::hasPermission($actor, 'configuracion.correo', 2);
+$mailReady = $settings['host'] !== ''
+    && filter_var($settings['port'], FILTER_VALIDATE_INT) !== false
+    && (int) $settings['port'] >= 1
+    && (int) $settings['port'] <= 65535
+    && $settings['username'] !== ''
+    && $settings['password_configured']
+    && in_array($settings['encryption'], ['tls', 'ssl'], true)
+    && filter_var($settings['from_address'], FILTER_VALIDATE_EMAIL) !== false;
 
 ?>
 <section class="content">
@@ -17,13 +25,18 @@ $canWrite = \App\Core\Authorization::hasPermission($actor, 'configuracion.correo
     </div>
 
     <?php if (is_array($flash)): ?>
-        <div class="alert alert-<?= $flash['type'] === 'success' ? 'success' : 'danger' ?>" role="status"><?= $escape($flash['message']) ?></div>
+        <div class="alert alert-<?= $flash['type'] === 'success' ? 'success' : 'danger' ?>" role="<?= $flash['type'] === 'success' ? 'status' : 'alert' ?>"><?= $escape($flash['message']) ?></div>
     <?php endif; ?>
 
     <div class="row g-3">
         <div class="col-xl-8">
             <div class="card">
-                <div class="card-header"><h2 class="card-title">Proveedor SMTP</h2></div>
+                <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <h2 class="card-title mb-0">Proveedor SMTP</h2>
+                    <span class="badge text-bg-<?= $mailReady ? 'success' : 'warning' ?>" role="status">
+                        <?= $mailReady ? 'Configuración lista para probar' : 'Configuración incompleta' ?>
+                    </span>
+                </div>
                 <form method="post" action="<?= $escape($basePath) ?>/configuracion/correo/guardar" autocomplete="off">
                     <div class="card-body">
                         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
@@ -45,12 +58,17 @@ $canWrite = \App\Core\Authorization::hasPermission($actor, 'configuracion.correo
                             </div>
                             <div class="col-md-6">
                                 <label for="mail-username" class="form-label">Usuario del proveedor</label>
-                                <input id="mail-username" name="username" class="form-control" maxlength="254" required value="<?= $escape($settings['username']) ?>" <?= $canWrite ? '' : 'readonly' ?> autocomplete="off">
+                                <input id="mail-username" name="username" class="form-control" maxlength="254" required value="<?= $escape($settings['username']) ?>" <?= $canWrite ? '' : 'readonly' ?> autocomplete="username">
                             </div>
                             <div class="col-md-6">
                                 <label for="mail-password" class="form-label">Contraseña o clave de aplicación</label>
-                                <input id="mail-password" name="password" type="password" class="form-control" maxlength="512" <?= $canWrite ? '' : 'readonly' ?> autocomplete="new-password" placeholder="<?= $settings['password_configured'] ? 'Guardada; deja vacío para conservarla' : 'Ingresa la contraseña SMTP' ?>" <?= $settings['password_configured'] ? '' : 'required' ?>>
-                                <small class="text-secondary">La clave se guarda cifrada y nunca vuelve a mostrarse.</small>
+                                <div class="input-group">
+                                    <input id="mail-password" name="password" type="password" class="form-control" maxlength="512" <?= $canWrite ? '' : 'readonly' ?> autocomplete="new-password" placeholder="<?= $settings['password_configured'] ? 'Guardada; deja vacío para conservarla' : 'Ingresa la contraseña SMTP' ?>" <?= $settings['password_configured'] ? '' : 'required' ?>>
+                                    <?php if ($canWrite): ?>
+                                        <button class="btn btn-outline-secondary" type="button" id="toggle-mail-password" aria-controls="mail-password" aria-pressed="false">Mostrar</button>
+                                    <?php endif; ?>
+                                </div>
+                                <small class="text-secondary">La clave se guarda cifrada y nunca vuelve a mostrarse. Déjala vacía para conservar la guardada.</small>
                             </div>
                             <div class="col-md-6">
                                 <label for="mail-from-address" class="form-label">Correo remitente</label>
@@ -67,7 +85,7 @@ $canWrite = \App\Core\Authorization::hasPermission($actor, 'configuracion.correo
                     </div>
                     <?php if ($canWrite): ?>
                         <div class="card-footer">
-                            <button class="btn btn-primary" type="submit">Guardar configuración de correo</button>
+                            <button class="btn btn-primary" type="submit" data-loading-label="Guardando...">Guardar configuración de correo</button>
                         </div>
                     <?php endif; ?>
                 </form>
@@ -75,16 +93,21 @@ $canWrite = \App\Core\Authorization::hasPermission($actor, 'configuracion.correo
         </div>
         <div class="col-xl-4">
             <div class="card card-info card-outline">
-                <div class="card-header"><h2 class="card-title">Probar conexión y envío</h2></div>
+                <div class="card-header"><h2 class="card-title">Probar envío</h2></div>
                 <div class="card-body">
-                    <p class="text-secondary">Envía un correo de prueba a la dirección de tu cuenta para confirmar que el proveedor acepta las credenciales.</p>
+                    <p class="text-secondary">Envía un mensaje real a tu correo para comprobar las credenciales y la conexión SMTP.</p>
                     <p class="mb-0"><strong>Destinatario:</strong> <?= $escape($actor['email']) ?></p>
+                    <p class="small text-secondary mt-2 mb-0">
+                        <?= $mailReady
+                            ? 'Guarda los cambios antes de probar. La prueba utiliza la configuración guardada.'
+                            : 'Completa los campos obligatorios y guarda la configuración para habilitar la prueba.' ?>
+                    </p>
                 </div>
                 <?php if ($canWrite): ?>
                     <div class="card-footer">
                         <form method="post" action="<?= $escape($basePath) ?>/configuracion/correo/probar">
                             <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
-                            <button class="btn btn-outline-primary" type="submit">Enviar correo de prueba</button>
+                            <button class="btn btn-outline-primary" type="submit" data-loading-label="Enviando..." <?= $mailReady ? '' : 'disabled' ?>>Enviar correo de prueba</button>
                         </form>
                     </div>
                 <?php endif; ?>
@@ -92,3 +115,24 @@ $canWrite = \App\Core\Authorization::hasPermission($actor, 'configuracion.correo
         </div>
     </div>
 </section>
+<?php if ($canWrite): ?>
+<script>
+    document.getElementById('toggle-mail-password')?.addEventListener('click', function () {
+        const password = document.getElementById('mail-password');
+        const isVisible = password.type === 'text';
+        password.type = isVisible ? 'password' : 'text';
+        this.textContent = isVisible ? 'Mostrar' : 'Ocultar';
+        this.setAttribute('aria-pressed', String(!isVisible));
+    });
+
+    document.querySelectorAll('form[action$="/configuracion/correo/guardar"], form[action$="/configuracion/correo/probar"]').forEach((form) => {
+        form.addEventListener('submit', function () {
+            const button = form.querySelector('button[type="submit"]');
+            if (button && !button.disabled) {
+                button.disabled = true;
+                button.textContent = button.dataset.loadingLabel;
+            }
+        });
+    });
+</script>
+<?php endif; ?>
