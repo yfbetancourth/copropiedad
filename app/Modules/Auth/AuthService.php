@@ -6,6 +6,7 @@ namespace App\Modules\Auth;
 
 use App\Core\Database;
 use PDO;
+use RuntimeException;
 use Throwable;
 
 final class AuthService
@@ -175,6 +176,59 @@ final class AuthService
         $statement->execute([$userId, $authVersion]);
 
         return $statement->fetchColumn() !== false;
+    }
+
+    public function updateOwnCredentials(
+        int $userId,
+        string $currentPassword,
+        string $username,
+        string $email,
+        ?string $newPassword
+    ): int {
+        $pdo = Database::connection();
+        $pdo->beginTransaction();
+
+        try {
+            $statement = $pdo->prepare(
+                'SELECT password_hash, auth_version
+                 FROM admin_users
+                 WHERE id = ? AND is_active = 1
+                 LIMIT 1
+                 FOR UPDATE'
+            );
+            $statement->execute([$userId]);
+            $account = $statement->fetch();
+            if (!is_array($account)) {
+                throw new RuntimeException('No se pudo encontrar la cuenta activa.');
+            }
+            if (!password_verify($currentPassword, (string) $account['password_hash'])) {
+                throw new RuntimeException('La contrasena actual no es correcta.');
+            }
+
+            if ($newPassword === null) {
+                $pdo->prepare(
+                    'UPDATE admin_users SET username = ?, email = ? WHERE id = ?'
+                )->execute([$username, $email, $userId]);
+            } else {
+                $pdo->prepare(
+                    'UPDATE admin_users
+                     SET username = ?, email = ?, password_hash = ?, failed_attempts = 0,
+                         locked_until = NULL, auth_version = auth_version + 1
+                     WHERE id = ?'
+                )->execute([$username, $email, password_hash($newPassword, PASSWORD_DEFAULT), $userId]);
+            }
+
+            $authVersion = (int) $account['auth_version'] + ($newPassword === null ? 0 : 1);
+            $pdo->commit();
+
+            return $authVersion;
+        } catch (Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            throw $exception;
+        }
     }
 
     public function currentUser(int $userId, int $authVersion): ?array

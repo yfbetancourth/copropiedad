@@ -2,8 +2,12 @@
     <div class="col-md-7 col-lg-5">
         <div class="card card-primary card-outline mb-4">
             <div class="card-header">
-                <h1 class="card-title fs-4"><?= htmlspecialchars($propertyName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></h1>
-                <p class="text-secondary mb-0">Acceso administrativo</p>
+                <?php if ($destination === 'usuario'): ?>
+                    <h1 class="card-title fs-4">Bienvenido <?= htmlspecialchars($propertyName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></h1>
+                <?php else: ?>
+                    <h1 class="card-title fs-4"><?= htmlspecialchars($propertyName, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></h1>
+                    <p class="text-secondary mb-0">Acceso administrativo</p>
+                <?php endif; ?>
             </div>
             <form method="post" action="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/login" autocomplete="on">
                 <div class="card-body">
@@ -14,8 +18,9 @@
                         <div class="alert alert-success" role="status"><?= htmlspecialchars($notice, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></div>
                     <?php endif; ?>
                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
+                    <input type="hidden" name="destination" value="<?= htmlspecialchars($destination, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
                     <div class="mb-3">
-                        <label for="identity" class="form-label">Usuario o correo</label>
+                        <label for="identity" class="form-label">Usuario o correo electronico</label>
                         <input id="identity" name="identity" class="form-control" autocomplete="username" required autofocus>
                     </div>
                     <div class="mb-3">

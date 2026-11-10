@@ -13,6 +13,22 @@ final class View
      */
     public static function render(string $template, array $data = []): void
     {
+        self::renderWithLayout($template, $data, 'layout.php');
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    public static function renderPortal(string $template, array $data = []): void
+    {
+        self::renderWithLayout($template, $data, 'portal-layout.php');
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function renderWithLayout(string $template, array $data, string $layout): void
+    {
         if (!preg_match('/^[A-Za-z0-9]+(?:[\/-][A-Za-z0-9]+)*$/D', $template)) {
             throw new RuntimeException('La plantilla solicitada no es valida.');
         }
@@ -32,6 +48,6 @@ final class View
         $content = ob_get_clean();
         $pageTitle = isset($title) && is_string($title) ? $title : $propertyName;
 
-        require dirname(__DIR__) . '/Views/layout.php';
+        require dirname(__DIR__) . '/Views/' . $layout;
     }
 }

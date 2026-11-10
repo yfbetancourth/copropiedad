@@ -26,6 +26,58 @@ $housingLabel = $housingLabels[$housingType] ?? 'Copropiedad';
         <div class="alert alert-<?= $flash['type'] === 'success' ? 'success' : 'danger' ?>" role="status"><?= $escape($flash['message']) ?></div>
     <?php endif; ?>
 
+    <div class="card card-primary card-outline mb-3">
+        <div class="card-header">
+            <h2 class="card-title">Resumen de la conformación</h2>
+            <?php if ($completed): ?>
+                <span class="badge text-bg-success">Guardada</span>
+            <?php elseif ($storedUnitCount !== null): ?>
+                <span class="badge text-bg-warning">Pendiente de confirmar</span>
+            <?php elseif ($estimatedUnitCount !== null): ?>
+                <span class="badge text-bg-info">Lista para generar</span>
+            <?php else: ?>
+                <span class="badge text-bg-secondary">En progreso</span>
+            <?php endif; ?>
+        </div>
+        <div class="card-body">
+            <dl class="row mb-3">
+                <dt class="col-sm-8">Tipo de copropiedad</dt>
+                <dd class="col-sm-4"><?= $escape($housingLabel) ?></dd>
+                <?php if (in_array($housingType, ['torres_apartamento', 'mixto'], true)): ?>
+                    <dt class="col-sm-8">Nomenclatura de las torres</dt>
+                    <dd class="col-sm-4"><?= $towerNomenclature === 'alphabetic' ? 'Alfabética' : 'Numérica' ?></dd>
+                <?php endif; ?>
+                <?php foreach ($steps as $summaryStep): ?>
+                    <dt class="col-sm-8"><?= $escape(match ($summaryStep['key']) {
+                        'houses' => 'Cantidad de casas',
+                        'towers' => 'Cantidad de torres',
+                        'floors_per_tower' => 'Pisos por torre',
+                        'units_per_floor' => 'Apartamentos por piso',
+                        'commercial_properties' => 'Inmuebles comerciales',
+                        default => $summaryStep['label'],
+                    }) ?></dt>
+                    <dd class="col-sm-4"><?= array_key_exists($summaryStep['key'], $answers) ? $escape($answers[$summaryStep['key']]) : 'Pendiente' ?></dd>
+                <?php endforeach; ?>
+            </dl>
+
+            <?php if ($storedUnitCount !== null): ?>
+                <p class="mb-2"><strong>Total de inmuebles en la estructura:</strong> <?= $escape($storedUnitCount) ?></p>
+                <?php if ($unitCountsByCategory !== []): ?>
+                    <p class="mb-2 fw-semibold">Distribución por categoría</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <?php foreach ($unitCountsByCategory as $category => $count): ?>
+                            <span class="badge text-bg-light border"><?= $escape($category) ?>: <?= $escape($count) ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            <?php elseif ($estimatedUnitCount !== null): ?>
+                <p class="mb-0"><strong>Total estimado de inmuebles:</strong> <?= $escape($estimatedUnitCount) ?>. Se mostrará la distribución por categoría al generar la estructura.</p>
+            <?php else: ?>
+                <p class="text-secondary mb-0">El total y la distribución aparecerán cuando completes las cantidades y generes la estructura.</p>
+            <?php endif; ?>
+        </div>
+    </div>
+
     <?php if ($mode === 'wizard'): ?>
         <?php $step = $steps[$stepIndex]; ?>
         <div class="card">
@@ -124,7 +176,7 @@ $housingLabel = $housingLabels[$housingType] ?? 'Copropiedad';
                         <input id="composition-units-json" type="hidden" name="units_json" value="">
                         <div id="composition-unit-list" class="vstack gap-2">
                             <?php foreach ($units as $index => $unit): ?>
-                                <div class="row g-2 align-items-end composition-unit">
+                                <div class="row g-2 align-items-end composition-unit" data-unit-id="<?= $escape($unit['id'] ?? '') ?>">
                                     <div class="col-md-4">
                                         <label class="form-label" for="unit-category-<?= $index ?>">Categoria</label>
                                         <input id="unit-category-<?= $index ?>" data-unit-field="category" class="form-control" type="text" maxlength="80" required value="<?= $escape($unit['category'] ?? '') ?>">
@@ -215,6 +267,7 @@ $housingLabel = $housingLabels[$housingType] ?? 'Copropiedad';
                 });
                 form.addEventListener('submit', () => {
                     const units = [...list.querySelectorAll('.composition-unit')].map((row) => ({
+                        id: row.dataset.unitId || '',
                         category: row.querySelector('[data-unit-field="category"]').value.trim(),
                         name: row.querySelector('[data-unit-field="name"]').value.trim(),
                     }));

@@ -9,6 +9,7 @@ use App\Core\Database;
 use App\Core\Session;
 use App\Core\Url;
 use App\Core\View;
+use App\Modules\Auth\SmtpMailer;
 use PDOException;
 use RuntimeException;
 use Throwable;
@@ -382,6 +383,93 @@ final class ConfigurationController
         $this->redirect('/configuracion/financiera');
     }
 
+    public function mail(): void
+    {
+        $actor = Authorization::requirePermission('configuracion.correo', 'read');
+        if ($actor === null) {
+            return;
+        }
+
+        $this->render('mail', 'Configuracion / Correo', [
+            'actor' => $actor,
+            'settings' => (new MailSettingsService())->current(),
+        ]);
+    }
+
+    public function saveMail(): void
+    {
+        if ($this->requireAction('configuracion.correo', 'write') === null) {
+            return;
+        }
+        $this->requireCsrf();
+
+        $host = trim($this->stringInput($_POST['host'] ?? null));
+        $port = $this->integerInput($_POST['port'] ?? null);
+        $username = trim($this->stringInput($_POST['username'] ?? null));
+        $password = $this->stringInput($_POST['password'] ?? null);
+        $encryption = $this->stringInput($_POST['encryption'] ?? null);
+        $fromAddress = trim($this->stringInput($_POST['from_address'] ?? null));
+        $fromName = trim($this->stringInput($_POST['from_name'] ?? null));
+
+        if (preg_match('/^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/D', $host) !== 1
+            || $port === false || $port === null || $port < 1 || $port > 65535
+            || $username === '' || strlen($username) > 254 || strlen($password) > 512
+            || !in_array($encryption, ['tls', 'ssl'], true)
+            || !filter_var($fromAddress, FILTER_VALIDATE_EMAIL)
+            || strlen($fromName) > 160
+        ) {
+            $this->flash('error', 'Revisa el servidor, puerto, cifrado, usuario y dirección remitente.');
+            $this->redirect('/configuracion/correo');
+        }
+
+        try {
+            (new MailSettingsService())->save(
+                $host,
+                $port,
+                $username,
+                $password,
+                $encryption,
+                $fromAddress,
+                $fromName
+            );
+            $this->flash('success', 'La configuración de correo se guardó de forma segura.');
+        } catch (RuntimeException $exception) {
+            $this->flash('error', $exception->getMessage());
+        }
+
+        $this->redirect('/configuracion/correo');
+    }
+
+    public function testMail(): void
+    {
+        $actor = $this->requireAction('configuracion.correo', 'write');
+        if ($actor === null) {
+            return;
+        }
+        $this->requireCsrf();
+
+        try {
+            $settings = (new MailSettingsService())->credentials();
+            $username = htmlspecialchars($actor['username'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            (new SmtpMailer())->send(
+                $settings,
+                $actor['email'],
+                $actor['username'],
+                'Prueba de correo de la copropiedad',
+                '<p>Hola ' . $username . ',</p><p>La configuración de correo funciona correctamente.</p>',
+                'La configuracion de correo funciona correctamente.'
+            );
+            $this->flash('success', 'Se envió el correo de prueba a ' . $actor['email'] . '.');
+        } catch (RuntimeException $exception) {
+            $this->flash('error', $exception->getMessage());
+        } catch (\PHPMailer\PHPMailer\Exception $exception) {
+            error_log('Fallo la prueba SMTP: ' . $exception->getMessage());
+            $this->flash('error', 'No se pudo enviar el correo. Verifica los datos del proveedor y su conexión SMTP.');
+        }
+
+        $this->redirect('/configuracion/correo');
+    }
+
     public function characterization(): void
     {
         $actor = Authorization::requirePermission('configuracion.caracterizacion', 'read');
@@ -476,7 +564,11 @@ final class ConfigurationController
             throw new RuntimeException('El tipo de nomenclatura guardado no es valido.');
         }
 
-        $composition = (new CompositionService())->current();
+        $compositionService = new CompositionService();
+        $composition = $compositionService->current();
+        if (is_array($composition) && is_array($composition['units'])) {
+            $composition = $compositionService->ensureUnitIds();
+        }
         if (!is_array($composition) || $composition['housing_type'] !== $housingType) {
             $composition = null;
         }
@@ -496,6 +588,19 @@ final class ConfigurationController
         } else {
             $mode = 'wizard';
         }
+        $units = $composition['units'] ?? null;
+        $unitCountsByCategory = [];
+        if (is_array($units)) {
+            foreach ($units as $unit) {
+                if (!is_array($unit)) {
+                    continue;
+                }
+                $category = trim($this->stringInput($unit['category'] ?? null));
+                $category = $category !== '' ? $category : 'Sin categoria';
+                $unitCountsByCategory[$category] = ($unitCountsByCategory[$category] ?? 0) + 1;
+            }
+            ksort($unitCountsByCategory, SORT_NATURAL | SORT_FLAG_CASE);
+        }
 
         $this->render('composition', 'Configuracion / Conformación de la copropiedad', [
             'actor' => $actor,
@@ -506,7 +611,10 @@ final class ConfigurationController
             'stepIndex' => $stepIndex,
             'progress' => $allAnswered ? 100 : (int) floor((($stepIndex + 1) / count($steps)) * 100),
             'mode' => $mode,
-            'units' => $composition['units'] ?? [],
+            'units' => $units ?? [],
+            'storedUnitCount' => is_array($units) ? count($units) : null,
+            'unitCountsByCategory' => $unitCountsByCategory,
+            'estimatedUnitCount' => $allAnswered ? $this->compositionUnitCount($housingType, $answers) : null,
             'completed' => (bool) ($composition['completed'] ?? false),
         ]);
     }
@@ -609,11 +717,17 @@ final class ConfigurationController
         $this->requireCsrf();
 
         $housingType = $this->configuredHousingType();
-        $composition = (new CompositionService())->current();
+        $compositionService = new CompositionService();
+        $composition = $compositionService->current();
         if (!is_array($composition) || $composition['housing_type'] !== $housingType
             || $composition['units'] === null
         ) {
             $this->flash('error', 'Genera la estructura antes de guardarla.');
+            $this->redirect('/configuracion/conformacion');
+        }
+        $composition = $compositionService->ensureUnitIds();
+        if (!is_array($composition) || !is_array($composition['units'])) {
+            $this->flash('error', 'No se pudo cargar la estructura actual. Recarga la pagina e intenta nuevamente.');
             $this->redirect('/configuracion/conformacion');
         }
 
@@ -633,6 +747,13 @@ final class ConfigurationController
             $this->redirect('/configuracion/conformacion');
         }
 
+        $existingIds = [];
+        foreach ($composition['units'] as $existingUnit) {
+            if (is_array($existingUnit) && is_string($existingUnit['id'] ?? null)) {
+                $existingIds[$existingUnit['id']] = true;
+            }
+        }
+        $submittedIds = [];
         $units = [];
         foreach ($submitted as $unit) {
             if (!is_array($unit)) {
@@ -651,10 +772,18 @@ final class ConfigurationController
                 $this->flash('error', 'Los apartamentos deben terminar con un numero de dos digitos entre 01 y 99. El identificador 00 no es valido.');
                 $this->redirect('/configuracion/conformacion');
             }
-            $units[] = ['category' => $category, 'name' => $name];
+            $id = $this->stringInput($unit['id'] ?? null);
+            if ($id !== '' && (!isset($existingIds[$id]) || isset($submittedIds[$id]))) {
+                $this->flash('error', 'La lista contiene un identificador de inmueble invalido. Recarga la pagina e intenta nuevamente.');
+                $this->redirect('/configuracion/conformacion');
+            }
+            if ($id !== '') {
+                $submittedIds[$id] = true;
+            }
+            $units[] = ['id' => $id, 'category' => $category, 'name' => $name];
         }
 
-        (new CompositionService())->saveUnits($units, true);
+        $compositionService->saveUnits($units, true);
         $this->flash('success', 'La estructura de bienes se guardo correctamente.');
         $this->redirect('/configuracion/conformacion');
     }

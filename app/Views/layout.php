@@ -13,13 +13,17 @@ $canSeeTeam = $authUser !== null && Authorization::hasPermission($authUser, 'con
 $canSeeRoles = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.roles', 1);
 $canSeeParametrization = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.parametrizacion', 1);
 $canSeeFinancial = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.financiera', 1);
+$canSeeMail = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.correo', 1);
 $canSeeCharacterization = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.caracterizacion', 1);
 $canSeeComposition = false;
 if ($authUser !== null && Authorization::hasPermission($authUser, 'configuracion.conformacion', 1)) {
     $compositionHousingType = (new \App\Modules\Configuration\SettingsService())->current()['housing_type'] ?? '';
     $canSeeComposition = in_array($compositionHousingType, ['casa', 'torres_apartamento', 'mixto'], true);
 }
+$canSeeUnitAssignments = $authUser !== null && Authorization::hasPermission($authUser, 'inmuebles.asignaciones', 1);
+$canSeeUserPortal = $authUser !== null && Authorization::hasPermission($authUser, 'usuario.portal', 1);
 $inConfiguration = str_starts_with($currentPath, '/configuracion/');
+$inUnitAssignments = str_starts_with($currentPath, '/inmuebles/');
 
 ?>
 <!doctype html>
@@ -48,6 +52,13 @@ $inConfiguration = str_starts_with($currentPath, '/configuracion/');
                     <?php endif; ?>
                 </ul>
                 <ul class="navbar-nav ms-auto align-items-center">
+                    <?php if ($canSeeUserPortal && Authorization::hasPermission($authUser, 'panel', 1)): ?>
+                        <li class="nav-item me-2">
+                            <a class="btn btn-outline-primary btn-sm" href="<?= $escape($basePath) ?>/usuario">
+                                <i class="bi bi-person-vcard me-1" aria-hidden="true"></i>Ver panel de Usuario
+                            </a>
+                        </li>
+                    <?php endif; ?>
                     <li class="nav-item">
                         <span class="navbar-text me-3"><?= $escape($authUser['username']) ?></span>
                     </li>
@@ -66,7 +77,7 @@ $inConfiguration = str_starts_with($currentPath, '/configuracion/');
     <?php if ($authUser !== null): ?>
         <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
             <div class="sidebar-brand">
-                <a class="brand-link" href="<?= $escape($basePath) ?>/admin" title="<?= $escape($propertyName) ?>">
+                <a class="brand-link" href="<?= $escape($basePath) ?><?= Authorization::hasPermission($authUser, 'panel', 1) ? '/admin' : '/usuario' ?>" title="<?= $escape($propertyName) ?>">
                     <span class="brand-text fw-light"><?= $escape($propertyName) ?></span>
                 </a>
             </div>
@@ -81,7 +92,7 @@ $inConfiguration = str_starts_with($currentPath, '/configuracion/');
                                 </a>
                             </li>
                         <?php endif; ?>
-                        <?php if ($canSeeTeam || $canSeeRoles || $canSeeParametrization || $canSeeFinancial || $canSeeCharacterization || $canSeeComposition): ?>
+                        <?php if ($canSeeTeam || $canSeeRoles || $canSeeParametrization || $canSeeFinancial || $canSeeMail || $canSeeCharacterization || $canSeeComposition): ?>
                             <li class="nav-item<?= $inConfiguration ? ' menu-open' : '' ?>">
                                 <a href="#" class="nav-link<?= $inConfiguration ? ' active' : '' ?>" aria-expanded="<?= $inConfiguration ? 'true' : 'false' ?>">
                                     <i class="nav-icon bi bi-gear" aria-hidden="true"></i>
@@ -104,6 +115,14 @@ $inConfiguration = str_starts_with($currentPath, '/configuracion/');
                                             <a href="<?= $escape($basePath) ?>/configuracion/financiera" class="nav-link<?= $currentPath === '/configuracion/financiera' ? ' active' : '' ?>">
                                                 <i class="nav-icon bi bi-cash-coin" aria-hidden="true"></i>
                                                 <p>Financiera</p>
+                                            </a>
+                                        </li>
+                                    <?php endif; ?>
+                                    <?php if ($canSeeMail): ?>
+                                        <li class="nav-item">
+                                            <a href="<?= $escape($basePath) ?>/configuracion/correo" class="nav-link<?= $currentPath === '/configuracion/correo' ? ' active' : '' ?>">
+                                                <i class="nav-icon bi bi-envelope-at" aria-hidden="true"></i>
+                                                <p>Correo</p>
                                             </a>
                                         </li>
                                     <?php endif; ?>
@@ -142,6 +161,14 @@ $inConfiguration = str_starts_with($currentPath, '/configuracion/');
                                 </ul>
                             </li>
                         <?php endif; ?>
+                        <?php if ($canSeeUnitAssignments): ?>
+                            <li class="nav-item">
+                                <a href="<?= $escape($basePath) ?>/inmuebles/asignaciones" class="nav-link<?= $inUnitAssignments ? ' active' : '' ?>">
+                                    <i class="nav-icon bi bi-person-vcard" aria-hidden="true"></i>
+                                    <p>Asignación de inmuebles</p>
+                                </a>
+                            </li>
+                        <?php endif; ?>
                     </ul>
                 </nav>
             </div>
@@ -154,6 +181,14 @@ $inConfiguration = str_starts_with($currentPath, '/configuracion/');
             </div>
         </div>
     </main>
+    <footer class="app-footer">
+        <div class="float-end">
+            <?php if ($authUser === null): ?>
+                <a href="<?= $escape($basePath) ?>/login?destino=usuario">Iniciar sesión de usuario</a>
+            <?php endif; ?>
+        </div>
+        <strong><?= $escape($propertyName) ?></strong>
+    </footer>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/browser/overlayscrollbars.browser.es6.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>

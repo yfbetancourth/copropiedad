@@ -11,6 +11,9 @@ $router->get('/configuracion/parametrizacion', [$configuration, 'parametrization
 $router->post('/configuracion/parametrizacion/guardar', [$configuration, 'saveParametrization']);
 $router->get('/configuracion/financiera', [$configuration, 'financial']);
 $router->post('/configuracion/financiera/guardar', [$configuration, 'saveFinancial']);
+$router->get('/configuracion/correo', [$configuration, 'mail']);
+$router->post('/configuracion/correo/guardar', [$configuration, 'saveMail']);
+$router->post('/configuracion/correo/probar', [$configuration, 'testMail']);
 $router->get('/configuracion/caracterizacion', [$configuration, 'characterization']);
 $router->post('/configuracion/caracterizacion/guardar', [$configuration, 'saveCharacterization']);
 $router->get('/configuracion/conformacion', [$configuration, 'composition']);

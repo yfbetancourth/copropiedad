@@ -15,3 +15,5 @@ $router->post('/forgot-password', [$auth, 'requestPasswordReset']);
 $router->get('/reset-password', [$auth, 'resetPasswordForm']);
 $router->post('/reset-password', [$auth, 'resetPassword']);
 $router->get('/admin', [$auth, 'adminPanel']);
+$router->get('/usuario', [$auth, 'userPanel']);
+$router->post('/usuario/perfil', [$auth, 'updateOwnProfile']);

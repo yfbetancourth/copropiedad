@@ -19,6 +19,7 @@ $router = new Router();
 require dirname(__DIR__) . '/app/Modules/Home/routes.php';
 require dirname(__DIR__) . '/app/Modules/Auth/routes.php';
 require dirname(__DIR__) . '/app/Modules/Configuration/routes.php';
+require dirname(__DIR__) . '/app/Modules/PropertyAssignment/routes.php';
 
 try {
     $router->dispatch(

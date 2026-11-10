@@ -6,8 +6,11 @@ namespace App\Modules\Auth;
 
 use App\Core\Session;
 use App\Core\Authorization;
+use App\Core\Database;
 use App\Core\Url;
 use App\Core\View;
+use PDOException;
+use RuntimeException;
 use Throwable;
 
 final class AuthController
@@ -21,10 +24,16 @@ final class AuthController
     public function loginForm(): void
     {
         if ($this->isAuthenticated()) {
-            $this->redirect('/admin');
+            $user = Authorization::currentUser();
+            if ($user !== null) {
+                $destination = $this->loginDestination($user, $_GET['destino'] ?? null);
+                if ($destination !== '/login') {
+                    $this->redirect($destination);
+                }
+            }
         }
 
-        $this->render('login', 'Acceso administrativo');
+        $this->render('login', 'Acceso', null, null, '', $this->requestedDestination($_GET['destino'] ?? null));
     }
 
     public function login(): void
@@ -34,14 +43,14 @@ final class AuthController
         $password = (string) ($_POST['password'] ?? '');
 
         if ($identity === '' || $password === '') {
-            $this->render('login', 'Acceso administrativo', 'Ingresa tu usuario o correo y contrasena.');
+            $this->render('login', 'Acceso', 'Ingresa tu usuario o correo y contrasena.', null, '', $this->requestedDestination($_POST['destination'] ?? null));
             return;
         }
 
         $user = $this->auth->authenticate($identity, $password);
 
         if ($user === null) {
-            $this->render('login', 'Acceso administrativo', 'Credenciales invalidas o cuenta temporalmente bloqueada.');
+            $this->render('login', 'Acceso', 'Credenciales invalidas o cuenta temporalmente bloqueada.', null, '', $this->requestedDestination($_POST['destination'] ?? null));
             return;
         }
 
@@ -50,7 +59,25 @@ final class AuthController
         $_SESSION['admin_username'] = $user['username'];
         $_SESSION['admin_auth_version'] = $user['auth_version'];
         $_SESSION['last_activity'] = time();
-        $this->redirect('/admin');
+        $authenticatedUser = Authorization::currentUser();
+        if ($authenticatedUser === null) {
+            $this->redirect('/login');
+        }
+
+        $requestedDestination = $this->requestedDestination($_POST['destination'] ?? null);
+        $canAccessPortal = Authorization::hasPermission($authenticatedUser, 'usuario.portal', 1);
+        $canAccessAdmin = Authorization::hasPermission($authenticatedUser, 'panel', 1);
+        if ($requestedDestination === 'usuario' && !$canAccessPortal) {
+            Session::destroy();
+            $this->render('login', 'Acceso', 'Esta cuenta no tiene acceso al panel de Usuario.', null, '', 'usuario');
+            return;
+        }
+        if ($requestedDestination === 'admin' && !$canAccessAdmin && !$canAccessPortal) {
+            Session::destroy();
+            $this->render('login', 'Acceso', 'Esta cuenta no tiene acceso a un panel habilitado.', null, '', 'admin');
+            return;
+        }
+        $this->redirect($requestedDestination === 'usuario' || !$canAccessAdmin ? '/usuario' : '/admin');
     }
 
     public function logout(): void
@@ -130,7 +157,110 @@ final class AuthController
             return;
         }
 
-        $this->render('login', 'Acceso administrativo', null, 'Contrasena actualizada. Ya puedes iniciar sesion.');
+        $this->render('login', 'Acceso', null, 'Contrasena actualizada. Ya puedes iniciar sesion.');
+    }
+
+    public function userPanel(): void
+    {
+        $user = Authorization::requirePermission('usuario.portal', 'read');
+        if ($user === null) {
+            return;
+        }
+
+        $compositionService = new \App\Modules\Configuration\CompositionService();
+        $composition = $compositionService->current();
+        $unitsById = [];
+        if (is_array($composition) && $composition['completed'] && is_array($composition['units'])) {
+            $composition = $compositionService->ensureUnitIds();
+            foreach ($composition['units'] ?? [] as $unit) {
+                if (is_array($unit) && is_string($unit['id'] ?? null)) {
+                    $unitsById[$unit['id']] = $unit;
+                }
+            }
+        }
+
+        $statement = Database::connection()->prepare(
+            'SELECT unit_id FROM property_unit_assignments WHERE user_id = ? ORDER BY unit_id'
+        );
+        $statement->execute([$user['id']]);
+        $assignedUnitIds = [];
+        foreach ($statement->fetchAll() as $assignment) {
+            $assignedUnitIds[(string) $assignment['unit_id']] = true;
+        }
+        $assignedUnits = [];
+        foreach ($unitsById as $unitId => $unit) {
+            if (isset($assignedUnitIds[$unitId])) {
+                $assignedUnits[] = $unit;
+            }
+        }
+
+        Session::start();
+        View::renderPortal('Auth/user-panel', [
+            'title' => 'Panel de Usuario',
+            'user' => $user,
+            'units' => $assignedUnits,
+            'settings' => (new \App\Modules\Configuration\SettingsService())->current(),
+            'flash' => $_SESSION['user_profile_flash'] ?? null,
+            'csrfToken' => Session::csrfToken(),
+        ]);
+        unset($_SESSION['user_profile_flash']);
+    }
+
+    public function updateOwnProfile(): void
+    {
+        $user = Authorization::requirePermission('usuario.portal', 'read');
+        if ($user === null) {
+            return;
+        }
+        $this->requireCsrf();
+
+        $username = trim(is_string($_POST['username'] ?? null) ? $_POST['username'] : '');
+        $email = trim(is_string($_POST['email'] ?? null) ? $_POST['email'] : '');
+        $currentPassword = is_string($_POST['current_password'] ?? null) ? $_POST['current_password'] : '';
+        $newPassword = is_string($_POST['new_password'] ?? null) ? $_POST['new_password'] : '';
+        $passwordConfirmation = is_string($_POST['password_confirmation'] ?? null)
+            ? $_POST['password_confirmation']
+            : '';
+
+        if (strlen($username) < 3 || strlen($username) > 64
+            || !preg_match('/^[\p{L}\p{N}_.@-]+$/uD', $username)
+            || strlen($email) > 254 || !filter_var($email, FILTER_VALIDATE_EMAIL)
+            || $currentPassword === ''
+        ) {
+            $this->profileFlash('error', 'Revisa tu nombre de usuario, correo y contrasena actual.');
+            $this->redirect('/usuario');
+        }
+        if ($newPassword !== '' && strlen($newPassword) < 12) {
+            $this->profileFlash('error', 'La nueva contrasena debe tener al menos 12 caracteres.');
+            $this->redirect('/usuario');
+        }
+        if ($newPassword !== '' && !hash_equals($newPassword, $passwordConfirmation)) {
+            $this->profileFlash('error', 'La nueva contrasena y su confirmacion no coinciden.');
+            $this->redirect('/usuario');
+        }
+
+        try {
+            $authVersion = $this->auth->updateOwnCredentials(
+                (int) $user['id'],
+                $currentPassword,
+                $username,
+                $email,
+                $newPassword === '' ? null : $newPassword
+            );
+            $_SESSION['admin_auth_version'] = $authVersion;
+            $_SESSION['admin_username'] = $username;
+            $this->profileFlash('success', 'Los datos de tu cuenta se actualizaron correctamente.');
+        } catch (PDOException $exception) {
+            if ((string) $exception->getCode() === '23000') {
+                $this->profileFlash('error', 'Ese nombre de usuario o correo ya está asociado a otra cuenta.');
+            } else {
+                throw $exception;
+            }
+        } catch (RuntimeException $exception) {
+            $this->profileFlash('error', $exception->getMessage());
+        }
+
+        $this->redirect('/usuario');
     }
 
     public function adminPanel(): void
@@ -174,6 +304,26 @@ final class AuthController
         return true;
     }
 
+    private function requestedDestination(mixed $destination): string
+    {
+        return $destination === 'usuario' ? 'usuario' : 'admin';
+    }
+
+    private function loginDestination(array $user, mixed $destination): string
+    {
+        if ($this->requestedDestination($destination) === 'usuario'
+            && Authorization::hasPermission($user, 'usuario.portal', 1)
+        ) {
+            return '/usuario';
+        }
+
+        if (Authorization::hasPermission($user, 'panel', 1)) {
+            return '/admin';
+        }
+
+        return Authorization::hasPermission($user, 'usuario.portal', 1) ? '/usuario' : '/login';
+    }
+
     private function requireCsrf(): void
     {
         if (!Session::verifyCsrf($_POST['_token'] ?? null)) {
@@ -188,7 +338,8 @@ final class AuthController
         string $title,
         ?string $error = null,
         ?string $notice = null,
-        string $token = ''
+        string $token = '',
+        string $destination = 'admin'
     ): void {
         header('Cache-Control: no-store, private');
         View::render('Auth/' . $template, [
@@ -197,6 +348,7 @@ final class AuthController
             'error' => $error,
             'notice' => $notice,
             'token' => $token,
+            'destination' => $destination,
         ]);
     }
 
@@ -204,5 +356,11 @@ final class AuthController
     {
         header('Location: ' . Url::to($path), true, 303);
         exit;
+    }
+
+    private function profileFlash(string $type, string $message): void
+    {
+        Session::start();
+        $_SESSION['user_profile_flash'] = ['type' => $type, 'message' => $message];
     }
 }
