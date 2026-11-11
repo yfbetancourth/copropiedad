@@ -91,6 +91,67 @@
                     <?php endif; ?>
                 </div>
             </div>
+            <div class="card card-success card-outline mt-3" id="documentos">
+                <div class="card-header">
+                    <h2 class="card-title">Mis documentos de cobro</h2>
+                    <span class="badge text-bg-primary"><?= count($billingDocuments) ?></span>
+                </div>
+                <div class="card-body">
+                    <?php if ($billingDocuments === []): ?>
+                        <p class="text-secondary mb-0">No tienes notas de cobro emitidas.</p>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-striped align-middle mb-0">
+                                <thead>
+                                <tr><th>Nota</th><th>Inmueble</th><th>Período</th><th>Saldo</th><th>Estado</th><th>Acción</th></tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ($billingDocuments as $document): ?>
+                                    <?php
+                                    $balance = (int) $document['balance'];
+                                    $paymentStatus = $document['online_payment_status'] ?? null;
+                                    ?>
+                                    <tr>
+                                        <td><?= htmlspecialchars((string) $document['number'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
+                                        <td><?= htmlspecialchars((string) $document['unit_name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
+                                        <td><?= htmlspecialchars((string) $document['period'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
+                                        <td><?= htmlspecialchars($currency($balance / 100), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
+                                        <td>
+                                            <?php if ($balance <= 0): ?>
+                                                <span class="badge text-bg-success">Pagada</span>
+                                            <?php elseif ($paymentStatus === 'approved'): ?>
+                                                <span class="badge text-bg-success">Pago aprobado</span>
+                                            <?php elseif ($paymentStatus === 'pending'): ?>
+                                                <span class="badge text-bg-warning">Pago en proceso</span>
+                                            <?php elseif ($paymentStatus === 'rejected'): ?>
+                                                <span class="badge text-bg-danger">Pago rechazado</span>
+                                            <?php else: ?>
+                                                <span class="badge text-bg-secondary">Pendiente</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <?php if ($balance > 0 && $onlinePaymentsReady): ?>
+                                                <form method="post" action="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/pagar">
+                                                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
+                                                    <input type="hidden" name="statement_id" value="<?= (int) $document['id'] ?>">
+                                                    <button class="btn btn-success btn-sm" type="submit">
+                                                        <?= $document['checkout_url'] !== null ? 'Continuar pago' : 'Pagar con Bold' ?>
+                                                    </button>
+                                                </form>
+                                            <?php elseif ($balance > 0): ?>
+                                                <span class="text-secondary small">Pago en línea no disponible</span>
+                                            <?php else: ?>
+                                                <span class="text-secondary small">Sin saldo pendiente</span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
         <div class="col-xl-4">
             <div class="card">

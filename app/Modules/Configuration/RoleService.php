@@ -16,6 +16,7 @@ final class RoleService
         'configuracion.parametrizacion' => 'Configuracion / Parametrizacion',
         'configuracion.financiera' => 'Configuracion / Financiera',
         'configuracion.correo' => 'Configuracion / Correo',
+        'configuracion.pagos' => 'Configuracion / Metodos de pago',
         'configuracion.caracterizacion' => 'Configuracion / Caracterizacion',
         'configuracion.conformacion' => 'Configuracion / Conformacion de la copropiedad',
         'inmuebles.asignaciones' => 'Inmuebles / Asignacion de usuarios',

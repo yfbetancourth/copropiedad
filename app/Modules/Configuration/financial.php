@@ -75,6 +75,26 @@ $lateFeeType = in_array($settings['late_fee_type'] ?? null, ['percentage', 'fixe
                     </div>
                 </div>
             </div>
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header"><h2 class="card-title">Cuota extraordinaria</h2></div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="extraordinary_fee" class="form-label">Valor de la cuota extraordinaria (COP)</label>
+                            <input id="extraordinary_fee" name="extraordinary_fee" type="number" class="form-control" min="0" max="9999999999999.99" step="0.01" value="<?= $escape($settings['extraordinary_fee'] ?? '') ?>" <?= $canWrite ? '' : 'readonly' ?>>
+                        </div>
+                        <div class="mb-3">
+                            <label for="extraordinary_fee_start_date" class="form-label">Fecha inicial de vigencia</label>
+                            <input id="extraordinary_fee_start_date" name="extraordinary_fee_start_date" type="date" class="form-control" value="<?= $escape($settings['extraordinary_fee_start_date'] ?? '') ?>" <?= $canWrite ? '' : 'readonly' ?>>
+                        </div>
+                        <div class="mb-3">
+                            <label for="extraordinary_fee_end_date" class="form-label">Fecha final de vigencia</label>
+                            <input id="extraordinary_fee_end_date" name="extraordinary_fee_end_date" type="date" class="form-control" value="<?= $escape($settings['extraordinary_fee_end_date'] ?? '') ?>" <?= $canWrite ? '' : 'readonly' ?>>
+                        </div>
+                        <small class="text-secondary">Completa los tres campos para configurar la cuota; déjalos vacíos si no aplica.</small>
+                    </div>
+                </div>
+            </div>
             <?php if ($canWrite): ?>
                 <div class="col-12">
                     <button class="btn btn-primary" type="submit">Guardar parametros financieros</button>

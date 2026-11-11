@@ -10,6 +10,7 @@ use App\Core\Session;
 use App\Core\Url;
 use App\Core\View;
 use App\Modules\Auth\SmtpMailer;
+use App\Modules\Billing\BoldPaymentService;
 use PDOException;
 use RuntimeException;
 use Throwable;
@@ -360,8 +361,28 @@ final class ConfigurationController
         $lateFeeValue = $this->moneyInput($_POST['late_fee_value'] ?? null);
         $lateFeeDays = $this->integerInput($_POST['late_fee_days'] ?? null);
         $fineAmount = $this->moneyInput($_POST['fine_amount'] ?? null);
+        $extraordinaryFeeInput = $_POST['extraordinary_fee'] ?? null;
+        $extraordinaryFee = $extraordinaryFeeInput === null || $extraordinaryFeeInput === ''
+            ? null
+            : $this->moneyInput($extraordinaryFeeInput);
+        $extraordinaryFeeStartDate = trim($this->stringInput($_POST['extraordinary_fee_start_date'] ?? null));
+        $extraordinaryFeeEndDate = trim($this->stringInput($_POST['extraordinary_fee_end_date'] ?? null));
         $validDate = \DateTimeImmutable::createFromFormat('!Y-m-d', $effectiveDate);
         $dateErrors = \DateTimeImmutable::getLastErrors();
+        $extraordinaryStartDate = $extraordinaryFeeStartDate === ''
+            ? null
+            : \DateTimeImmutable::createFromFormat('!Y-m-d', $extraordinaryFeeStartDate);
+        $extraordinaryStartErrors = \DateTimeImmutable::getLastErrors();
+        $extraordinaryEndDate = $extraordinaryFeeEndDate === ''
+            ? null
+            : \DateTimeImmutable::createFromFormat('!Y-m-d', $extraordinaryFeeEndDate);
+        $extraordinaryEndErrors = \DateTimeImmutable::getLastErrors();
+        $extraordinaryFeeConfigured = $extraordinaryFee !== null
+            && $extraordinaryFeeStartDate !== ''
+            && $extraordinaryFeeEndDate !== '';
+        $extraordinaryFeeCleared = $extraordinaryFee === null
+            && $extraordinaryFeeStartDate === ''
+            && $extraordinaryFeeEndDate === '';
 
         if ($administrationFee === false || $discount === false || $lateFeeValue === false
             || $fineAmount === false || !in_array($lateFeeType, ['percentage', 'fixed'], true)
@@ -369,8 +390,23 @@ final class ConfigurationController
             || $effectiveDate === '' || $validDate === false
             || ($dateErrors !== false && ($dateErrors['warning_count'] > 0 || $dateErrors['error_count'] > 0))
             || ($lateFeeType === 'percentage' && $this->decimalGreaterThan($lateFeeValue, '100'))
+            || (!$extraordinaryFeeConfigured && !$extraordinaryFeeCleared)
+            || ($extraordinaryFeeConfigured && (
+                $extraordinaryFee === false
+                || $extraordinaryStartDate === false
+                || $extraordinaryEndDate === false
+                || $extraordinaryStartDate->format('Y-m-d') !== $extraordinaryFeeStartDate
+                || $extraordinaryEndDate->format('Y-m-d') !== $extraordinaryFeeEndDate
+                || ($extraordinaryStartErrors !== false && (
+                    $extraordinaryStartErrors['warning_count'] > 0 || $extraordinaryStartErrors['error_count'] > 0
+                ))
+                || ($extraordinaryEndErrors !== false && (
+                    $extraordinaryEndErrors['warning_count'] > 0 || $extraordinaryEndErrors['error_count'] > 0
+                ))
+                || $extraordinaryFeeStartDate > $extraordinaryFeeEndDate
+            ))
         ) {
-            $this->flash('error', 'Revisa los valores: montos no negativos, fecha valida y porcentaje de mora entre 0 y 100.');
+            $this->flash('error', 'Revisa los valores financieros, las fechas de vigencia y el porcentaje de mora entre 0 y 100.');
             $this->redirect('/configuracion/financiera');
         }
 
@@ -381,7 +417,10 @@ final class ConfigurationController
             $lateFeeType,
             $lateFeeValue,
             $lateFeeDays,
-            $fineAmount
+            $fineAmount,
+            $extraordinaryFeeConfigured ? $extraordinaryFee : null,
+            $extraordinaryFeeConfigured ? $extraordinaryFeeStartDate : null,
+            $extraordinaryFeeConfigured ? $extraordinaryFeeEndDate : null
         );
         $this->flash('success', 'Los parametros financieros se guardaron correctamente.');
         $this->redirect('/configuracion/financiera');
@@ -473,6 +512,61 @@ final class ConfigurationController
         }
 
         $this->redirect('/configuracion/correo');
+    }
+
+    public function paymentMethods(): void
+    {
+        $actor = Authorization::requirePermission('configuracion.pagos', 'read');
+        if ($actor === null) {
+            return;
+        }
+
+        $service = new BoldPaymentService();
+        $settings = $service->settings();
+        $availableMethods = [];
+        $providerError = null;
+        if ($settings['api_key_configured']) {
+            try {
+                $availableMethods = $service->availableMethods();
+            } catch (RuntimeException $exception) {
+                $providerError = $exception->getMessage();
+            }
+        }
+
+        $this->render('payment-methods', 'Configuracion / Metodos de pago', [
+            'actor' => $actor,
+            'settings' => $settings,
+            'availableMethods' => $availableMethods,
+            'providerError' => $providerError,
+        ]);
+    }
+
+    public function savePaymentMethods(): void
+    {
+        if (Authorization::requirePermission('configuracion.pagos', 'write') === null) {
+            return;
+        }
+        $this->requireCsrf();
+
+        $methods = $_POST['payment_methods'] ?? [];
+        try {
+            if (!is_array($methods) || !array_is_list($methods)) {
+                throw new RuntimeException('Selecciona métodos de pago válidos.');
+            }
+            $unavailableMethods = (new BoldPaymentService())->saveSettings(
+                $this->stringInput($_POST['environment'] ?? null),
+                $this->stringInput($_POST['api_key'] ?? null),
+                $methods
+            );
+            $message = 'La configuración de Bold se guardó y la conexión fue verificada.';
+            if ($unavailableMethods !== []) {
+                $message .= ' Métodos no habilitados en Bold: ' . implode(', ', $unavailableMethods) . '.';
+            }
+            $this->flash('success', $message);
+        } catch (RuntimeException $exception) {
+            $this->flash('error', $exception->getMessage());
+        }
+        $this->redirect('/configuracion/metodos-pago');
     }
 
     public function characterization(): void

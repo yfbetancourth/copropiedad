@@ -20,3 +20,4 @@ $router->get('/usuario/mensajes', [$auth, 'userMessages']);
 $router->post('/usuario/mensajes/leer', [$auth, 'markMessageRead']);
 $router->post('/usuario/notificaciones/cobro', [$auth, 'markBillingNotificationRead']);
 $router->post('/usuario/perfil', [$auth, 'updateOwnProfile']);
+$router->post('/usuario/pagar', [$auth, 'userStartPayment']);

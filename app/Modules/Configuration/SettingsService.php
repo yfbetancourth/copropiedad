@@ -23,7 +23,9 @@ final class SettingsService
             'SELECT property_name, address, tax_id, account_holder, bank_name, account_type, account_number,
                     early_payment_day, payment_due_day,
                     administration_fee, effective_date, early_payment_discount,
-                    late_fee_type, late_fee_value, late_fee_days, fine_amount, housing_type, tower_nomenclature
+                    late_fee_type, late_fee_value, late_fee_days, fine_amount,
+                    extraordinary_fee, extraordinary_fee_start_date, extraordinary_fee_end_date,
+                    housing_type, tower_nomenclature
              FROM copropiedad_settings
              WHERE id = 1'
         )->fetch();
@@ -45,6 +47,9 @@ final class SettingsService
             'late_fee_value' => '',
             'late_fee_days' => 0,
             'fine_amount' => '',
+            'extraordinary_fee' => null,
+            'extraordinary_fee_start_date' => null,
+            'extraordinary_fee_end_date' => null,
             'housing_type' => '',
             'tower_nomenclature' => 'numeric',
         ];
@@ -107,13 +112,17 @@ final class SettingsService
         string $lateFeeType,
         string $lateFeeValue,
         int $lateFeeDays,
-        string $fineAmount
+        string $fineAmount,
+        ?string $extraordinaryFee,
+        ?string $extraordinaryFeeStartDate,
+        ?string $extraordinaryFeeEndDate
     ): void {
         Database::connection()->prepare(
             'INSERT INTO copropiedad_settings
                 (id, administration_fee, effective_date, early_payment_discount,
-                 late_fee_type, late_fee_value, late_fee_days, fine_amount)
-             VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+                 late_fee_type, late_fee_value, late_fee_days, fine_amount,
+                 extraordinary_fee, extraordinary_fee_start_date, extraordinary_fee_end_date)
+             VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 administration_fee = VALUES(administration_fee),
                 effective_date = VALUES(effective_date),
@@ -121,7 +130,10 @@ final class SettingsService
                 late_fee_type = VALUES(late_fee_type),
                 late_fee_value = VALUES(late_fee_value),
                 late_fee_days = VALUES(late_fee_days),
-                fine_amount = VALUES(fine_amount)'
+                fine_amount = VALUES(fine_amount),
+                extraordinary_fee = VALUES(extraordinary_fee),
+                extraordinary_fee_start_date = VALUES(extraordinary_fee_start_date),
+                extraordinary_fee_end_date = VALUES(extraordinary_fee_end_date)'
         )->execute([
             $administrationFee,
             $effectiveDate,
@@ -130,6 +142,9 @@ final class SettingsService
             $lateFeeValue,
             $lateFeeDays,
             $fineAmount,
+            $extraordinaryFee,
+            $extraordinaryFeeStartDate,
+            $extraordinaryFeeEndDate,
         ]);
     }
 }
