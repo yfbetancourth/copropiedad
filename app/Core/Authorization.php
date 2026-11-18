@@ -9,6 +9,10 @@ use App\Modules\Auth\AuthService;
 final class Authorization
 {
     private const PERMISSION_LEVELS = ['none' => 0, 'read' => 1, 'write' => 2, 'total' => 3];
+    private static bool $userResolved = false;
+    private static ?array $requestUser = null;
+    private static ?int $requestUserId = null;
+    private static ?int $requestAuthVersion = null;
 
     public static function currentUser(): ?array
     {
@@ -27,13 +31,31 @@ final class Authorization
             return null;
         }
 
+        if (self::$userResolved
+            && self::$requestUserId === $userId
+            && self::$requestAuthVersion === $authVersion
+        ) {
+            $_SESSION['last_activity'] = time();
+
+            return self::$requestUser;
+        }
+
         $user = (new AuthService())->currentUser($userId, $authVersion);
         if ($user === null) {
             Session::destroy();
+            self::$userResolved = true;
+            self::$requestUser = null;
+            self::$requestUserId = $userId;
+            self::$requestAuthVersion = $authVersion;
+
             return null;
         }
 
         $_SESSION['last_activity'] = time();
+        self::$userResolved = true;
+        self::$requestUser = $user;
+        self::$requestUserId = $userId;
+        self::$requestAuthVersion = $authVersion;
 
         return $user;
     }

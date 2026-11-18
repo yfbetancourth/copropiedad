@@ -46,6 +46,19 @@ final class BoldPaymentService
         ];
     }
 
+    /** @return list<array{code: string, label: string}> */
+    public function configuredMethods(): array
+    {
+        $settings = $this->settings();
+        $methods = [];
+        foreach ($settings['payment_methods'] as $code) {
+            if (isset(self::PAYMENT_METHODS[$code])) {
+                $methods[] = ['code' => $code, 'label' => self::PAYMENT_METHODS[$code]];
+            }
+        }
+        return $methods;
+    }
+
     public function availableMethods(): array
     {
         $response = $this->request('GET', '/online/link/v1/payment_methods');
@@ -148,12 +161,20 @@ final class BoldPaymentService
              WHERE statement_id = ?
              ORDER BY id DESC LIMIT 1'
         );
+        $terminalQuery = Database::connection()->prepare(
+            'SELECT status FROM billing_bold_terminal_payments WHERE statement_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1'
+        );
         foreach ($query->fetchAll() as $row) {
             $statement = $billing->statement((int) $row['id']);
             $paymentQuery->execute([(int) $row['id']]);
             $latestPayment = $paymentQuery->fetch();
+            $terminalQuery->execute([(int) $row['id'], $userId]);
+            $latestTerminalPayment = $terminalQuery->fetch();
             $statement['online_payment_status'] = is_array($latestPayment)
                 ? (string) $latestPayment['status']
+                : null;
+            $statement['terminal_payment_status'] = is_array($latestTerminalPayment)
+                ? (string) $latestTerminalPayment['status']
                 : null;
             $statement['checkout_url'] = is_array($latestPayment)
                 && $latestPayment['status'] === 'pending'

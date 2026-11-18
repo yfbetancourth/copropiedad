@@ -73,7 +73,7 @@ final class CompositionService
     }
 
     /**
-     * @param list<array{id?: string, category: string, name: string}> $units
+     * @param list<array{id?: string, category: string, name: string, coefficient?: string}> $units
      */
     public function saveUnits(array $units, bool $completed): void
     {
@@ -92,6 +92,7 @@ final class CompositionService
                 'id' => $id,
                 'category' => $unit['category'],
                 'name' => $unit['name'],
+                'coefficient' => $unit['coefficient'] ?? '',
             ];
         }
 

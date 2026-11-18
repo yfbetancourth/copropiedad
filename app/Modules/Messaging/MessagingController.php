@@ -19,7 +19,7 @@ final class MessagingController
             return;
         }
 
-        View::render('Messaging/index', [
+        View::renderAdmin('Messaging/index', [
             'title' => 'Mensajes',
             'actor' => $user,
             'users' => (new MessagingService())->activeUsers(),

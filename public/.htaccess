@@ -1,5 +1,10 @@
 Options -Indexes
 RewriteEngine On
+# Each application scenario has its own front controller.
+RewriteRule ^admin/index\.php$ - [L]
+RewriteRule ^usuario/index\.php$ - [L]
+RewriteRule ^admin(?:/.*)?$ admin/index.php [QSA,L]
+RewriteRule ^usuario(?:/.*)?$ usuario/index.php [QSA,L]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [QSA,L]

@@ -11,6 +11,7 @@ use App\Core\Url;
 use App\Core\View;
 use App\Modules\Auth\SmtpMailer;
 use App\Modules\Billing\BoldPaymentService;
+use App\Modules\Billing\BoldTerminalService;
 use PDOException;
 use RuntimeException;
 use Throwable;
@@ -333,6 +334,53 @@ final class ConfigurationController
         $this->redirect('/configuracion/parametrizacion');
     }
 
+    public function propertyGallery(): void
+    {
+        $actor = Authorization::requirePermission('configuracion.parametrizacion', 'read');
+        if ($actor === null) {
+            return;
+        }
+
+        $this->render('property-gallery', 'Configuracion / Galeria publica', [
+            'actor' => $actor,
+            'images' => (new PropertyGalleryService())->images(),
+        ]);
+    }
+
+    public function addPropertyGalleryImages(): void
+    {
+        if ($this->requireAction('configuracion.parametrizacion', 'write') === null) {
+            return;
+        }
+        $this->requireCsrf();
+
+        try {
+            $count = (new PropertyGalleryService())->upload($_FILES['images'] ?? []);
+            $this->flash('success', sprintf('Se agregaron %d %s a la galería pública.', $count, $count === 1 ? 'imagen' : 'imágenes'));
+        } catch (RuntimeException $exception) {
+            $this->flash('error', $exception->getMessage());
+        }
+
+        $this->redirect('/configuracion/galeria-publica');
+    }
+
+    public function deletePropertyGalleryImage(): void
+    {
+        if ($this->requireAction('configuracion.parametrizacion', 'write') === null) {
+            return;
+        }
+        $this->requireCsrf();
+        $name = $this->stringInput($_POST['image'] ?? null);
+
+        if ((new PropertyGalleryService())->delete($name)) {
+            $this->flash('success', 'La imagen se retiró de la galería pública.');
+        } else {
+            $this->flash('error', 'No se encontró la imagen seleccionada.');
+        }
+
+        $this->redirect('/configuracion/galeria-publica');
+    }
+
     public function financial(): void
     {
         $actor = Authorization::requirePermission('configuracion.financiera', 'read');
@@ -532,12 +580,29 @@ final class ConfigurationController
                 $providerError = $exception->getMessage();
             }
         }
+        $terminalService = new BoldTerminalService();
+        $terminalSettings = $terminalService->settings();
+        $availableTerminals = [];
+        $availableTerminalMethods = [];
+        $terminalProviderError = null;
+        if ($terminalSettings['api_key_configured']) {
+            try {
+                $availableTerminals = $terminalService->terminals();
+                $availableTerminalMethods = $terminalService->paymentMethods();
+            } catch (RuntimeException $exception) {
+                $terminalProviderError = $exception->getMessage();
+            }
+        }
 
         $this->render('payment-methods', 'Configuracion / Metodos de pago', [
             'actor' => $actor,
             'settings' => $settings,
             'availableMethods' => $availableMethods,
             'providerError' => $providerError,
+            'terminalSettings' => $terminalSettings,
+            'availableTerminals' => $availableTerminals,
+            'availableTerminalMethods' => $availableTerminalMethods,
+            'terminalProviderError' => $terminalProviderError,
         ]);
     }
 
@@ -563,6 +628,29 @@ final class ConfigurationController
                 $message .= ' Métodos no habilitados en Bold: ' . implode(', ', $unavailableMethods) . '.';
             }
             $this->flash('success', $message);
+        } catch (RuntimeException $exception) {
+            $this->flash('error', $exception->getMessage());
+        }
+        $this->redirect('/configuracion/metodos-pago');
+    }
+
+    public function saveBoldTerminalSettings(): void
+    {
+        if (Authorization::requirePermission('configuracion.pagos', 'write') === null) {
+            return;
+        }
+        $this->requireCsrf();
+        try {
+            $terminalParts = explode('|', $this->stringInput($_POST['terminal'] ?? null), 2);
+            (new BoldTerminalService())->saveSettings(
+                $this->stringInput($_POST['terminal_environment'] ?? null),
+                $this->stringInput($_POST['terminal_api_key'] ?? null),
+                $this->stringInput($_POST['terminal_webhook_secret'] ?? null),
+                $terminalParts[0] ?? '',
+                $terminalParts[1] ?? '',
+                $this->stringInput($_POST['terminal_payment_method'] ?? null)
+            );
+            $this->flash('success', 'API Integrations quedó configurada y Bold validó el método y el datáfono.');
         } catch (RuntimeException $exception) {
             $this->flash('error', $exception->getMessage());
         }
@@ -871,6 +959,11 @@ final class ConfigurationController
                 $this->flash('error', 'Los apartamentos deben terminar con un numero de dos digitos entre 01 y 99. El identificador 00 no es valido.');
                 $this->redirect('/configuracion/conformacion');
             }
+            $coefficient = $this->coefficientInput($unit['coefficient'] ?? null);
+            if ($coefficient === false) {
+                $this->flash('error', 'Cada inmueble debe tener un coeficiente mayor que cero y hasta 100, con máximo cuatro decimales (por ejemplo, 1.2500).');
+                $this->redirect('/configuracion/conformacion');
+            }
             $id = $this->stringInput($unit['id'] ?? null);
             if ($id !== '' && (!isset($existingIds[$id]) || isset($submittedIds[$id]))) {
                 $this->flash('error', 'La lista contiene un identificador de inmueble invalido. Recarga la pagina e intenta nuevamente.');
@@ -879,7 +972,7 @@ final class ConfigurationController
             if ($id !== '') {
                 $submittedIds[$id] = true;
             }
-            $units[] = ['id' => $id, 'category' => $category, 'name' => $name];
+            $units[] = ['id' => $id, 'category' => $category, 'name' => $name, 'coefficient' => $coefficient];
         }
 
         $compositionService->saveUnits($units, true);
@@ -1056,6 +1149,24 @@ final class ConfigurationController
         return is_string($value) ? $value : '';
     }
 
+    private function coefficientInput(mixed $value): string|false
+    {
+        if (!is_string($value) && !is_int($value)) {
+            return false;
+        }
+        $value = trim((string) $value);
+        if (!preg_match('/^(\d{1,3})(?:\.(\d{1,4}))?$/D', $value, $matches)) {
+            return false;
+        }
+        $whole = (int) $matches[1];
+        $fraction = (int) str_pad($matches[2] ?? '', 4, '0');
+        $scaled = $whole * 10000 + $fraction;
+        if ($scaled < 1 || $scaled > 1000000) {
+            return false;
+        }
+        return $whole . '.' . str_pad((string) $fraction, 4, '0', STR_PAD_LEFT);
+    }
+
     private function moneyInput(mixed $value): string|false
     {
         if (!is_string($value) && !is_int($value) && !is_float($value)) {
@@ -1105,7 +1216,7 @@ final class ConfigurationController
         $data['csrfToken'] = Session::csrfToken();
         $data['flash'] = $_SESSION['configuration_flash'] ?? null;
         unset($_SESSION['configuration_flash']);
-        View::render('Configuration/' . $template, $data);
+        View::renderAdmin('Configuration/' . $template, $data);
     }
 
     private function redirect(string $path): never

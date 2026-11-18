@@ -232,7 +232,7 @@ final class BillingController
         $data['csrfToken'] = Session::csrfToken();
         $data['flash'] = $_SESSION['billing_flash'] ?? null;
         unset($_SESSION['billing_flash']);
-        View::render($template, $data);
+        View::renderAdmin($template, $data);
     }
 
     private function flash(string $type, string $message): void

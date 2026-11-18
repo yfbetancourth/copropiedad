@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 820" role="img" aria-labelledby="title desc">
+  <title id="title">Vivienda en comunidad</title>
+  <desc id="desc">Ilustración de edificios, jardín y cielo cálido.</desc>
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#e7e8db"/><stop offset="1" stop-color="#f3dfc4"/></linearGradient>
+    <linearGradient id="building" x2="0" y2="1"><stop stop-color="#f8f5eb"/><stop offset="1" stop-color="#dcd8ca"/></linearGradient>
+  </defs>
+  <rect width="1000" height="820" rx="46" fill="url(#sky)"/>
+  <circle cx="785" cy="145" r="66" fill="#e6a76e" opacity=".85"/>
+  <path d="M0 596c176-91 304-52 461 2 147 50 318 65 539-27v249H0Z" fill="#aeb99a"/>
+  <path d="M108 640V292l192-96 190 96v348Z" fill="url(#building)" stroke="#c9c4b5" stroke-width="5"/>
+  <path d="M489 640V359l154-81 154 81v281Z" fill="#eee9dc" stroke="#c9c4b5" stroke-width="5"/>
+  <path d="M300 640V424h111v216" fill="#a9795f"/>
+  <g fill="#a8b7b0"><path d="M158 326h66v74h-66zM277 264h66v74h-66zM392 326h58v74h-58zM541 391h52v66h-52zM650 330h52v66h-52zM541 501h52v66h-52zM650 501h52v66h-52z"/></g>
+  <g fill="#e9f0e9" opacity=".8"><path d="M173 342h36v4h-36zM293 280h36v4h-36zM407 342h30v4h-30zM552 405h30v4h-30zM661 344h30v4h-30z"/></g>
+  <path d="M0 718c117-45 214-47 314-9 87 33 191 25 280-17 118-55 260-46 406 14v114H0Z" fill="#788d72"/>
+  <g fill="#5f775d"><circle cx="94" cy="607" r="48"/><circle cx="873" cy="600" r="64"/><circle cx="784" cy="643" r="35"/><circle cx="223" cy="672" r="35"/></g>
+  <g fill="#e6c58e"><circle cx="584" cy="704" r="9"/><circle cx="623" cy="687" r="7"/><circle cx="670" cy="713" r="8"/></g>
+</svg>

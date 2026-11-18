@@ -38,17 +38,22 @@ Aplicacion PHP 8.2+ con MVC modular, AdminLTE 4 y MySQL mediante PDO.
 6. Para una prueba local, inicia el servidor con `public` como raiz web:
 
    ```powershell
-   php -S 127.0.0.1:8080 -t public
+   php -S 127.0.0.1:8080 -t public public/router.php
    ```
 
-   Abre `http://127.0.0.1:8080/login`. En Apache, configura el `DocumentRoot` del sitio hacia la carpeta `public`, no hacia la raiz del proyecto. Si se usa XAMPP en `http://localhost/Copropiedad/public`, ajusta `APP_URL` a esa direccion en `.env`.
+   La raiz (`http://127.0.0.1:8080/`) es la portada pública, el panel administrativo está en `/admin` y el panel de usuario en `/usuario`. En Apache, configura el `DocumentRoot` del sitio hacia la carpeta `public`, no hacia la raíz del proyecto. Si se usa XAMPP en `http://localhost/Copropiedad/public`, configura `APP_URL=http://localhost/Copropiedad/public` en `.env`; los paneles quedan en `/Copropiedad/public/admin` y `/Copropiedad/public/usuario`.
 
 ## Estructura modular
 
 - `app/Core`: infraestructura compartida (enrutador, vistas y conexion).
-- `app/Modules/<Modulo>`: rutas, controlador y vistas propias del modulo.
-- `app/Views`: plantilla compartida de AdminLTE.
-- `public`: unico directorio expuesto al servidor web.
+- `app/Modules/<Modulo>`: controladores, servicios y registro de rutas por dominio funcional.
+- `app/Scenarios/Admin`: rutas de composición, layout y vistas exclusivas de administración.
+- `app/Scenarios/User`: rutas, layout y vistas del panel de usuario.
+- `app/Scenarios/Public`: rutas, layout y vistas de la portada y clasificados públicos.
+- `public`: raiz expuesta al servidor web y pagina publica de la copropiedad.
+- `public/admin`: punto de entrada del panel administrativo; las solicitudes bajo `/admin` se enrutan a esta carpeta.
+- `public/usuario`: punto de entrada del panel de usuario; las solicitudes bajo `/usuario` se enrutan a esta carpeta.
+- `public/assets/portada`: estilos e ilustración de respaldo de la portada.
 
 Cada modulo debe registrar solo sus rutas y mantener su logica y vistas dentro de su propia carpeta. Los modulos acceden a MySQL a traves de `App\Core\Database`; usa consultas preparadas y nunca construyas SQL concatenando datos recibidos.
 
@@ -87,7 +92,7 @@ Aplica la migracion una sola vez con una cuenta MySQL administradora:
 Get-Content .\database\migrations\003_create_property_settings.sql | & C:\xampp\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
 ```
 
-En **Configuracion / Parametrizacion** se guardan el nombre, direccion, NIT y, opcionalmente, los datos completos del titular, banco, tipo y numero de cuenta. En bases donde ya se aplico la migracion 003, aplica una sola vez la migracion adicional `004_add_bank_account_number.sql` para agregar el campo bancario sin afectar los demas datos. En **Configuracion / Financiera** se guardan el valor de administracion, su fecha de vigencia, el descuento fijo por pronto pago, la mora en porcentaje o valor fijo con sus dias de espera, el valor base de las multas y, opcionalmente, el valor de la cuota extraordinaria con sus fechas inicial y final de vigencia. En **Configuracion / Caracterizacion** se define si la copropiedad es una casa, un conjunto de torres de apartamentos o una copropiedad mixta.
+En **Configuracion / Parametrizacion** se guardan el nombre, direccion, NIT y, opcionalmente, los datos completos del titular, banco, tipo y numero de cuenta. En bases donde ya se aplico la migracion 003, aplica una sola vez la migracion adicional `004_add_bank_account_number.sql` para agregar el campo bancario sin afectar los demas datos. En **Configuracion / Financiera** se guardan la base mensual de liquidacion, su fecha de vigencia, el descuento fijo por pronto pago, la mora en porcentaje o valor fijo con sus dias de espera, el valor base de las multas y, opcionalmente, el valor de la cuota extraordinaria con sus fechas inicial y final de vigencia. En **Configuracion / Caracterizacion** se define si la copropiedad es una casa, un conjunto de torres de apartamentos o una copropiedad mixta.
 
 Aplica tambien las migraciones `004_add_bank_account_number.sql` (si aun no se ha aplicado) y `005_add_housing_type.sql` una sola vez:
 
@@ -105,11 +110,14 @@ Get-Content .\database\migrations\013_create_billing_module.sql | & C:\xampp\mys
 Get-Content .\database\migrations\014_create_user_notifications.sql | & C:\xampp\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
 Get-Content .\database\migrations\015_add_extraordinary_fee_settings.sql | & C:\xampp\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
 Get-Content .\database\migrations\016_create_bold_payment_settings.sql | & C:\xampp\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+Get-Content .\database\migrations\017_create_classifieds.sql | & C:\xampp\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+Get-Content .\database\migrations\018_add_coefficient_snapshot_to_billing_statements.sql | & C:\xampp\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+Get-Content .\database\migrations\019_add_bold_api_integrations.sql | & C:\xampp\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
 ```
 
 En **Configuracion / Metodos de pago**, configura la llave de identidad del **Boton de pagos** de Bold (ambiente de pruebas o produccion) y los metodos habilitados para el comercio. La llave se cifra usando `APP_KEY`. El portal genera un link de pago cerrado por cada nota recibida; la cartera solo registra el abono despues de verificar que Bold reporta el link como pagado y que su monto coincide con el saldo. Para produccion, configura `APP_URL` con el dominio publico HTTPS y registra `{APP_URL}/pagos/bold/webhook` en Integraciones / Webhooks del Panel de Comercios de Bold. La API Link de pagos utiliza la llave de identidad de Boton de pagos, no las llaves para conectar datáfonos.
 
-La migracion 005 agrega el tipo de vivienda como un dato opcional y un permiso independiente para Caracterizacion; la migracion 006 habilita el tipo Mixto y crea el almacenamiento de la estructura de bienes; las migraciones 007 a 009 agregan y separan la nomenclatura de torres y apartamentos. En **Configuracion / Caracterizacion**, para **Torres de apartamentos** y **Mixto** se puede elegir nomenclatura de torres numerica (Torre 1, Torre 2…) o alfabetica (Torre A, Torre B… Torre Z, Torre AA…). Los apartamentos usan siempre numeracion de dos digitos, del 01 al 99; 00 no es valido. En **Configuracion / Conformación de la copropiedad**, el administrador completa un asistente que guarda el avance, genera inmuebles a partir de las cantidades y permite corregir o agregar categorias (por ejemplo, locales u oficinas) antes de finalizar. La estructura admite hasta 5.000 inmuebles. Si se cambia la caracterizacion o la nomenclatura despues de comenzar, se solicita confirmacion y se reinician los datos de conformacion. El permiso de Conformacion se inicializa a partir del permiso de Caracterizacion; los permisos se pueden ajustar en **Configuracion / Roles y permisos**. Guardar parametros no emite facturas, crea cobros ni aplica mora o multas automaticamente.
+La migracion 005 agrega el tipo de vivienda como un dato opcional y un permiso independiente para Caracterizacion; la migracion 006 habilita el tipo Mixto y crea el almacenamiento de la estructura de bienes; las migraciones 007 a 009 agregan y separan la nomenclatura de torres y apartamentos. En **Configuracion / Caracterizacion**, para **Torres de apartamentos** y **Mixto** se puede elegir nomenclatura de torres numerica (Torre 1, Torre 2…) o alfabetica (Torre A, Torre B… Torre Z, Torre AA…). Los apartamentos usan siempre numeracion de dos digitos, del 01 al 99; 00 no es valido. En **Configuracion / Conformación de la copropiedad**, el administrador completa un asistente que guarda el avance, genera inmuebles a partir de las cantidades y permite corregir o agregar categorias (por ejemplo, locales u oficinas) antes de finalizar. La estructura admite hasta 5.000 inmuebles. En cada inmueble se registra un coeficiente porcentual mayor que cero, de hasta cuatro decimales. La cuota mensual se calcula como base mensual × coeficiente / 100 y se redondea al centavo; la emisión se bloquea si falta un coeficiente. La migración 018 agrega a cada nota una instantánea del coeficiente aplicado; aplícala una sola vez en bases existentes. Si se cambia la caracterizacion o la nomenclatura despues de comenzar, se solicita confirmacion y se reinician los datos de conformacion. El permiso de Conformacion se inicializa a partir del permiso de Caracterizacion; los permisos se pueden ajustar en **Configuracion / Roles y permisos**. Guardar parametros no emite facturas, crea cobros ni aplica mora o multas automaticamente.
 
 La migracion 010 crea el registro de asignaciones entre usuarios e inmuebles y agrega el permiso independiente **Inmuebles / Asignacion de usuarios** (inicializado con el nivel de **Configuracion / Equipo**). En la seccion **Asignacion de inmuebles**, selecciona un usuario y marca uno o varios inmuebles; las asignaciones se mantienen al editar el nombre del inmueble y se eliminan al quitarlo de la estructura.
 
@@ -121,4 +129,16 @@ La migracion 013 incorpora **Cartera / Cobros**, los días configurables de pron
 
 La migracion 014 agrega la bandeja de mensajes internos y el registro de lectura de notificaciones de cartera. En el encabezado del **Panel de Usuario**, el avatar muestra avisos de notas emitidas con cuota de administración o multas y mensajes nuevos. Los cobros se marcan como leídos desde el menú del avatar; los mensajes se consultan en **Mis mensajes**. Administración puede enviar mensajes de texto a un usuario o a todos los usuarios activos desde **Mensajes**; el permiso **Mensajes internos** controla lectura y envío.
 
+La migracion 017 agrega clasificados de inmuebles. El usuario puede publicar una oferta en venta o una búsqueda de compra con descripción, precio/presupuesto opcional y hasta cinco imágenes JPEG, PNG o WebP de máximo 4 MB cada una. Configura PHP para permitir esos archivos (`upload_max_filesize=4M`, `post_max_size=25M` y `max_file_uploads=8`). Las imágenes se guardan fuera del directorio público y se sirven mediante una ruta que valida la publicación; el diseño se adapta a pantallas móviles y de escritorio. Las publicaciones se consultan sin iniciar sesión en `/clasificados` y el usuario puede cerrarlas, volver a publicarlas o eliminarlas desde su panel. Los datos de contacto no se almacenan para difusión ni se muestran sin autorización explícita en cada clasificado; el usuario solo expone los campos que ingresa y autoriza.
+
+La página pública de `/` usa los datos de **Configuración / Parametrización**, muestra la dirección con un enlace a Google Maps, presenta hasta tres clasificados recientes y permite entrar al panel de usuario. En **Configuración / Galería pública**, administra hasta ocho fotos JPG, PNG o WebP (3 MB y 24 megapíxeles por imagen); estas imágenes quedan en `public/uploads/property-gallery` y deben incluirse en los respaldos del sitio. Para subir varias fotos en una solicitud configura PHP con `upload_max_filesize=4M`, `post_max_size=25M` y `max_file_uploads=8`. La portada incluye títulos y descripciones para buscadores, URL canónica, datos estructurados WebSite, `robots.txt` y `sitemap.xml`. Define `APP_URL` con el dominio público HTTPS para que los enlaces canónicos y el sitemap usen la dirección correcta.
+
 El diseño sigue el ciclo de vida de documentos de cobro usados habitualmente: previsualización, emisión con datos congelados, estados de pago y seguimiento/reintento de notificaciones. Referencia general: [Stripe Invoicing: ciclo de vida de las facturas](https://docs.stripe.com/invoicing/overview) y [notificaciones y recordatorios](https://docs.stripe.com/invoicing/send-email).
+
+## Documentación de requisitos, seguridad y operación
+
+- [Requisitos de la solución actual](REQUISITOS_SOLUCION_ACTUAL.md): funciones aplicadas, pendientes, reglas de negocio y criterios de aceptación sugeridos.
+- [Mapa técnico y flujos](MAPA_TECNICO_Y_FLUJOS.md): responsabilidades archivo por archivo, recorridos de solicitudes y convenciones para cambios.
+- [Revisión de seguridad y operación](REVISION_SEGURIDAD_Y_OPERACION.md): cambios aplicados, riesgos pendientes, instalación, actualización, backups, cartera e incidentes.
+
+API Integrations de Bold (datáfono): la migración 019 crea el almacenamiento separado para llave, terminal, método y pagos pendientes. En Configuración / Métodos de pago guarda primero la llave API Datáfono y selecciona el método activo; recarga para elegir un terminal Smart o Smart Pro vinculado. Configura APP_URL en HTTPS, registra la URL de webhook mostrada y guarda la llave secreta de producción para verificar x-bold-signature. El residente puede iniciar el cobro desde Panel de Usuario / Pagos; no debe volver a enviarlo si el servidor indica que Bold pudo haberlo recibido. La cartera solo registra el abono cuando llega una venta aprobada, firmada, con la referencia y el monto correctos.

@@ -4,7 +4,9 @@
 !.env.example
 /var/log/
 /var/cache/
-/public/uploads/
+/public/uploads/*
+!/public/uploads/.htaccess
+/storage/classifieds/
 /composer.phar
 /.phpunit.cache/
 /coverage/

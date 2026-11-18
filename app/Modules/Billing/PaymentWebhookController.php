@@ -40,7 +40,20 @@ final class PaymentWebhookController
         }
 
         try {
-            (new BoldPaymentService())->handleWebhook($event);
+            $terminalReference = $event['data']['metadata']['reference'] ?? null;
+            if (is_string($terminalReference) && str_starts_with($terminalReference, 'CPT-')) {
+                $signature = $_SERVER['HTTP_X_BOLD_SIGNATURE'] ?? '';
+                if (!is_string($signature)
+                    || !(new BoldTerminalService())->verifyWebhookSignature($rawBody, $signature)
+                ) {
+                    http_response_code(400);
+                    echo 'Invalid signature';
+                    return;
+                }
+                (new BoldTerminalService())->handleWebhook($event);
+            } else {
+                (new BoldPaymentService())->handleWebhook($event);
+            }
             http_response_code(200);
             echo 'OK';
         } catch (RuntimeException $exception) {
@@ -65,6 +78,6 @@ final class PaymentWebhookController
             $status = 'pending';
         }
 
-        header('Location: ' . \App\Core\Url::to('/usuario?pago=' . rawurlencode($status) . '#documentos'), true, 303);
+        header('Location: ' . \App\Core\Url::to('/usuario/pagos?pago=' . rawurlencode($status)), true, 303);
     }
 }

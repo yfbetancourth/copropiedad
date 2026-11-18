@@ -10,6 +10,8 @@ use App\Core\Database;
 use App\Core\Url;
 use App\Core\View;
 use App\Modules\Billing\BoldPaymentService;
+use App\Modules\Billing\BoldTerminalService;
+use App\Modules\Classifieds\ClassifiedsService;
 use PDOException;
 use RuntimeException;
 use Throwable;
@@ -215,7 +217,7 @@ final class AuthController
         $paymentService = new BoldPaymentService();
         $paymentSettings = $paymentService->settings();
         Session::start();
-        View::renderPortal('Auth/user-panel', [
+        View::renderPortal('Portal/index', [
             'title' => 'Panel de Usuario',
             'user' => $user,
             'units' => $assignedUnits,
@@ -223,7 +225,10 @@ final class AuthController
             'onlinePaymentsReady' => $paymentSettings['api_key_configured']
                 && $paymentSettings['payment_methods'] !== []
                 && $paymentService->webhookUrl() !== '',
+            'terminalPaymentsReady' => (new BoldTerminalService())->settings()['configured']
+                && (new BoldTerminalService())->webhookUrl() !== '',
             'notifications' => (new PortalNotificationService())->unreadForUser((int) $user['id']),
+            'classifieds' => (new ClassifiedsService())->listingsForUser((int) $user['id']),
             'settings' => (new \App\Modules\Configuration\SettingsService())->current(),
             'flash' => $_SESSION['user_profile_flash'] ?? null,
             'csrfToken' => Session::csrfToken(),
@@ -242,7 +247,7 @@ final class AuthController
         $statementId = filter_var($_POST['statement_id'] ?? null, FILTER_VALIDATE_INT);
         if (!is_int($statementId) || $statementId < 1) {
             $this->profileFlash('error', 'Selecciona una nota de cobro válida.');
-            $this->redirect('/usuario#documentos');
+            $this->redirect('/usuario/pagos');
         }
 
         try {
@@ -251,8 +256,71 @@ final class AuthController
             exit;
         } catch (RuntimeException $exception) {
             $this->profileFlash('error', $exception->getMessage());
-            $this->redirect('/usuario#documentos');
+            $this->redirect('/usuario/pagos');
         }
+    }
+
+    public function userStartTerminalPayment(): void
+    {
+        $user = Authorization::requirePermission('usuario.portal', 'read');
+        if ($user === null) return;
+        $this->requireCsrf();
+        $statementId = filter_var($_POST['statement_id'] ?? null, FILTER_VALIDATE_INT);
+        if (!is_int($statementId) || $statementId < 1) {
+            $this->profileFlash('error', 'Selecciona una nota de cobro válida.');
+            $this->redirect('/usuario/pagos');
+        }
+        try {
+            (new BoldTerminalService())->startPayment($statementId, (int) $user['id'], (string) ($user['email'] ?? ''));
+            $this->profileFlash('success', 'Solicitud enviada al datáfono Bold. Completa el pago en el terminal; el saldo se actualizará cuando Bold confirme la transacción.');
+        } catch (RuntimeException $exception) {
+            $this->profileFlash('error', $exception->getMessage());
+        }
+        $this->redirect('/usuario/pagos');
+    }
+
+    public function userPayments(): void
+    {
+        $user = Authorization::requirePermission('usuario.portal', 'read');
+        if ($user === null) {
+            return;
+        }
+
+        $paymentResult = $_GET['pago'] ?? null;
+        if (is_string($paymentResult) && isset([
+            'approved' => true,
+            'pending' => true,
+            'rejected' => true,
+        ][$paymentResult]) && !isset($_SESSION['user_profile_flash'])) {
+            $messages = [
+                'approved' => ['success', 'Bold confirmó el pago y se actualizó el saldo de la nota.'],
+                'pending' => ['error', 'El pago aún está pendiente de confirmación de Bold. Actualiza la sección en unos minutos.'],
+                'rejected' => ['error', 'Bold no aprobó el pago. Puedes intentarlo nuevamente desde la nota.'],
+            ];
+            $_SESSION['user_profile_flash'] = [
+                'type' => $messages[$paymentResult][0],
+                'message' => $messages[$paymentResult][1],
+            ];
+        }
+
+        $paymentService = new BoldPaymentService();
+        $paymentSettings = $paymentService->settings();
+        Session::start();
+        View::renderPortal('Portal/payments', [
+            'title' => 'Pagos',
+            'user' => $user,
+            'billingDocuments' => $paymentService->payableStatements((int) $user['id']),
+            'paymentMethods' => $paymentService->configuredMethods(),
+            'onlinePaymentsReady' => $paymentSettings['api_key_configured']
+                && $paymentSettings['payment_methods'] !== []
+                && $paymentService->webhookUrl() !== '',
+            'terminalPaymentsReady' => (new BoldTerminalService())->settings()['configured']
+                && (new BoldTerminalService())->webhookUrl() !== '',
+            'notifications' => (new PortalNotificationService())->unreadForUser((int) $user['id']),
+            'flash' => $_SESSION['user_profile_flash'] ?? null,
+            'csrfToken' => Session::csrfToken(),
+        ]);
+        unset($_SESSION['user_profile_flash']);
     }
 
     public function userMessages(): void
@@ -262,7 +330,7 @@ final class AuthController
             return;
         }
 
-        View::renderPortal('Auth/messages', [
+        View::renderPortal('Portal/messages', [
             'title' => 'Mis mensajes',
             'user' => $user,
             'notifications' => (new PortalNotificationService())->unreadForUser((int) $user['id']),
@@ -389,7 +457,7 @@ final class AuthController
             return;
         }
 
-        View::render('Auth/admin', [
+        View::renderAdmin('Auth/admin', [
             'title' => 'Panel administrativo',
             'username' => $user['username'],
             'csrfToken' => Session::csrfToken(),

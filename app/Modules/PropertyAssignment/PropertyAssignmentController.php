@@ -81,7 +81,7 @@ final class PropertyAssignmentController
         $data['csrfToken'] = Session::csrfToken();
         $data['flash'] = $_SESSION['property_assignment_flash'] ?? null;
         unset($_SESSION['property_assignment_flash']);
-        View::render('PropertyAssignment/index', $data);
+        View::renderAdmin('PropertyAssignment/index', $data);
     }
 
     private function requireCsrf(): void

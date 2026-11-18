@@ -18,6 +18,10 @@ final class Session
             throw new RuntimeException('No se puede iniciar la sesion despues de enviar la respuesta.');
         }
 
+        // Reject caller-supplied session IDs that PHP has not issued.
+        ini_set('session.use_strict_mode', '1');
+        ini_set('session.use_only_cookies', '1');
+
         session_set_cookie_params([
             'httponly' => true,
             'secure' => self::isHttps(),

@@ -108,7 +108,13 @@ final class BillingService
             $openingBalance = $previousBalance + $openingAdjustment;
             $effectiveDate = (string) ($propertySettings['effective_date'] ?? '');
             $feeApplies = $feeReady && $effectiveDate <= $periodStart && !$feeNotYetEffective;
-            $currentFee = $feeApplies ? $fee : 0;
+            $coefficient = $existingStatement !== null
+                ? self::normalizedCoefficient($existingStatement['coefficient'] ?? null)
+                : self::normalizedCoefficient($unit['coefficient']);
+            $coefficientMissing = $coefficient === null && $existingStatement === null;
+            $currentFee = $existingStatement !== null
+                ? self::cents($existingStatement['administration_fee'])
+                : ($feeApplies && $coefficient !== null ? self::allocatedFeeCents($fee, $coefficient) : 0);
             $total = $openingBalance + $currentFee + array_sum($itemAmounts);
             $discount = min($configuredDiscount, $currentFee);
             $earlyPayable = max(0, $total - $discount);
@@ -123,6 +129,8 @@ final class BillingService
                 'id' => $unitId,
                 'name' => $unit['name'],
                 'category' => $unit['category'],
+                'coefficient' => $coefficient,
+                'coefficient_missing' => $coefficientMissing,
                 'recipients' => $recipients,
                 'already_issued' => $existingStatement !== null,
                 'statement_id' => $existingStatement['id'] ?? null,
@@ -148,6 +156,7 @@ final class BillingService
             static fn (array $row): bool => !$row['already_issued']
                 && !$row['prior_period_invalid']
                 && !$row['invalid_recipient']
+                && !$row['coefficient_missing']
         );
         $blockingReasons = [];
         if (!$dateSettingsReady) {
@@ -161,6 +170,9 @@ final class BillingService
         }
         if (!$feeReady) {
             $blockingReasons[] = 'Configura la cuota y su fecha de vigencia en Configuración / Financiera.';
+        }
+        if (array_filter($rows, static fn (array $row): bool => $row['coefficient_missing']) !== []) {
+            $blockingReasons[] = 'Completa el coeficiente (%) de cada inmueble en Configuración / Conformación antes de emitir.';
         }
         if ($feeStartsMidPeriod) {
             $blockingReasons[] = 'La cuota empieza a mitad del período. Define el tratamiento de prorrata antes de emitir; el sistema no la calcula automáticamente.';
@@ -575,9 +587,12 @@ final class BillingService
         if (self::cents($statement['previous_balance']) < 0) {
             $previousRows[] = ['Saldo a favor', -self::cents($statement['previous_balance'])];
         }
+        $feeLabel = empty($statement['coefficient'])
+            ? 'Cuota Administración'
+            : 'Cuota Administración (coef. ' . number_format((float) $statement['coefficient'], 4, ',', '.') . '%)';
         $currentRows = [
             ['Saldo mes anterior', self::cents($statement['opening_balance'])],
-            ['Cuota Administración', self::cents($statement['administration_fee'])],
+            [$feeLabel, self::cents($statement['administration_fee'])],
             ['Interés moratorio', self::cents($statement['interest'])],
             ['Cobro por proceso jurídico', self::cents($statement['legal'])],
             ['Multas', self::cents($statement['fine'])],
@@ -648,9 +663,12 @@ final class BillingService
         if (self::cents($statement['previous_balance']) < 0) {
             $previousRows['Saldo a favor'] = self::decimal(-self::cents($statement['previous_balance']));
         }
+        $feeLabel = empty($statement['coefficient'])
+            ? 'Cuota Administración'
+            : 'Cuota Administración (coef. ' . number_format((float) $statement['coefficient'], 4, ',', '.') . '%)';
         $currentRows = [
             'Saldo mes anterior' => $statement['opening_balance'],
-            'Cuota Administración' => $statement['administration_fee'],
+            $feeLabel => $statement['administration_fee'],
             'Interés moratorio' => $statement['interest'],
             'Cobro por proceso jurídico' => $statement['legal'],
             'Multas' => $statement['fine'],
@@ -742,6 +760,7 @@ final class BillingService
             'period' => $preview['period'],
             'unit_name' => $row['name'],
             'unit_category' => $row['category'],
+            'coefficient' => $row['coefficient'],
             'issued_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
             'issue_date' => (new DateTimeImmutable('today'))->format('Y-m-d'),
             'previous_period' => $preview['previous_period'],
@@ -837,6 +856,7 @@ final class BillingService
                     'id' => $unit['id'],
                     'name' => (string) $unit['name'],
                     'category' => (string) $unit['category'],
+                    'coefficient' => (string) ($unit['coefficient'] ?? ''),
                     'recipients' => [],
                 ];
             }
@@ -890,7 +910,7 @@ final class BillingService
     private function statementMap(string $period): array
     {
         $query = Database::connection()->prepare(
-            'SELECT statements.id, statements.unit_id,
+            'SELECT statements.id, statements.unit_id, statements.coefficient, statements.administration_fee,
                     GROUP_CONCAT(recipients.delivery_status ORDER BY recipients.id) AS delivery_status
              FROM billing_statements statements
              LEFT JOIN billing_statement_recipients recipients ON recipients.statement_id = statements.id
@@ -902,6 +922,8 @@ final class BillingService
         foreach ($query->fetchAll() as $row) {
             $map[(string) $row['unit_id']] = [
                 'id' => (int) $row['id'],
+                'coefficient' => $row['coefficient'] === null ? null : (string) $row['coefficient'],
+                'administration_fee' => (string) $row['administration_fee'],
                 'delivery_status' => (string) ($row['delivery_status'] ?? ''),
             ];
         }
@@ -1063,6 +1085,34 @@ final class BillingService
         $cents = ((int) $matches[2] * 100) + (int) str_pad($matches[3] ?? '', 2, '0');
 
         return ($matches[1] ?? '') === '-' ? -$cents : $cents;
+    }
+
+    private static function normalizedCoefficient(mixed $value): ?string
+    {
+        if (!is_string($value) && !is_int($value)) {
+            return null;
+        }
+        $value = trim((string) $value);
+        if (!preg_match('/^(\d{1,3})(?:\.(\d{1,4}))?$/D', $value, $matches)) {
+            return null;
+        }
+        $whole = (int) $matches[1];
+        $fraction = (int) str_pad($matches[2] ?? '', 4, '0');
+        $scaled = $whole * 10000 + $fraction;
+        if ($scaled < 1 || $scaled > 1000000) {
+            return null;
+        }
+        return $whole . '.' . str_pad((string) $fraction, 4, '0', STR_PAD_LEFT);
+    }
+
+    private static function allocatedFeeCents(int $baseCents, string $coefficient): int
+    {
+        [$whole, $fraction] = explode('.', $coefficient, 2);
+        $scaledCoefficient = ((int) $whole * 10000) + (int) $fraction;
+        $denominator = 1000000;
+        $wholePart = intdiv($baseCents, $denominator) * $scaledCoefficient;
+        $remainder = ($baseCents % $denominator) * $scaledCoefficient;
+        return $wholePart + intdiv($remainder + intdiv($denominator, 2), $denominator);
     }
 
     private static function decimal(int $cents): string
