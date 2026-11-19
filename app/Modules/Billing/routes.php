@@ -12,5 +12,11 @@ $router->get('/cartera/cobros/nota', [$billing, 'statement']);
 $router->post('/cartera/cobros/concepto', [$billing, 'addItem']);
 $router->post('/cartera/cobros/concepto/eliminar', [$billing, 'removeItem']);
 $router->post('/cartera/cobros/pago', [$billing, 'addPayment']);
+$router->post('/cartera/cobros/pago/anular', [$billing, 'voidPayment']);
 $router->post('/cartera/cobros/emitir', [$billing, 'issue']);
 $router->post('/cartera/cobros/reintentar', [$billing, 'retry']);
+
+$reports = new \App\Modules\Billing\ReportController();
+$router->get('/cartera/reportes', [$reports, 'index']);
+$router->get('/cartera/reportes/exportar', [$reports, 'export']);
+$router->get('/cartera/buscar', [$reports, 'search']);

@@ -10,7 +10,7 @@ use Throwable;
 final class RoleService
 {
     public const MODULES = [
-        'panel' => 'Panel administrativo',
+        'panel' => 'Bienvenida (acceso al panel administrativo)',
         'configuracion.equipo' => 'Configuracion / Equipo',
         'configuracion.roles' => 'Configuracion / Roles y permisos',
         'configuracion.parametrizacion' => 'Configuracion / Parametrizacion',

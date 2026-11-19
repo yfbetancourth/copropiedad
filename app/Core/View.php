@@ -17,6 +17,16 @@ final class View
     }
 
     /**
+     * Pantallas de acceso (login y recuperación): plantillas en app/Modules, con layout propio a pantalla completa.
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function renderAuth(string $template, array $data = []): void
+    {
+        self::renderWithLayout($template, $data, null, 'Shared/auth-layout.php');
+    }
+
+    /**
      * @param array<string, mixed> $data
      */
     public static function renderAdmin(string $template, array $data = []): void

@@ -89,6 +89,15 @@ final class Authorization
         return $level >= $requiredLevel;
     }
 
+    /**
+     * El Superadmin es el único rol de sistema (protegido, no se crea ni se edita desde la interfaz).
+     * Se usa para acciones que ningún rol personalizado debe poder hacer, aunque tenga nivel «total».
+     */
+    public static function isSuperadmin(?array $user): bool
+    {
+        return $user !== null && (bool) ($user['is_system'] ?? false);
+    }
+
     public static function canGrant(string $requested, string $actorLevel): bool
     {
         return (self::PERMISSION_LEVELS[$requested] ?? PHP_INT_MAX)

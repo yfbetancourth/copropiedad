@@ -38,13 +38,21 @@ final class PropertyAssignmentService
             }
         }
 
+        // Todas las asignaciones: sirven para contar por usuario, mostrar copropietarios y medir la cobertura.
         $userCounts = [];
+        $unitOwners = [];
         foreach (Database::connection()->query(
-            'SELECT user_id, COUNT(*) AS assignment_count
-             FROM property_unit_assignments
-             GROUP BY user_id'
-        )->fetchAll() as $assignmentCount) {
-            $userCounts[(int) $assignmentCount['user_id']] = (int) $assignmentCount['assignment_count'];
+            'SELECT assignments.unit_id, assignments.user_id, users.username
+             FROM property_unit_assignments AS assignments
+             JOIN admin_users AS users ON users.id = assignments.user_id
+             ORDER BY users.username'
+        )->fetchAll() as $assignment) {
+            $unitId = (string) $assignment['unit_id'];
+            if (!isset($validUnitIds[$unitId])) {
+                continue;
+            }
+            $userCounts[(int) $assignment['user_id']] = ($userCounts[(int) $assignment['user_id']] ?? 0) + 1;
+            $unitOwners[$unitId][] = ['id' => (int) $assignment['user_id'], 'username' => (string) $assignment['username']];
         }
 
         $selectedAssignments = [];
@@ -76,6 +84,8 @@ final class PropertyAssignmentService
             'users' => $users,
             'selectedUser' => $selectedUser,
             'assignedUnitIds' => $selectedAssignments,
+            'unitOwners' => $unitOwners,
+            'coveredUnits' => count($unitOwners),
         ];
     }
 

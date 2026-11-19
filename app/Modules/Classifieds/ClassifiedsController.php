@@ -22,6 +22,8 @@ final class ClassifiedsController
         View::renderPublic('Classifieds/index', [
             'title' => 'Clasificados de inmuebles',
             'listings' => $this->service->publicListings(),
+            // El pie de página público muestra la dirección de la copropiedad.
+            'settings' => (new \App\Modules\Configuration\SettingsService())->current(),
         ]);
     }
 

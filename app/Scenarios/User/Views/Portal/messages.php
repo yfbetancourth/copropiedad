@@ -5,7 +5,7 @@
             <p class="text-secondary mb-0">Mensajes internos recibidos de la administración.</p>
         </div>
         <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario">
-            <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Volver al panel
+            <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Volver a Bienvenida
         </a>
     </div>
 

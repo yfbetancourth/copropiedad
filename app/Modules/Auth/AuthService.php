@@ -202,7 +202,7 @@ final class AuthService
                 throw new RuntimeException('No se pudo encontrar la cuenta activa.');
             }
             if (!password_verify($currentPassword, (string) $account['password_hash'])) {
-                throw new RuntimeException('La contrasena actual no es correcta.');
+                throw new RuntimeException('La contraseña actual no es correcta.');
             }
 
             if ($newPassword === null) {

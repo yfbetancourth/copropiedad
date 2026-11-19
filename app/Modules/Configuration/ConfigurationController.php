@@ -18,6 +18,9 @@ use Throwable;
 
 final class ConfigurationController
 {
+    /** Categorías sugeridas al editar la estructura; se puede escribir otra. */
+    public const UNIT_CATEGORIES = ['Apartamento', 'Casa', 'Inmueble comercial', 'Parqueadero', 'Depósito', 'Oficina'];
+
     public function __construct(
         private readonly TeamService $team = new TeamService(),
         private readonly RoleService $roles = new RoleService()
@@ -562,6 +565,132 @@ final class ConfigurationController
         $this->redirect('/configuracion/correo');
     }
 
+    /* ---------- Correo personal de envío (p. ej. correo certificado) de cada administrador ---------- */
+
+    private const PERSONAL_MAIL_PERMISSION = 'cartera.cobros';
+
+    public function myMail(): void
+    {
+        $actor = Authorization::requirePermission(self::PERSONAL_MAIL_PERMISSION, 'write');
+        if ($actor === null) {
+            return;
+        }
+        $general = (new MailSettingsService())->current();
+        $this->render('my-mail', 'Mi correo de envío', [
+            'actor' => $actor,
+            'personal' => (new PersonalMailService())->current((int) $actor['id']),
+            'generalAddress' => $general['from_address'],
+        ]);
+    }
+
+    public function saveMyMail(): void
+    {
+        $actor = Authorization::requirePermission(self::PERSONAL_MAIL_PERMISSION, 'write');
+        if ($actor === null) {
+            return;
+        }
+        $this->requireCsrf();
+
+        $host = trim($this->stringInput($_POST['host'] ?? null));
+        $port = $this->integerInput($_POST['port'] ?? null);
+        $username = trim($this->stringInput($_POST['username'] ?? null));
+        $password = $this->stringInput($_POST['password'] ?? null);
+        $encryption = $this->stringInput($_POST['encryption'] ?? null);
+        $fromAddress = trim($this->stringInput($_POST['from_address'] ?? null));
+        $fromName = trim($this->stringInput($_POST['from_name'] ?? null));
+
+        if (preg_match('/^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/D', $host) !== 1
+            || $port === false || $port === null || $port < 1 || $port > 65535
+            || $username === '' || strlen($username) > 254 || strlen($password) > 512
+            || preg_match('/[\x00-\x1F\x7F]/', $username) === 1
+            || !in_array($encryption, ['tls', 'ssl'], true)
+            || !filter_var($fromAddress, FILTER_VALIDATE_EMAIL)
+            || strlen($fromName) > 160 || preg_match('/[\x00-\x1F\x7F]/', $fromName) === 1
+        ) {
+            $this->flash('error', 'Revisa el servidor, puerto, cifrado, usuario y el correo remitente.');
+            $this->redirect('/configuracion/mi-correo');
+        }
+
+        try {
+            $service = new PersonalMailService();
+            $service->save((int) $actor['id'], $host, $port, $username, $password, $encryption, $fromAddress, $fromName);
+            $active = $service->current((int) $actor['id'])['active'] ?? false;
+            $this->flash('success', $active
+                ? 'Se guardaron los cambios; tu correo personal sigue activo.'
+                : 'Datos guardados. Ahora envía el correo de prueba: si llega, tu cuenta quedará activa para tus envíos.');
+        } catch (RuntimeException $exception) {
+            $this->flash('error', $exception->getMessage());
+        }
+        $this->redirect('/configuracion/mi-correo');
+    }
+
+    public function testMyMail(): void
+    {
+        $actor = Authorization::requirePermission(self::PERSONAL_MAIL_PERMISSION, 'write');
+        if ($actor === null) {
+            return;
+        }
+        $this->requireCsrf();
+
+        $service = new PersonalMailService();
+        try {
+            $settings = $service->credentials((int) $actor['id']);
+            if ($settings === null) {
+                throw new RuntimeException('Primero guarda los datos de tu cuenta de correo.');
+            }
+            $name = htmlspecialchars($actor['username'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $from = htmlspecialchars($settings['from_address'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            (new SmtpMailer())->send(
+                $settings,
+                $actor['email'],
+                $actor['username'],
+                'Prueba de tu correo de envío · ' . (new SettingsService())->propertyName(),
+                '<p>Hola ' . $name . ',</p><p>Tu cuenta <strong>' . $from . '</strong> quedó lista para enviar las notificaciones de cobro que tú emitas.</p>'
+                    . '<p>Si tu proveedor certifica los envíos, deberías recibir también su constancia.</p>',
+                'Tu cuenta ' . $settings['from_address'] . ' quedo lista para enviar las notificaciones de cobro que tu emitas.'
+            );
+            $service->markVerified((int) $actor['id']);
+            $this->flash('success', 'La prueba se envió a ' . $actor['email'] . ' y tu correo personal quedó ACTIVO: las notas que emitas o reenvíes saldrán desde ' . $settings['from_address'] . '.');
+        } catch (RuntimeException $exception) {
+            $this->flash('error', $exception->getMessage());
+        } catch (\PHPMailer\PHPMailer\Exception $exception) {
+            error_log('Fallo la prueba SMTP personal: ' . $exception->getMessage());
+            $this->flash('error', 'El proveedor rechazó el envío. Revisa servidor, puerto, cifrado, usuario y contraseña (algunos proveedores exigen una contraseña de aplicación). Tu cuenta sigue inactiva.');
+        }
+        $this->redirect('/configuracion/mi-correo');
+    }
+
+    public function setMyMailStatus(): void
+    {
+        $actor = Authorization::requirePermission(self::PERSONAL_MAIL_PERMISSION, 'write');
+        if ($actor === null) {
+            return;
+        }
+        $this->requireCsrf();
+        $active = ($_POST['active'] ?? '') === '1';
+        try {
+            (new PersonalMailService())->setActive((int) $actor['id'], $active);
+            $this->flash('success', $active
+                ? 'Tu correo personal está activo para tus envíos.'
+                : 'Tu correo personal quedó en pausa: tus envíos saldrán por la cuenta general de la copropiedad.');
+        } catch (RuntimeException $exception) {
+            $this->flash('error', $exception->getMessage());
+        }
+        $this->redirect('/configuracion/mi-correo');
+    }
+
+    public function deleteMyMail(): void
+    {
+        $actor = Authorization::requirePermission(self::PERSONAL_MAIL_PERMISSION, 'write');
+        if ($actor === null) {
+            return;
+        }
+        $this->requireCsrf();
+        (new PersonalMailService())->delete((int) $actor['id']);
+        $this->flash('success', 'Se eliminó tu correo personal de envío y su contraseña. Tus envíos saldrán por la cuenta general.');
+        $this->redirect('/configuracion/mi-correo');
+    }
+
     public function paymentMethods(): void
     {
         $actor = Authorization::requirePermission('configuracion.pagos', 'read');
@@ -664,11 +793,24 @@ final class ConfigurationController
             return;
         }
 
-        $this->render('characterization', 'Configuracion / Caracterizacion', [
+        $settings = (new SettingsService())->current();
+        $compositionService = new CompositionService();
+        $composition = $compositionService->current();
+        $housingType = in_array($settings['housing_type'] ?? null, ['casa', 'torres_apartamento', 'mixto'], true)
+            ? (string) $settings['housing_type']
+            : '';
+        $this->render('characterization', 'Conformación / Caracterización', [
             'actor' => $actor,
-            'settings' => (new SettingsService())->current(),
-            'hasComposition' => ($composition = (new CompositionService())->current()) !== null
+            'settings' => $settings,
+            'hasComposition' => $composition !== null
                 && ($composition['answers'] !== [] || $composition['units'] !== null),
+            'impact' => [
+                'units' => is_array($composition['units'] ?? null) ? count($composition['units']) : 0,
+                'answers' => count($composition['answers'] ?? []),
+                'assignments' => $compositionService->assignmentCount(),
+            ],
+            'billingLocked' => $compositionService->unitIdsWithBillingHistory() !== [],
+            'conformation' => $compositionService->progress($housingType),
         ]);
     }
 
@@ -702,14 +844,29 @@ final class ConfigurationController
         $composition = $compositionService->current();
         $hasComposition = is_array($composition)
             && ($composition['answers'] !== [] || $composition['units'] !== null);
-        $confirmedChange = ($_POST['confirm_housing_change'] ?? null) === '1';
+        $confirmedChange = $this->confirmedReset($_POST['confirm_text'] ?? null);
         $nomenclatureChanged = in_array($housingType, ['torres_apartamento', 'mixto'], true)
             && $towerNomenclature !== $previousNomenclature;
+        $resetsStructure = ($housingType !== $previousType || $nomenclatureChanged) && $hasComposition;
 
-        if (($housingType !== $previousType || $nomenclatureChanged) && $hasComposition && !$confirmedChange) {
+        if ($resetsStructure && !Authorization::isSuperadmin($actor)) {
             $this->flash(
                 'error',
-                'La estructura registrada puede dejar de corresponder a esta caracterizacion. Confirma el cambio para reiniciar las respuestas y los inmuebles.'
+                'Solo el perfil Superadmin puede reiniciar el proceso de conformación. La caracterización no se cambió.'
+            );
+            $this->redirect('/configuracion/caracterizacion');
+        }
+        if ($resetsStructure && $compositionService->unitIdsWithBillingHistory() !== []) {
+            $this->flash(
+                'error',
+                'No se puede cambiar la caracterización: ya hay notas de cobro emitidas para los inmuebles actuales y su historial de cartera quedaría desconectado. Corrige nombres o coeficientes desde Conformación de la copropiedad.'
+            );
+            $this->redirect('/configuracion/caracterizacion');
+        }
+        if ($resetsStructure && !$confirmedChange) {
+            $this->flash(
+                'error',
+                'Para cambiar la caracterización escribe REINICIAR en la confirmación. Se eliminarán la estructura de inmuebles y sus asignaciones.'
             );
             $this->redirect('/configuracion/caracterizacion');
         }
@@ -718,7 +875,7 @@ final class ConfigurationController
         $pdo->beginTransaction();
         try {
             (new SettingsService())->saveCharacterization($housingType, $towerNomenclature);
-            if (($housingType !== $previousType || $nomenclatureChanged) && $hasComposition) {
+            if ($resetsStructure) {
                 $compositionService->clear();
             }
             $pdo->commit();
@@ -728,8 +885,19 @@ final class ConfigurationController
             }
             throw $exception;
         }
-        $this->flash('success', 'La caracterizacion se guardo correctamente.');
+        if ($resetsStructure || $previousType === '') {
+            // El siguiente paso natural es definir la estructura con la nueva caracterización.
+            $this->flash('success', 'Caracterización guardada. Ahora define cuántos inmuebles conforman la copropiedad.');
+            $this->redirect('/configuracion/conformacion');
+        }
+        $this->flash('success', 'La caracterización se guardó correctamente.');
         $this->redirect('/configuracion/caracterizacion');
+    }
+
+    /** Las acciones que borran la estructura exigen escribir REINICIAR, no solo pulsar «Aceptar». */
+    private function confirmedReset(mixed $value): bool
+    {
+        return is_string($value) && mb_strtoupper(trim($value), 'UTF-8') === 'REINICIAR';
     }
 
     public function composition(): void
@@ -768,7 +936,13 @@ final class ConfigurationController
             ? $firstUnanswered
             : min(max($requestedStep, 0), $firstUnanswered);
 
-        if (($composition['units'] ?? null) !== null) {
+        $structureExists = ($composition['units'] ?? null) !== null;
+        $editingAnswer = $structureExists && $requestedStep !== null && $requestedStep !== false
+            && Authorization::isSuperadmin($actor);
+        if ($editingAnswer) {
+            // «Cambiar» una cantidad con la estructura ya generada: se muestra el paso con la advertencia de regeneración.
+            $mode = 'wizard';
+        } elseif ($structureExists) {
             $mode = 'structure';
         } elseif ($allAnswered) {
             $mode = 'answers_review';
@@ -789,8 +963,30 @@ final class ConfigurationController
             ksort($unitCountsByCategory, SORT_NATURAL | SORT_FLAG_CASE);
         }
 
-        $this->render('composition', 'Configuracion / Conformación de la copropiedad', [
+        // Si el servidor rechazó la estructura, se devuelve exactamente lo que el usuario había escrito.
+        Session::start();
+        $draftUnits = null;
+        if (is_string($_SESSION['composition_draft'] ?? null)) {
+            $decodedDraft = json_decode($_SESSION['composition_draft'], true);
+            $draftUnits = is_array($decodedDraft) && array_is_list($decodedDraft) ? $decodedDraft : null;
+        }
+        unset($_SESSION['composition_draft']);
+        if ($mode === 'structure' && $draftUnits !== null) {
+            $units = array_map(static fn (mixed $unit): array => is_array($unit) ? [
+                'id' => is_string($unit['id'] ?? null) ? $unit['id'] : '',
+                'category' => is_string($unit['category'] ?? null) ? $unit['category'] : '',
+                'name' => is_string($unit['name'] ?? null) ? $unit['name'] : '',
+                'coefficient' => is_scalar($unit['coefficient'] ?? null) ? (string) $unit['coefficient'] : '',
+            ] : ['id' => '', 'category' => '', 'name' => '', 'coefficient' => ''], $draftUnits);
+        }
+
+        $this->render('composition', 'Conformación de la copropiedad', [
             'actor' => $actor,
+            'structureExists' => $structureExists,
+            'restoredDraft' => $mode === 'structure' && $draftUnits !== null,
+            'billingUnitIds' => $compositionService->unitIdsWithBillingHistory(),
+            'assignmentCount' => $compositionService->assignmentCount(),
+            'conformation' => $compositionService->progress($housingType),
             'housingType' => $housingType,
             'towerNomenclature' => $towerNomenclature,
             'answers' => $answers,
@@ -835,10 +1031,29 @@ final class ConfigurationController
             $this->redirect('/configuracion/conformacion?paso=' . $fieldIndex);
         }
 
-        if (!is_array($composition) || $composition['housing_type'] !== $housingType
-            || $answers !== $composition['answers']
-        ) {
+        $changed = !is_array($composition) || $composition['housing_type'] !== $housingType
+            || $answers !== $composition['answers'];
+        $structureExists = is_array($composition) && $composition['housing_type'] === $housingType
+            && $composition['units'] !== null;
+        if ($changed && $structureExists) {
+            // Cambiar una cantidad regenera todos los inmuebles: se pierden coeficientes, ediciones y asignaciones.
+            if (!Authorization::isSuperadmin(Authorization::currentUser())) {
+                $this->flash('error', 'Solo el perfil Superadmin puede reiniciar el proceso de conformación. La cantidad no se cambió.');
+                $this->redirect('/configuracion/conformacion');
+            }
+            if ((new CompositionService())->unitIdsWithBillingHistory() !== []) {
+                $this->flash('error', 'No se puede regenerar la estructura: ya hay notas de cobro emitidas para estos inmuebles. Agrega o corrige inmuebles directamente en la lista.');
+                $this->redirect('/configuracion/conformacion');
+            }
+            if (!$this->confirmedReset($_POST['confirm_text'] ?? null)) {
+                $this->flash('error', 'La cantidad no se cambió. Para regenerar la estructura escribe REINICIAR en la confirmación.');
+                $this->redirect('/configuracion/conformacion?paso=' . $fieldIndex);
+            }
+        }
+        if ($changed) {
             (new CompositionService())->saveAnswers($housingType, $answers);
+        } elseif ($structureExists) {
+            $this->flash('success', 'La cantidad no cambió; la estructura de inmuebles se conserva.');
         }
         $this->redirect('/configuracion/conformacion');
     }
@@ -935,49 +1150,101 @@ final class ConfigurationController
         }
 
         $existingIds = [];
+        $existingNames = [];
         foreach ($composition['units'] as $existingUnit) {
             if (is_array($existingUnit) && is_string($existingUnit['id'] ?? null)) {
                 $existingIds[$existingUnit['id']] = true;
+                $existingNames[$existingUnit['id']] = (string) ($existingUnit['name'] ?? '');
             }
         }
+        $billingIds = $compositionService->unitIdsWithBillingHistory();
         $submittedIds = [];
+        $seenNames = [];
         $units = [];
-        foreach ($submitted as $unit) {
+        $errors = [];
+        $totalTenThousandths = 0;
+        foreach ($submitted as $index => $unit) {
+            $row = 'Fila ' . ($index + 1);
             if (!is_array($unit)) {
-                $this->flash('error', 'Revisa los nombres y categorias de los inmuebles.');
-                $this->redirect('/configuracion/conformacion');
+                $errors[] = $row . ': el inmueble no tiene un formato válido.';
+                continue;
             }
-            $name = trim($this->stringInput($unit['name'] ?? null));
-            $category = trim($this->stringInput($unit['category'] ?? null));
-            if ($name === '' || strlen($name) > 160 || $category === '' || strlen($category) > 80) {
-                $this->flash('error', 'Cada inmueble necesita un nombre y una categoria de hasta 80 caracteres.');
-                $this->redirect('/configuracion/conformacion');
+            $name = preg_replace('/\s+/u', ' ', trim($this->stringInput($unit['name'] ?? null))) ?? '';
+            $category = $this->normalizedCategory($this->stringInput($unit['category'] ?? null));
+            if ($name === '' || mb_strlen($name) > 160) {
+                $errors[] = $row . ': escribe el nombre del inmueble (máximo 160 caracteres).';
             }
-            if ($category === 'Apartamento'
-                && !$this->hasValidApartmentNomenclature($name)
-            ) {
-                $this->flash('error', 'Los apartamentos deben terminar con un numero de dos digitos entre 01 y 99. El identificador 00 no es valido.');
-                $this->redirect('/configuracion/conformacion');
+            if ($category === '' || mb_strlen($category) > 80) {
+                $errors[] = $row . ': elige o escribe una categoría (máximo 80 caracteres).';
+            }
+            $nameKey = mb_strtolower($name, 'UTF-8');
+            if ($name !== '' && isset($seenNames[$nameKey])) {
+                $errors[] = $row . ': «' . $name . '» está repetido (también en la fila ' . $seenNames[$nameKey] . ').';
+            } elseif ($name !== '') {
+                $seenNames[$nameKey] = $index + 1;
+            }
+            if ($category === 'Apartamento' && $name !== '' && !$this->hasValidApartmentNomenclature($name)) {
+                $errors[] = $row . ': los apartamentos deben terminar en «Apartamento NN», con NN entre 01 y 99.';
             }
             $coefficient = $this->coefficientInput($unit['coefficient'] ?? null);
             if ($coefficient === false) {
-                $this->flash('error', 'Cada inmueble debe tener un coeficiente mayor que cero y hasta 100, con máximo cuatro decimales (por ejemplo, 1.2500).');
-                $this->redirect('/configuracion/conformacion');
+                $errors[] = $row . ': el coeficiente debe ser mayor que 0 y hasta 100, con máximo 4 decimales (ej. 1.2500).';
+            } else {
+                [$whole, $fraction] = explode('.', $coefficient);
+                $totalTenThousandths += (int) $whole * 10000 + (int) $fraction;
             }
             $id = $this->stringInput($unit['id'] ?? null);
             if ($id !== '' && (!isset($existingIds[$id]) || isset($submittedIds[$id]))) {
-                $this->flash('error', 'La lista contiene un identificador de inmueble invalido. Recarga la pagina e intenta nuevamente.');
+                $this->flash('error', 'La lista contiene un identificador de inmueble inválido. Recarga la página e intenta nuevamente.');
                 $this->redirect('/configuracion/conformacion');
             }
             if ($id !== '') {
                 $submittedIds[$id] = true;
             }
-            $units[] = ['id' => $id, 'category' => $category, 'name' => $name, 'coefficient' => $coefficient];
+            $units[] = ['id' => $id, 'category' => $category, 'name' => $name, 'coefficient' => $coefficient === false ? '' : $coefficient];
+        }
+
+        // Inmuebles con notas de cobro no se pueden quitar: su cartera quedaría sin inmueble.
+        foreach (array_diff_key($billingIds, $submittedIds) as $removedId => $_) {
+            if (isset($existingIds[$removedId])) {
+                $errors[] = '«' . ($existingNames[$removedId] ?? 'Un inmueble') . '» tiene notas de cobro y no se puede quitar.';
+            }
+        }
+
+        // Ley 675 de 2001: los coeficientes de copropiedad suman 100 %. Se tolera ±0,01 por redondeo del reglamento.
+        if ($errors === [] && abs($totalTenThousandths - 1000000) > 100) {
+            $errors[] = sprintf(
+                'Los coeficientes suman %s %% y deben sumar 100 %% (se admite ±0,01 por redondeo). La cuota de administración se reparte con estos valores.',
+                number_format($totalTenThousandths / 10000, 4, ',', '.')
+            );
+        }
+
+        if ($errors !== []) {
+            Session::start();
+            $_SESSION['composition_draft'] = $submittedJson;
+            $shown = array_slice($errors, 0, 6);
+            $extra = count($errors) - count($shown);
+            $this->flash('error', 'No se guardó la estructura. Tus cambios siguen en pantalla; corrige: ' . implode(' · ', $shown)
+                . ($extra > 0 ? ' · y ' . $extra . ' error(es) más.' : ''));
+            $this->redirect('/configuracion/conformacion');
         }
 
         $compositionService->saveUnits($units, true);
-        $this->flash('success', 'La estructura de bienes se guardo correctamente.');
+        $this->flash('success', 'La estructura de ' . count($units) . ' inmuebles se guardó correctamente. Siguiente paso: asigna los inmuebles a sus usuarios.');
         $this->redirect('/configuracion/conformacion');
+    }
+
+    /** Unifica mayúsculas y espacios de las categorías conocidas para evitar «apartamento» vs «Apartamento». */
+    private function normalizedCategory(string $category): string
+    {
+        $category = preg_replace('/\s+/u', ' ', trim($category)) ?? '';
+        foreach (self::UNIT_CATEGORIES as $known) {
+            if (mb_strtolower($category, 'UTF-8') === mb_strtolower($known, 'UTF-8')) {
+                return $known;
+            }
+        }
+
+        return $category;
     }
 
     /**

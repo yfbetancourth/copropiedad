@@ -11,6 +11,7 @@ final class WebBootstrap
     public static function router(string $projectRoot): Router
     {
         Dotenv::createImmutable($projectRoot)->safeLoad();
+        self::configureTimezone();
 
         header('X-Content-Type-Options: nosniff');
         header('X-Frame-Options: DENY');
@@ -20,5 +21,18 @@ final class WebBootstrap
         header('Cache-Control: no-store, private');
 
         return new Router();
+    }
+
+    /**
+     * Zona horaria de la aplicación: períodos, vencimientos y fechas de pago se calculan en hora de Colombia
+     * sin depender del date.timezone del servidor. Se puede cambiar con APP_TIMEZONE.
+     */
+    public static function configureTimezone(): void
+    {
+        $timezone = (string) ($_ENV['APP_TIMEZONE'] ?? 'America/Bogota');
+        if (!in_array($timezone, timezone_identifiers_list(), true)) {
+            $timezone = 'America/Bogota';
+        }
+        date_default_timezone_set($timezone);
     }
 }

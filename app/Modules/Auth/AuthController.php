@@ -46,14 +46,14 @@ final class AuthController
         $password = (string) ($_POST['password'] ?? '');
 
         if ($identity === '' || $password === '') {
-            $this->render('login', 'Acceso', 'Ingresa tu usuario o correo y contrasena.', null, '', $this->requestedDestination($_POST['destination'] ?? null));
+            $this->render('login', 'Acceso', 'Ingresa tu usuario o correo y contraseña.', null, '', $this->requestedDestination($_POST['destination'] ?? null));
             return;
         }
 
         $user = $this->auth->authenticate($identity, $password);
 
         if ($user === null) {
-            $this->render('login', 'Acceso', 'Credenciales invalidas o cuenta temporalmente bloqueada.', null, '', $this->requestedDestination($_POST['destination'] ?? null));
+            $this->render('login', 'Acceso', 'Credenciales inválidas o cuenta temporalmente bloqueada.', null, '', $this->requestedDestination($_POST['destination'] ?? null));
             return;
         }
 
@@ -92,7 +92,7 @@ final class AuthController
 
     public function forgotPasswordForm(): void
     {
-        $this->render('forgot-password', 'Recuperar contrasena');
+        $this->render('forgot-password', 'Recuperar contraseña');
     }
 
     public function requestPasswordReset(): void
@@ -101,7 +101,7 @@ final class AuthController
         $email = trim((string) ($_POST['email'] ?? ''));
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $this->render('forgot-password', 'Recuperar contrasena', 'Ingresa un correo valido.');
+            $this->render('forgot-password', 'Recuperar contraseña', 'Ingresa un correo válido.');
             return;
         }
 
@@ -121,16 +121,16 @@ final class AuthController
 
         $this->render(
             'forgot-password',
-            'Recuperar contrasena',
+            'Recuperar contraseña',
             null,
-            'Si la cuenta esta registrada, recibiras instrucciones para recuperar el acceso.'
+            'Si la cuenta está registrada, recibirás instrucciones para recuperar el acceso.'
         );
     }
 
     public function resetPasswordForm(): void
     {
         $token = (string) ($_GET['token'] ?? '');
-        $this->render('reset-password', 'Nueva contrasena', null, null, $token);
+        $this->render('reset-password', 'Nueva contraseña', null, null, $token);
     }
 
     public function resetPassword(): void
@@ -141,26 +141,26 @@ final class AuthController
         $confirmation = (string) ($_POST['password_confirmation'] ?? '');
 
         if (!preg_match('/^[a-f0-9]{64}$/D', $token)) {
-            $this->render('reset-password', 'Nueva contrasena', 'El enlace no es valido o ha vencido.', null, '');
+            $this->render('reset-password', 'Nueva contraseña', 'El enlace no es válido o ha vencido.', null, '');
             return;
         }
 
         if (strlen($password) < 12) {
-            $this->render('reset-password', 'Nueva contrasena', 'La contrasena debe tener al menos 12 caracteres.', null, $token);
+            $this->render('reset-password', 'Nueva contraseña', 'La contraseña debe tener al menos 12 caracteres.', null, $token);
             return;
         }
 
         if (!hash_equals($password, $confirmation)) {
-            $this->render('reset-password', 'Nueva contrasena', 'Las contrasenas no coinciden.', null, $token);
+            $this->render('reset-password', 'Nueva contraseña', 'Las contraseñas no coinciden.', null, $token);
             return;
         }
 
         if (!$this->auth->resetPassword(hash('sha256', $token), $password)) {
-            $this->render('reset-password', 'Nueva contrasena', 'El enlace no es valido o ha vencido.', null, '');
+            $this->render('reset-password', 'Nueva contraseña', 'El enlace no es válido o ha vencido.', null, '');
             return;
         }
 
-        $this->render('login', 'Acceso', null, 'Contrasena actualizada. Ya puedes iniciar sesion.');
+        $this->render('login', 'Acceso', null, 'Contraseña actualizada. Ya puedes iniciar sesión.');
     }
 
     public function userPanel(): void
@@ -218,7 +218,7 @@ final class AuthController
         $paymentSettings = $paymentService->settings();
         Session::start();
         View::renderPortal('Portal/index', [
-            'title' => 'Panel de Usuario',
+            'title' => 'Bienvenida',
             'user' => $user,
             'units' => $assignedUnits,
             'billingDocuments' => $paymentService->payableStatements((int) $user['id']),
@@ -410,15 +410,15 @@ final class AuthController
             || strlen($email) > 254 || !filter_var($email, FILTER_VALIDATE_EMAIL)
             || $currentPassword === ''
         ) {
-            $this->profileFlash('error', 'Revisa tu nombre de usuario, correo y contrasena actual.');
+            $this->profileFlash('error', 'Revisa tu nombre de usuario, correo y contraseña actual.');
             $this->redirect('/usuario');
         }
         if ($newPassword !== '' && strlen($newPassword) < 12) {
-            $this->profileFlash('error', 'La nueva contrasena debe tener al menos 12 caracteres.');
+            $this->profileFlash('error', 'La nueva contraseña debe tener al menos 12 caracteres.');
             $this->redirect('/usuario');
         }
         if ($newPassword !== '' && !hash_equals($newPassword, $passwordConfirmation)) {
-            $this->profileFlash('error', 'La nueva contrasena y su confirmacion no coinciden.');
+            $this->profileFlash('error', 'La nueva contraseña y su confirmación no coinciden.');
             $this->redirect('/usuario');
         }
 
@@ -457,10 +457,21 @@ final class AuthController
             return;
         }
 
+        $dashboard = null;
+        if (Authorization::hasPermission($user, 'cartera.cobros', 1)) {
+            try {
+                $dashboard = (new \App\Modules\Billing\ReportService())->dashboard();
+            } catch (\Throwable $exception) {
+                // El panel debe abrir aunque falte una migración o configuración de cartera.
+                error_log('No se pudieron cargar los indicadores del panel: ' . $exception->getMessage());
+            }
+        }
+
+        header('Cache-Control: no-store, private');
         View::renderAdmin('Auth/admin', [
-            'title' => 'Panel administrativo',
+            'title' => 'Bienvenida',
             'username' => $user['username'],
-            'csrfToken' => Session::csrfToken(),
+            'dashboard' => $dashboard,
         ]);
     }
 
@@ -511,7 +522,7 @@ final class AuthController
     {
         if (!Session::verifyCsrf($_POST['_token'] ?? null)) {
             http_response_code(419);
-            echo 'La sesion del formulario vencio. Recarga la pagina e intenta nuevamente.';
+            echo 'La sesión del formulario venció. Recarga la página e intenta nuevamente.';
             exit;
         }
     }
@@ -525,13 +536,23 @@ final class AuthController
         string $destination = 'admin'
     ): void {
         header('Cache-Control: no-store, private');
-        View::render('Auth/' . $template, [
+        try {
+            $coverImage = (new \App\Modules\Configuration\PropertyGalleryService())->images()[0]['url'] ?? null;
+            $address = trim((string) ((new \App\Modules\Configuration\SettingsService())->current()['address'] ?? ''));
+        } catch (\Throwable) {
+            // La pantalla de acceso debe abrir aunque falle la galería o la configuración.
+            $coverImage = null;
+            $address = '';
+        }
+        View::renderAuth('Auth/' . $template, [
             'title' => $title,
             'csrfToken' => Session::csrfToken(),
             'error' => $error,
             'notice' => $notice,
             'token' => $token,
             'destination' => $destination,
+            'coverImage' => $coverImage,
+            'address' => $address,
         ]);
     }
 

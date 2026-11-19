@@ -11,11 +11,14 @@ use App\Modules\Configuration\MailSettingsService;
 use App\Modules\Configuration\SettingsService;
 use DateTimeImmutable;
 use PDO;
+use PDOException;
 use RuntimeException;
 use Throwable;
 
 final class BillingService
 {
+    private const PROVIDER_PAYMENT_TABLES = ['billing_online_payments', 'billing_bold_terminal_payments'];
+
     private const ITEM_COLUMNS = [
         'interest' => 'interest',
         'legal' => 'legal',
@@ -35,7 +38,7 @@ final class BillingService
         'other' => 'Otros cobros',
     ];
 
-    public function preview(string $period): array
+    public function preview(string $period, ?int $actorId = null): array
     {
         $periodDate = self::periodDate($period);
         $currentMonth = new DateTimeImmutable('first day of this month');
@@ -61,7 +64,8 @@ final class BillingService
             && trim((string) ($propertySettings['bank_name'] ?? '')) !== ''
             && trim((string) ($propertySettings['account_type'] ?? '')) !== ''
             && trim((string) ($propertySettings['account_number'] ?? '')) !== '';
-        $mailSettingsReady = trim($mailSettings['host']) !== ''
+        $personalMail = $actorId !== null ? (new \App\Modules\Configuration\PersonalMailService())->current($actorId) : null;
+        $mailSettingsReady = ($personalMail['active'] ?? false) || trim($mailSettings['host']) !== ''
             && (int) $mailSettings['port'] >= 1 && (int) $mailSettings['port'] <= 65535
             && trim($mailSettings['username']) !== ''
             && $mailSettings['password_configured']
@@ -102,10 +106,10 @@ final class BillingService
                 $previous['total'] = $openingAdjustment;
                 $previous['balance'] = $openingAdjustment;
             }
-            $previousBalance = $prior === null
+            // Sin nota anterior, el ajuste es el saldo inicial: sumarlo otra vez lo duplicaba.
+            $openingBalance = $prior === null
                 ? $openingAdjustment
-                : $previous['balance'];
-            $openingBalance = $previousBalance + $openingAdjustment;
+                : $previous['balance'] + $openingAdjustment;
             $effectiveDate = (string) ($propertySettings['effective_date'] ?? '');
             $feeApplies = $feeReady && $effectiveDate <= $periodStart && !$feeNotYetEffective;
             $coefficient = $existingStatement !== null
@@ -166,7 +170,7 @@ final class BillingService
             $blockingReasons[] = 'Completa los datos bancarios en Parametrización.';
         }
         if (!$mailSettingsReady) {
-            $blockingReasons[] = 'Completa y prueba la configuración SMTP en Configuración / Correo.';
+            $blockingReasons[] = 'Completa y prueba la configuración SMTP en Configuración / Correo, o activa tu correo personal de envío.';
         }
         if (!$feeReady) {
             $blockingReasons[] = 'Configura la cuota y su fecha de vigencia en Configuración / Financiera.';
@@ -194,6 +198,14 @@ final class BillingService
                 break;
             }
         }
+        $warnings = [];
+        $pendingOnline = $this->pendingOnlinePaymentsBefore($period);
+        if ($pendingOnline > 0) {
+            $warnings[] = sprintf(
+                'Hay %d pago(s) en línea o en datáfono pendientes de confirmación sobre notas anteriores. Si se aprueban después de emitir, quedarán en la nota anterior y deberás registrar un ajuste en este período.',
+                $pendingOnline
+            );
+        }
 
         return [
             'period' => $period,
@@ -204,6 +216,7 @@ final class BillingService
             'due_day' => $dueDay,
             'ready' => $blockingReasons === [],
             'blocking_reasons' => array_values(array_unique($blockingReasons)),
+            'warnings' => $warnings,
             'new_count' => count($eligibleRows),
             'issued_count' => count(array_filter($rows, static fn (array $row): bool => $row['already_issued'])),
         ];
@@ -274,10 +287,18 @@ final class BillingService
         $pdo = Database::connection();
         $pdo->beginTransaction();
         try {
-            $lock = $pdo->prepare('SELECT id FROM billing_statements WHERE id = ? FOR UPDATE');
+            $lock = $pdo->prepare('SELECT id, unit_id, period FROM billing_statements WHERE id = ? FOR UPDATE');
             $lock->execute([$statementId]);
-            if ($lock->fetchColumn() === false) {
+            $locked = $lock->fetch();
+            if (!is_array($locked)) {
                 throw new RuntimeException('La nota de cobro seleccionada no existe.');
+            }
+            $newer = $this->newerStatement((string) $locked['unit_id'], (string) $locked['period']);
+            if ($newer !== null) {
+                throw new RuntimeException(sprintf(
+                    'El saldo de esta nota ya se trasladó a la nota del período %s. Registra el pago en la nota más reciente del inmueble.',
+                    $newer['period']
+                ));
             }
             $pdo->prepare(
                 'INSERT INTO billing_payments (statement_id, amount, received_on, reference, notes, created_by)
@@ -290,6 +311,82 @@ final class BillingService
             }
             throw $exception;
         }
+    }
+
+    /**
+     * Anula un pago manual registrado por error. El registro se conserva con quién, cuándo y por qué
+     * se anuló; nunca se borra. Solo aplica mientras el saldo de la nota no se haya trasladado.
+     */
+    public function voidPayment(int $paymentId, string $reason, int $actorId): void
+    {
+        $reasonLength = function_exists('mb_strlen') ? mb_strlen($reason, 'UTF-8') : strlen($reason);
+        if ($reasonLength < 5 || strlen($reason) > 255) {
+            throw new RuntimeException('Indica el motivo de la anulación (entre 5 y 255 caracteres).');
+        }
+
+        $pdo = Database::connection();
+        $pdo->beginTransaction();
+        try {
+            $query = $pdo->prepare(
+                'SELECT payments.id, payments.statement_id, payments.reference, payments.voided_at,
+                        statements.unit_id, statements.period
+                 FROM billing_payments AS payments
+                 JOIN billing_statements AS statements ON statements.id = payments.statement_id
+                 WHERE payments.id = ?
+                 FOR UPDATE'
+            );
+            $query->execute([$paymentId]);
+            $payment = $query->fetch();
+            if (!is_array($payment)) {
+                throw new RuntimeException('El pago seleccionado no existe.');
+            }
+            if ($payment['voided_at'] !== null) {
+                throw new RuntimeException('El pago ya estaba anulado.');
+            }
+            $newer = $this->newerStatement((string) $payment['unit_id'], (string) $payment['period']);
+            if ($newer !== null) {
+                throw new RuntimeException(sprintf(
+                    'El saldo de esta nota ya se trasladó a la nota del período %s. Corrige la diferencia con un concepto de ajuste en el período vigente.',
+                    $newer['period']
+                ));
+            }
+            if ($this->isProviderPayment((int) $payment['statement_id'], (string) $payment['reference'])) {
+                throw new RuntimeException('Los pagos confirmados por Bold no se anulan desde aquí: gestiona la reversión con el proveedor y registra un ajuste.');
+            }
+            $pdo->prepare(
+                'UPDATE billing_payments
+                 SET voided_at = CURRENT_TIMESTAMP, voided_by = ?, void_reason = ?
+                 WHERE id = ? AND voided_at IS NULL'
+            )->execute([$actorId, $reason, $paymentId]);
+            $pdo->commit();
+        } catch (Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $exception;
+        }
+    }
+
+    /** Pagos (incluidos los anulados) de las notas de un período, para consulta y anulación. */
+    public function periodPayments(string $period): array
+    {
+        self::periodDate($period);
+        $query = Database::connection()->prepare(
+            'SELECT payments.id, payments.statement_id, payments.amount, payments.received_on,
+                    payments.reference, payments.notes, payments.created_at,
+                    payments.voided_at, payments.void_reason,
+                    statements.unit_name, statements.period,
+                    creators.username AS created_by_name, voiders.username AS voided_by_name
+             FROM billing_payments AS payments
+             JOIN billing_statements AS statements ON statements.id = payments.statement_id
+             LEFT JOIN admin_users AS creators ON creators.id = payments.created_by
+             LEFT JOIN admin_users AS voiders ON voiders.id = payments.voided_by
+             WHERE statements.period = ?
+             ORDER BY payments.received_on DESC, payments.id DESC'
+        );
+        $query->execute([$period]);
+
+        return $query->fetchAll();
     }
 
     public function removeItem(int $itemId, string $period): void
@@ -343,7 +440,7 @@ final class BillingService
             );
             $lockPrevious->execute([$previousPeriod]);
             $lockPrevious->fetchAll();
-            $preview = $this->preview($period);
+            $preview = $this->preview($period, $actorId);
             if (!$preview['ready']) {
                 throw new RuntimeException(implode(' ', $preview['blocking_reasons']));
             }
@@ -404,7 +501,7 @@ final class BillingService
             throw $exception;
         }
 
-        $delivery = $this->sendPeriod($period);
+        $delivery = $this->sendPeriod($period, $actorId);
 
         return [
             'issued' => count($statementIds),
@@ -414,10 +511,30 @@ final class BillingService
         ];
     }
 
-    public function sendPeriod(string $period): array
+    /**
+     * Cuenta desde la que salen los correos que dispara un administrador: su correo personal
+     * (p. ej. certificado) si lo tiene activo y verificado; si no, la cuenta general.
+     *
+     * @return array{settings: array, address: string, name: string, personal: bool}
+     */
+    public function senderFor(?int $actorId): array
+    {
+        $personal = $actorId !== null ? (new \App\Modules\Configuration\PersonalMailService())->activeCredentials($actorId) : null;
+        $settings = $personal ?? (new MailSettingsService())->credentials();
+
+        return [
+            'settings' => $settings,
+            'address' => (string) $settings['from_address'],
+            'name' => (string) $settings['from_name'],
+            'personal' => $personal !== null,
+        ];
+    }
+
+    public function sendPeriod(string $period, ?int $actorId = null): array
     {
         self::periodDate($period);
-        $settings = (new MailSettingsService())->credentials();
+        $sender = $this->senderFor($actorId);
+        $settings = $sender['settings'];
         $query = Database::connection()->prepare(
             "SELECT recipients.id AS recipient_id, recipients.recipient_email, recipients.recipient_name,
                     statements.id AS statement_id, statements.period
@@ -460,20 +577,18 @@ final class BillingService
                     $this->statementHtml($statement),
                     $this->statementText($statement)
                 );
-                Database::connection()->prepare(
-                    "UPDATE billing_statement_recipients
-                     SET delivery_status = 'sent', sent_at = CURRENT_TIMESTAMP, delivery_started_at = NULL
-                     WHERE id = ?"
-                )->execute([(int) $recipient['recipient_id']]);
+                $this->markRecipientSent((int) $recipient['recipient_id'], $sender['address'], $actorId);
                 $sent++;
             } catch (\PHPMailer\PHPMailer\Exception|RuntimeException $exception) {
                 error_log('Fallo al notificar una nota de cobro: ' . $exception->getMessage());
                 Database::connection()->prepare(
                     "UPDATE billing_statement_recipients
-                     SET delivery_status = 'failed', delivery_started_at = NULL,
-                         last_error = 'No se pudo enviar. Revisa SMTP y reintenta.'
+                     SET delivery_status = 'failed', delivery_started_at = NULL, last_error = ?
                      WHERE id = ?"
-                )->execute([(int) $recipient['recipient_id']]);
+                )->execute([
+                    mb_substr('No se pudo enviar desde ' . $sender['address'] . '. Revisa la cuenta SMTP y reintenta.', 0, 255, 'UTF-8'),
+                    (int) $recipient['recipient_id'],
+                ]);
             }
         }
 
@@ -498,6 +613,26 @@ final class BillingService
         ];
     }
 
+    /** Marca el envío como hecho y deja constancia de la cuenta remitente y de quién lo envió. */
+    private function markRecipientSent(int $recipientId, string $fromAddress, ?int $actorId): void
+    {
+        try {
+            Database::connection()->prepare(
+                "UPDATE billing_statement_recipients
+                 SET delivery_status = 'sent', sent_at = CURRENT_TIMESTAMP, delivery_started_at = NULL,
+                     sent_from = ?, sent_by = ?
+                 WHERE id = ?"
+            )->execute([$fromAddress, $actorId, $recipientId]);
+        } catch (\PDOException) {
+            // Sin la migración 021 no existen las columnas de trazabilidad; el envío igual se registra.
+            Database::connection()->prepare(
+                "UPDATE billing_statement_recipients
+                 SET delivery_status = 'sent', sent_at = CURRENT_TIMESTAMP, delivery_started_at = NULL
+                 WHERE id = ?"
+            )->execute([$recipientId]);
+        }
+    }
+
     public function statements(string $period): array
     {
         $query = Database::connection()->prepare(
@@ -506,7 +641,9 @@ final class BillingService
                     (SELECT COUNT(*) FROM billing_statement_recipients r WHERE r.statement_id = statements.id AND r.delivery_status = "sent") AS sent_count,
                     (SELECT COUNT(*) FROM billing_statement_recipients r WHERE r.statement_id = statements.id AND r.delivery_status = "failed") AS failed_count,
                     (SELECT COUNT(*) FROM billing_statement_recipients r WHERE r.statement_id = statements.id AND r.delivery_status IN ("pending", "sending")) AS pending_count,
-                    (SELECT COALESCE(SUM(payments.amount), 0) FROM billing_payments payments WHERE payments.statement_id = statements.id) AS payments_total
+                    (SELECT COALESCE(SUM(payments.amount), 0) FROM billing_payments payments WHERE payments.statement_id = statements.id AND payments.voided_at IS NULL) AS payments_total,
+                    (SELECT COALESCE(SUM(payments.amount), 0) FROM billing_payments payments WHERE payments.statement_id = statements.id AND payments.voided_at IS NULL AND payments.received_on <= statements.early_payment_date) AS early_payments_total,
+                    (SELECT MIN(newer.period) FROM billing_statements newer WHERE newer.unit_id = statements.unit_id AND newer.period > statements.period) AS superseded_by_period
              FROM billing_statements statements
              WHERE statements.period = ?
              ORDER BY statements.unit_name'
@@ -529,26 +666,32 @@ final class BillingService
         $statement['lines'] = $this->statementLines($statementId);
         $statement['recipients'] = $this->statementRecipients($statementId);
         $statement['payments'] = $this->statementPayments($statementId);
+        $validPayments = array_filter(
+            $statement['payments'],
+            static fn (array $payment): bool => $payment['voided_at'] === null
+        );
         $statement['payments_total'] = array_sum(array_map(
             static fn (array $payment): int => self::cents($payment['amount']),
-            $statement['payments']
+            $validPayments
         ));
         $earlyPayments = array_sum(array_map(
             static fn (array $payment): int => $payment['received_on'] <= $statement['early_payment_date']
                 ? self::cents($payment['amount'])
                 : 0,
-            $statement['payments']
+            $validPayments
         ));
-        $earlyThreshold = max(0, self::cents($statement['total_due']) - self::cents($statement['early_discount']));
-        $statement['discount_applied'] = self::cents($statement['total_due']) > 0
-            && $earlyPayments >= $earlyThreshold
-            && $earlyPayments > 0
-            ? self::cents($statement['early_discount'])
-            : 0;
-        $statement['balance'] = self::cents($statement['total_due'])
-            - $statement['payments_total']
-            - $statement['discount_applied'];
+        $settlement = self::settle(
+            self::cents($statement['total_due']),
+            self::cents($statement['early_discount']),
+            $statement['payments_total'],
+            $earlyPayments
+        );
+        $statement['discount_applied'] = $settlement['discount'];
+        $statement['balance'] = $settlement['balance'];
         $statement['number'] = $this->number($statement);
+        // Una nota con una nota posterior del mismo inmueble ya trasladó su saldo: no se paga ni se ajusta.
+        $statement['superseded_by'] = $this->newerStatement((string) $statement['unit_id'], (string) $statement['period']);
+        $statement['payable_balance'] = $statement['superseded_by'] === null ? max(0, $settlement['balance']) : 0;
 
         return $statement;
     }
@@ -819,16 +962,12 @@ final class BillingService
             $items[$key] = self::cents($statement[$key]);
         }
         $paymentsTotal = $payments['total'] ?? 0;
-        $earlyPayments = $payments['early'] ?? 0;
-        $earlyThreshold = max(
-            0,
-            self::cents($statement['total_due']) - self::cents($statement['early_discount'])
+        $settlement = self::settle(
+            self::cents($statement['total_due']),
+            self::cents($statement['early_discount']),
+            $paymentsTotal,
+            $payments['early'] ?? 0
         );
-        $discount = self::cents($statement['total_due']) > 0
-            && $earlyPayments >= $earlyThreshold
-            && $earlyPayments > 0
-            ? self::cents($statement['early_discount'])
-            : 0;
 
         return [
             'statement_id' => (int) $statement['id'],
@@ -837,9 +976,90 @@ final class BillingService
             'items' => $items,
             'total' => self::cents($statement['total_due']),
             'payments' => $paymentsTotal,
-            'discount' => $discount,
-            'balance' => self::cents($statement['total_due']) - $paymentsTotal - $discount,
+            'discount' => $settlement['discount'],
+            'balance' => $settlement['balance'],
         ];
+    }
+
+    /**
+     * Regla única de saldo: el descuento de pronto pago se reconoce cuando los pagos recibidos
+     * hasta la fecha límite cubren el total menos el descuento.
+     *
+     * @return array{discount: int, balance: int}
+     */
+    public static function settle(int $totalDue, int $earlyDiscount, int $paymentsTotal, int $earlyPayments): array
+    {
+        $threshold = max(0, $totalDue - $earlyDiscount);
+        $discount = $totalDue > 0 && $earlyPayments > 0 && $earlyPayments >= $threshold ? $earlyDiscount : 0;
+
+        return ['discount' => $discount, 'balance' => $totalDue - $paymentsTotal - $discount];
+    }
+
+    /** Nota inmediatamente posterior del mismo inmueble, si existe. */
+    public function newerStatement(string $unitId, string $period): ?array
+    {
+        $query = Database::connection()->prepare(
+            'SELECT id, period FROM billing_statements
+             WHERE unit_id = ? AND period > ?
+             ORDER BY period LIMIT 1'
+        );
+        $query->execute([$unitId, $period]);
+        $row = $query->fetch();
+
+        return is_array($row) ? ['id' => (int) $row['id'], 'period' => (string) $row['period']] : null;
+    }
+
+    private function isProviderPayment(int $statementId, string $reference): bool
+    {
+        if ($reference === '') {
+            return false;
+        }
+        foreach (self::PROVIDER_PAYMENT_TABLES as $table) {
+            try {
+                $query = Database::connection()->prepare(
+                    "SELECT 1 FROM {$table} WHERE statement_id = ? AND transaction_id = ? AND status = 'approved' LIMIT 1"
+                );
+                $query->execute([$statementId, $reference]);
+            } catch (PDOException $exception) {
+                if (self::isMissingTable($exception)) {
+                    continue;
+                }
+                throw $exception;
+            }
+            if ($query->fetchColumn() !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Una integración Bold cuya migración no se aplicó simplemente no tiene pagos. */
+    private static function isMissingTable(PDOException $exception): bool
+    {
+        return (string) $exception->getCode() === '42S02';
+    }
+
+    private function pendingOnlinePaymentsBefore(string $period): int
+    {
+        $count = 0;
+        foreach (self::PROVIDER_PAYMENT_TABLES as $table) {
+            try {
+                $query = Database::connection()->prepare(
+                    "SELECT COUNT(*) FROM {$table} AS pending
+                     JOIN billing_statements AS statements ON statements.id = pending.statement_id
+                     WHERE statements.period < ? AND pending.status = 'pending'"
+                );
+                $query->execute([$period]);
+                $count += (int) $query->fetchColumn();
+            } catch (PDOException $exception) {
+                if (!self::isMissingTable($exception)) {
+                    throw $exception;
+                }
+            }
+        }
+
+        return $count;
     }
 
     private function assignedUnits(): array
@@ -993,6 +1213,7 @@ final class BillingService
              FROM billing_payments AS payments
              JOIN billing_statements AS statements ON statements.id = payments.statement_id
              WHERE payments.statement_id IN ($placeholders)
+               AND payments.voided_at IS NULL
              GROUP BY payments.statement_id"
         );
         $query->execute($ids);
@@ -1032,7 +1253,7 @@ final class BillingService
     private function statementPayments(int $statementId): array
     {
         $query = Database::connection()->prepare(
-            'SELECT amount, received_on, reference, notes
+            'SELECT id, amount, received_on, reference, notes, voided_at, void_reason
              FROM billing_payments WHERE statement_id = ? ORDER BY received_on, id'
         );
         $query->execute([$statementId]);

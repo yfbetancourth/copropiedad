@@ -8,6 +8,7 @@ use Dotenv\Dotenv;
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 Dotenv::createImmutable(dirname(__DIR__))->safeLoad();
+\App\Core\WebBootstrap::configureTimezone();
 
 $password = getenv('SUPERADMIN_PASSWORD');
 if (!is_string($password) || strlen($password) < 12) {

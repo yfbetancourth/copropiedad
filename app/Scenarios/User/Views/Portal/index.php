@@ -1,16 +1,36 @@
+<?php
+// Bienvenida con la misma estructura que la del panel administrativo.
+$welcomeNow = new DateTimeImmutable('now');
+$welcomeHour = (int) $welcomeNow->format('G');
+$welcomeGreeting = $welcomeHour < 12 ? 'Buenos días' : ($welcomeHour < 19 ? 'Buenas tardes' : 'Buenas noches');
+$welcomeWeekdays = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+$welcomeMonths = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+$welcomeDate = ucfirst($welcomeWeekdays[(int) $welcomeNow->format('w')]) . ', ' . $welcomeNow->format('j') . ' de '
+    . $welcomeMonths[(int) $welcomeNow->format('n') - 1] . ' de ' . $welcomeNow->format('Y');
+$welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notifications['billing_count'] ?? 0);
+?>
 <section class="content">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h1 class="h3 mb-1">Panel de Usuario</h1>
-            <p class="text-secondary mb-0">Bienvenido, <?= htmlspecialchars($user['username'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>.</p>
-        </div>
-        <div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-success" href="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/pagos">
-                <i class="bi bi-credit-card me-1" aria-hidden="true"></i>Pago en línea
-            </a>
-            <a class="btn btn-outline-primary" href="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/clasificados">
-            <i class="bi bi-megaphone me-1" aria-hidden="true"></i>Ver clasificados públicos
-            </a>
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <p class="text-secondary small text-uppercase fw-semibold mb-1"><?= htmlspecialchars($propertyName . ' · ' . $welcomeDate, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></p>
+                <h1 class="h3 mb-1"><?= htmlspecialchars($welcomeGreeting . ', ' . $user['username'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></h1>
+                <p class="text-secondary mb-0">
+                    <?php if ($welcomePending > 0): ?>
+                        <i class="bi bi-bell-fill text-warning me-1" aria-hidden="true"></i>Tienes <?= $welcomePending ?> notificación(es) sin leer.
+                    <?php else: ?>
+                        <i class="bi bi-check-circle-fill text-success me-1" aria-hidden="true"></i>Estás al día con tus notificaciones.
+                    <?php endif; ?>
+                </p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-primary" href="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/pagos">
+                    <i class="bi bi-credit-card me-1" aria-hidden="true"></i>Pagar mis cuotas
+                </a>
+                <a class="btn btn-outline-secondary" href="#documentos">
+                    <i class="bi bi-receipt me-1" aria-hidden="true"></i>Mis documentos de cobro
+                </a>
+            </div>
         </div>
     </div>
 
@@ -28,51 +48,37 @@
     };
     ?>
 
-    <div class="row g-3 mb-3">
-        <div class="col-sm-6 col-xl-3">
-            <div class="info-box">
-                <span class="info-box-icon text-bg-primary"><i class="bi bi-house-door" aria-hidden="true"></i></span>
-                <div class="info-box-content">
-                    <span class="info-box-text">Inmuebles asignados</span>
-                    <span class="info-box-number"><?= count($units) ?></span>
+    <?php
+    // Indicadores con las mismas tarjetas de la bienvenida del panel administrativo.
+    $portalKpis = [
+        ['Inmuebles asignados', (string) count($units), 'bi-house-door', 'text-primary', count($units) === 1 ? '1 inmueble a tu nombre' : count($units) . ' inmuebles a tu nombre', '#inmuebles', 'Ver mis inmuebles'],
+        ['Cuota de administración', $currency($settings['administration_fee'] ?? null), 'bi-cash-stack', 'text-success', 'Aplica desde ' . ($settings['effective_date'] ?? 'sin fecha'), $basePath . '/usuario/pagos', 'Ir a pagos'],
+        ['Descuento por pronto pago', $currency($settings['early_payment_discount'] ?? null), 'bi-piggy-bank', 'text-info', 'Si pagas antes de la fecha límite', $basePath . '/usuario/pagos', 'Ver fechas'],
+        ['Multas', 'Sin registro', 'bi-exclamation-octagon', 'text-warning', 'Aún no hay historial de multas', '#documentos', 'Ver documentos'],
+    ];
+    ?>
+    <h2 class="visually-hidden">Resumen de mi cuenta</h2>
+    <div class="row g-3 mb-4">
+        <?php foreach ($portalKpis as [$kpiLabel, $kpiValue, $kpiIcon, $kpiTone, $kpiHint, $kpiLink, $kpiAction]): ?>
+            <div class="col-sm-6 col-xl-3">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <span class="text-secondary small"><?= htmlspecialchars($kpiLabel, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span>
+                            <i class="bi <?= $kpiIcon ?> fs-5 <?= $kpiTone ?>" aria-hidden="true"></i>
+                        </div>
+                        <p class="h4 mb-1"><?= htmlspecialchars($kpiValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></p>
+                        <p class="small text-secondary mb-0"><?= htmlspecialchars((string) $kpiHint, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></p>
+                    </div>
+                    <a class="card-footer small text-decoration-none bg-transparent" href="<?= htmlspecialchars($kpiLink, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>"><?= htmlspecialchars($kpiAction, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?> <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
                 </div>
             </div>
-        </div>
-        <div class="col-sm-6 col-xl-3">
-            <div class="info-box">
-                <span class="info-box-icon text-bg-info"><i class="bi bi-cash-stack" aria-hidden="true"></i></span>
-                <div class="info-box-content">
-                    <span class="info-box-text">Canon mensual actual</span>
-                    <span class="info-box-number"><?= htmlspecialchars($currency($settings['administration_fee'] ?? null), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span>
-                    <span class="progress-description">Aplica desde <?= htmlspecialchars((string) ($settings['effective_date'] ?? 'sin fecha'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-6 col-xl-3">
-            <div class="info-box">
-                <span class="info-box-icon text-bg-warning"><i class="bi bi-exclamation-circle" aria-hidden="true"></i></span>
-                <div class="info-box-content">
-                    <span class="info-box-text">Multas generadas</span>
-                    <span class="info-box-number">Sin registro</span>
-                    <span class="progress-description">Aún no hay historial de multas en el sistema.</span>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-6 col-xl-3">
-            <div class="info-box">
-                <span class="info-box-icon text-bg-success"><i class="bi bi-piggy-bank" aria-hidden="true"></i></span>
-                <div class="info-box-content">
-                    <span class="info-box-text">Ahorro por pronto pago</span>
-                    <span class="info-box-number"><?= htmlspecialchars($currency($settings['early_payment_discount'] ?? null), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span>
-                    <span class="progress-description">Descuento configurado; el ahorro aplicado requiere historial de pagos.</span>
-                </div>
-            </div>
-        </div>
+        <?php endforeach; ?>
     </div>
 
     <div class="row g-3">
         <div class="col-xl-8">
-            <div class="card card-primary card-outline">
+            <div class="card card-primary card-outline" id="inmuebles">
                 <div class="card-header">
                     <h2 class="card-title">Mis inmuebles asignados</h2>
                     <span class="badge text-bg-primary"><?= count($units) ?></span>
@@ -117,15 +123,18 @@
                                 <?php foreach ($billingDocuments as $document): ?>
                                     <?php
                                     $balance = (int) $document['balance'];
+                                    $supersededPeriod = is_array($document["superseded_by"] ?? null) ? (string) $document["superseded_by"]["period"] : null;
+                                    $payable = $balance > 0 && $supersededPeriod === null;
                                     $paymentStatus = $document['terminal_payment_status'] ?? $document['online_payment_status'] ?? null;
                                     ?>
                                     <tr>
                                         <td><?= htmlspecialchars((string) $document['number'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
                                         <td><?= htmlspecialchars((string) $document['unit_name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
                                         <td><?= htmlspecialchars((string) $document['period'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
-                                        <td><?= htmlspecialchars($currency($balance / 100), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
+                                        <td><?= $supersededPeriod !== null ? '<span class="text-secondary">Incluido en ' . htmlspecialchars($supersededPeriod, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</span>' : htmlspecialchars($currency($balance / 100), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
                                         <td>
-                                            <?php if ($balance <= 0): ?>
+                                            <?php if ($supersededPeriod !== null): ?><span class="badge text-bg-secondary">Saldo trasladado a <?= htmlspecialchars($supersededPeriod, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8") ?></span>
+                                    <?php elseif ($balance <= 0): ?>
                                                 <span class="badge text-bg-success">Pagada</span>
                                             <?php elseif ($paymentStatus === 'approved'): ?>
                                                 <span class="badge text-bg-success">Pago aprobado</span>
@@ -138,7 +147,7 @@
                                             <?php endif; ?>
                                         </td>
                                         <td>
-                                            <?php if ($balance > 0 && $onlinePaymentsReady): ?>
+                                            <?php if ($payable && $onlinePaymentsReady): ?>
                                                 <form method="post" action="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/pagar">
                                                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
                                                     <input type="hidden" name="statement_id" value="<?= (int) $document['id'] ?>">
@@ -147,14 +156,16 @@
                                                     </button>
                                                 </form>
                                             <?php endif; ?>
-                                            <?php if ($balance > 0 && $terminalPaymentsReady): ?>
+                                            <?php if ($payable && $terminalPaymentsReady): ?>
                                                 <form class="mt-1" method="post" action="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/pagar-datafono" aria-label="Pagar nota en datáfono Bold">
                                                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
                                                     <input type="hidden" name="statement_id" value="<?= (int) $document['id'] ?>">
                                                     <button class="btn btn-outline-success btn-sm" type="submit">Datáfono Bold · <?= htmlspecialchars($currency($balance / 100), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></button>
                                                 </form>
                                             <?php endif; ?>
-                                            <?php if ($balance > 0 && !$onlinePaymentsReady && !$terminalPaymentsReady): ?>
+                                            <?php if ($supersededPeriod !== null): ?>
+                                        <span class="text-secondary small">Paga la nota más reciente</span>
+                                    <?php elseif ($payable && !$onlinePaymentsReady && !$terminalPaymentsReady): ?>
                                                 <span class="text-secondary small">Pago en línea no disponible</span>
                                             <?php elseif ($balance <= 0): ?>
                                                 <span class="text-secondary small">Sin saldo pendiente</span>
@@ -170,7 +181,7 @@
             </div>
         </div>
         <div class="col-xl-4">
-            <div class="card">
+            <div class="card" id="perfil">
                 <div class="card-header"><h2 class="card-title">Personalizar mi cuenta</h2></div>
                 <form method="post" action="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/perfil">
                     <div class="card-body">

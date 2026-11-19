@@ -17,6 +17,11 @@ $router->post('/configuracion/financiera/guardar', [$configuration, 'saveFinanci
 $router->get('/configuracion/correo', [$configuration, 'mail']);
 $router->post('/configuracion/correo/guardar', [$configuration, 'saveMail']);
 $router->post('/configuracion/correo/probar', [$configuration, 'testMail']);
+$router->get('/configuracion/mi-correo', [$configuration, 'myMail']);
+$router->post('/configuracion/mi-correo/guardar', [$configuration, 'saveMyMail']);
+$router->post('/configuracion/mi-correo/probar', [$configuration, 'testMyMail']);
+$router->post('/configuracion/mi-correo/estado', [$configuration, 'setMyMailStatus']);
+$router->post('/configuracion/mi-correo/eliminar', [$configuration, 'deleteMyMail']);
 $router->get('/configuracion/metodos-pago', [$configuration, 'paymentMethods']);
 $router->post('/configuracion/metodos-pago/guardar', [$configuration, 'savePaymentMethods']);
 $router->post('/configuracion/metodos-pago/bold-terminal/guardar', [$configuration, 'saveBoldTerminalSettings']);

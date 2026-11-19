@@ -113,6 +113,7 @@ Get-Content .\database\migrations\016_create_bold_payment_settings.sql | & C:\xa
 Get-Content .\database\migrations\017_create_classifieds.sql | & C:\xampp\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
 Get-Content .\database\migrations\018_add_coefficient_snapshot_to_billing_statements.sql | & C:\xampp\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
 Get-Content .\database\migrations\019_add_bold_api_integrations.sql | & C:\xampp\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+Get-Content .\database\migrations\020_add_payment_voiding.sql | & C:\xampp\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
 ```
 
 En **Configuracion / Metodos de pago**, configura la llave de identidad del **Boton de pagos** de Bold (ambiente de pruebas o produccion) y los metodos habilitados para el comercio. La llave se cifra usando `APP_KEY`. El portal genera un link de pago cerrado por cada nota recibida; la cartera solo registra el abono despues de verificar que Bold reporta el link como pagado y que su monto coincide con el saldo. Para produccion, configura `APP_URL` con el dominio publico HTTPS y registra `{APP_URL}/pagos/bold/webhook` en Integraciones / Webhooks del Panel de Comercios de Bold. La API Link de pagos utiliza la llave de identidad de Boton de pagos, no las llaves para conectar datáfonos.
@@ -137,8 +138,12 @@ El diseño sigue el ciclo de vida de documentos de cobro usados habitualmente: p
 
 ## Documentación de requisitos, seguridad y operación
 
+- [Análisis funcional y propuestas](ANALISIS_FUNCIONAL.md): defectos corregidos, funciones agregadas (panel, reportes, anulación de pagos) y pendientes priorizados.
+- [Inventario funcional para migración](INVENTARIO_MIGRACION.md): matriz para seleccionar funciones, procesos, datos y reglas que se conservarán o excluirán.
 - [Requisitos de la solución actual](REQUISITOS_SOLUCION_ACTUAL.md): funciones aplicadas, pendientes, reglas de negocio y criterios de aceptación sugeridos.
 - [Mapa técnico y flujos](MAPA_TECNICO_Y_FLUJOS.md): responsabilidades archivo por archivo, recorridos de solicitudes y convenciones para cambios.
 - [Revisión de seguridad y operación](REVISION_SEGURIDAD_Y_OPERACION.md): cambios aplicados, riesgos pendientes, instalación, actualización, backups, cartera e incidentes.
 
 API Integrations de Bold (datáfono): la migración 019 crea el almacenamiento separado para llave, terminal, método y pagos pendientes. En Configuración / Métodos de pago guarda primero la llave API Datáfono y selecciona el método activo; recarga para elegir un terminal Smart o Smart Pro vinculado. Configura APP_URL en HTTPS, registra la URL de webhook mostrada y guarda la llave secreta de producción para verificar x-bold-signature. El residente puede iniciar el cobro desde Panel de Usuario / Pagos; no debe volver a enviarlo si el servidor indica que Bold pudo haberlo recibido. La cartera solo registra el abono cuando llega una venta aprobada, firmada, con la referencia y el monto correctos.
+
+La migración 020 permite **anular pagos manuales** registrados por error desde **Cartera / Cobros** (requiere nivel Total): el pago se conserva con fecha, usuario y motivo y deja de contar en el saldo. Cuando se emite el período siguiente, el saldo de la nota anterior queda trasladado: esa nota ya no recibe pagos manuales ni en línea, y el portal indica pagar la nota más reciente. **Reportes de cartera** (`/cartera/reportes`) muestra el estado de cada inmueble, la antigüedad estimada de saldos y el recaudo mensual, y exporta cartera y pagos a CSV; el **Panel** administrativo resume estos indicadores y los pendientes operativos.

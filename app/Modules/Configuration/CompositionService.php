@@ -172,4 +172,78 @@ final class CompositionService
         $pdo->exec('DELETE FROM property_unit_assignments');
         $pdo->exec('DELETE FROM copropiedad_composition WHERE id = 1');
     }
+
+    /**
+     * Inmuebles que ya tienen notas de cobro. Sus identificadores no pueden desaparecer de la estructura:
+     * la cartera y los pagos quedarían huérfanos.
+     *
+     * @return array<string, true>
+     */
+    public function unitIdsWithBillingHistory(): array
+    {
+        try {
+            $ids = Database::connection()->query('SELECT DISTINCT unit_id FROM billing_statements')->fetchAll(\PDO::FETCH_COLUMN);
+        } catch (\PDOException) {
+            return []; // El módulo de cartera aún no está migrado.
+        }
+
+        return array_fill_keys(array_map('strval', $ids), true);
+    }
+
+    public function assignmentCount(): int
+    {
+        return (int) Database::connection()->query('SELECT COUNT(*) FROM property_unit_assignments')->fetchColumn();
+    }
+
+    /**
+     * Estado de los tres pasos de la conformación, para la guía que comparten sus pantallas.
+     *
+     * @return array{
+     *     housing_type: string, unit_count: int, completed: bool, missing_coefficients: int,
+     *     coefficient_total: string, assigned_units: int, assignments: int, billing_locked: bool
+     * }
+     */
+    public function progress(string $housingType): array
+    {
+        $composition = $this->current();
+        $units = is_array($composition) && $composition['housing_type'] === $housingType && is_array($composition['units'])
+            ? $composition['units']
+            : [];
+        $missing = 0;
+        $totalTenThousandths = 0;
+        foreach ($units as $unit) {
+            $coefficient = is_array($unit) ? (string) ($unit['coefficient'] ?? '') : '';
+            if (preg_match('/^(\d{1,3})\.(\d{4})$/D', $coefficient, $parts) !== 1 || ($parts[1] . $parts[2]) === '00000') {
+                $missing++;
+                continue;
+            }
+            $totalTenThousandths += (int) $parts[1] * 10000 + (int) $parts[2];
+        }
+
+        $assignedUnits = 0;
+        if ($units !== []) {
+            $validIds = [];
+            foreach ($units as $unit) {
+                if (is_array($unit) && is_string($unit['id'] ?? null)) {
+                    $validIds[$unit['id']] = true;
+                }
+            }
+            foreach (Database::connection()->query('SELECT DISTINCT unit_id FROM property_unit_assignments')->fetchAll(\PDO::FETCH_COLUMN) as $unitId) {
+                if (isset($validIds[(string) $unitId])) {
+                    $assignedUnits++;
+                }
+            }
+        }
+
+        return [
+            'housing_type' => $housingType,
+            'unit_count' => count($units),
+            'completed' => $units !== [] && (bool) ($composition['completed'] ?? false),
+            'missing_coefficients' => $missing,
+            'coefficient_total' => intdiv($totalTenThousandths, 10000) . '.' . str_pad((string) ($totalTenThousandths % 10000), 4, '0', STR_PAD_LEFT),
+            'assigned_units' => $assignedUnits,
+            'assignments' => $this->assignmentCount(),
+            'billing_locked' => $this->unitIdsWithBillingHistory() !== [],
+        ];
+    }
 }

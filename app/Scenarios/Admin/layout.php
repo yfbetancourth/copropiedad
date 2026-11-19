@@ -8,42 +8,106 @@ use App\Core\Url;
 
 $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $authUser = Authorization::currentUser();
-$adminUsername = $authUser !== null && is_string($authUser['username'] ?? null)
-    ? $authUser['username']
-    : '';
-$adminAvatarInitial = function_exists('mb_strtoupper')
-    ? mb_strtoupper(mb_substr($adminUsername, 0, 1, 'UTF-8'), 'UTF-8')
-    : strtoupper(substr($adminUsername, 0, 1));
 $currentPath = Url::routePath($_SERVER['REQUEST_URI'] ?? '/');
 $adminHome = Url::adminHome();
 $userPortalHome = Url::publicBasePath() . '/usuario';
-$canSeeTeam = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.equipo', 1);
-$canSeeRoles = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.roles', 1);
-$canSeeParametrization = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.parametrizacion', 1);
-$canSeeFinancial = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.financiera', 1);
-$canSeeMail = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.correo', 1);
-$canSeePaymentMethods = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.pagos', 1);
-$canSeeCharacterization = $authUser !== null && Authorization::hasPermission($authUser, 'configuracion.caracterizacion', 1);
+$can = static fn (?string $module): bool => $authUser !== null && $module !== null && Authorization::hasPermission($authUser, $module, 1);
+
+$accountName = is_string($authUser['username'] ?? null) ? $authUser['username'] : '';
+$account = [
+    'name' => $accountName,
+    'email' => is_string($authUser['email'] ?? null) ? $authUser['email'] : '',
+    'role' => is_string($authUser['role_name'] ?? null) ? $authUser['role_name'] : '',
+    'initial' => mb_strtoupper(mb_substr($accountName, 0, 1, 'UTF-8'), 'UTF-8'),
+];
+
 $canSeeComposition = false;
-if ($authUser !== null && Authorization::hasPermission($authUser, 'configuracion.conformacion', 1)) {
+if ($can('configuracion.conformacion')) {
     $compositionHousingType = (new \App\Modules\Configuration\SettingsService())->current()['housing_type'] ?? '';
+    // El asistente de conformación solo tiene sentido cuando ya se eligió el tipo de vivienda.
     $canSeeComposition = in_array($compositionHousingType, ['casa', 'torres_apartamento', 'mixto'], true);
 }
-$canSeeUnitAssignments = $authUser !== null && Authorization::hasPermission($authUser, 'inmuebles.asignaciones', 1);
-$canSeeBilling = $authUser !== null && Authorization::hasPermission($authUser, 'cartera.cobros', 1);
-$canSeeMessages = $authUser !== null && Authorization::hasPermission($authUser, 'mensajes', 1);
-$canSeeUserPortal = $authUser !== null && Authorization::hasPermission($authUser, 'usuario.portal', 1);
-$inPaymentMethods = $currentPath === '/configuracion/metodos-pago';
-$inMail = $currentPath === '/configuracion/correo';
-$inConformation = in_array($currentPath, ['/configuracion/caracterizacion', '/configuracion/conformacion'], true)
-    || str_starts_with($currentPath, '/inmuebles/');
-$inConfiguration = str_starts_with($currentPath, '/configuracion/')
-    && !$inPaymentMethods
-    && !$inMail
-    && !$inConformation;
-$inUnitAssignments = str_starts_with($currentPath, '/inmuebles/');
-$inBilling = str_starts_with($currentPath, '/cartera/');
-$inMessages = $currentPath === '/mensajes';
+
+/*
+ * Menú lateral: cada sección agrupa enlaces y solo se muestra si el rol puede abrir al menos uno.
+ * Enlace: [permiso, ruta, ícono, etiqueta, rutas que lo marcan activo (prefijos terminados en *)]
+ */
+$menu = [
+    [null, [
+        ['panel', '/admin', 'bi-house-heart', 'Bienvenida', ['/admin']],
+    ]],
+    ['Financiero', [
+        ['cartera.cobros', '/cartera/cobros', 'bi-receipt', 'Cartera / Cobros', ['/cartera/cobros*']],
+        ['cartera.cobros', '/cartera/reportes', 'bi-graph-up', 'Reportes de cartera', ['/cartera/reportes*']],
+        ['cartera.cobros', '/cartera/buscar', 'bi-search', 'Buscar en cartera', ['/cartera/buscar']],
+    ]],
+    ['Pagos', [
+        ['configuracion.pagos', '/configuracion/metodos-pago', 'bi-credit-card', 'Métodos de pago', ['/configuracion/metodos-pago']],
+    ]],
+    ['Comunicación', [
+        ['mensajes', '/mensajes', 'bi-chat-left-text', 'Mensajes', ['/mensajes']],
+        ['configuracion.correo', '/configuracion/correo', 'bi-envelope-at', 'Correo', ['/configuracion/correo']],
+    ]],
+    ['Conformación', [
+        ['configuracion.caracterizacion', '/configuracion/caracterizacion', 'bi-buildings', 'Caracterización', ['/configuracion/caracterizacion']],
+        [$canSeeComposition ? 'configuracion.conformacion' : null, '/configuracion/conformacion', 'bi-diagram-3', 'Conformación de la copropiedad', ['/configuracion/conformacion']],
+        ['inmuebles.asignaciones', '/inmuebles/asignaciones', 'bi-person-vcard', 'Asignación de inmuebles', ['/inmuebles/*']],
+    ]],
+    ['Administración', [
+        ['configuracion.parametrizacion', '/configuracion/parametrizacion', 'bi-building-gear', 'Parametrización', ['/configuracion/parametrizacion']],
+        ['configuracion.financiera', '/configuracion/financiera', 'bi-sliders', 'Configuración financiera', ['/configuracion/financiera']],
+        ['configuracion.equipo', '/configuracion/equipo', 'bi-people', 'Equipo', ['/configuracion/equipo']],
+        ['configuracion.roles', '/configuracion/roles', 'bi-shield-lock', 'Roles y permisos', ['/configuracion/roles']],
+    ]],
+    ['Personalización', [
+        ['configuracion.parametrizacion', '/configuracion/galeria-publica', 'bi-images', 'Galería pública', ['/configuracion/galeria-publica']],
+    ]],
+];
+$isActivePath = static function (array $patterns) use ($currentPath): bool {
+    foreach ($patterns as $pattern) {
+        if (str_ends_with($pattern, '*') ? str_starts_with($currentPath, rtrim($pattern, '*')) : $currentPath === $pattern) {
+            return true;
+        }
+    }
+
+    return false;
+};
+$sidebarSections = [];
+foreach ($menu as [$menuTitle, $menuEntries]) {
+    $menuItems = [];
+    foreach ($menuEntries as [$menuModule, $menuPath, $menuIcon, $menuLabel, $menuPatterns]) {
+        if ($can($menuModule)) {
+            $menuItems[] = [
+                'href' => $menuPath === '/admin' ? $adminHome : $basePath . $menuPath,
+                'icon' => $menuIcon,
+                'label' => $menuLabel,
+                'active' => $isActivePath($menuPatterns),
+            ];
+        }
+    }
+    $sidebarSections[] = ['title' => $menuTitle, 'items' => $menuItems];
+}
+$sidebarSections[] = ['title' => null, 'items' => $can('usuario.portal')
+    ? [['href' => $userPortalHome, 'icon' => 'bi-house-door', 'label' => 'Portal de residente']]
+    : []];
+$sidebarBrandHref = $can('panel') ? $adminHome : $userPortalHome;
+$sidebarUser = ['name' => $account['name'], 'role' => $account['role'], 'initial' => $account['initial']];
+
+$accountGroups = [
+    ['title' => 'Ir a', 'items' => array_values(array_filter([
+        $can('panel') ? ['href' => $adminHome, 'icon' => 'bi-house-heart', 'label' => 'Bienvenida', 'active' => $currentPath === '/admin'] : null,
+        $can('usuario.portal') ? ['href' => $userPortalHome, 'icon' => 'bi-house-door', 'label' => 'Portal de residente'] : null,
+        ['href' => Url::publicBasePath() . '/', 'icon' => 'bi-globe2', 'label' => 'Ver sitio público', 'newTab' => true],
+    ]))],
+    ['title' => 'Mi cuenta', 'items' => array_values(array_filter([
+        $can('usuario.portal') ? ['href' => $userPortalHome . '#perfil', 'icon' => 'bi-person-gear', 'label' => 'Editar mis datos y contraseña'] : null,
+        $authUser !== null && Authorization::hasPermission($authUser, 'cartera.cobros', 2)
+            ? ['href' => $basePath . '/configuracion/mi-correo', 'icon' => 'bi-envelope-check', 'label' => 'Mi correo de envío', 'active' => $currentPath === '/configuracion/mi-correo']
+            : null,
+    ]))],
+];
+$logoutAction = $basePath . '/logout';
+$csrfToken = Session::csrfToken();
 
 ?>
 <!doctype html>
@@ -64,51 +128,14 @@ $inMessages = $currentPath === '/mensajes';
         <div class="container-fluid">
             <?php if ($authUser !== null): ?>
                 <ul class="navbar-nav">
-                    <?php if (Authorization::hasPermission($authUser, 'panel', 1)): ?>
-                        <li class="nav-item">
-                            <button class="nav-link" type="button" data-lte-toggle="sidebar" aria-label="Alternar menu lateral">
-                                <i class="bi bi-list" aria-hidden="true"></i>
-                            </button>
-                        </li>
-                    <?php endif; ?>
+                    <li class="nav-item">
+                        <button class="nav-link" type="button" data-lte-toggle="sidebar" aria-label="Alternar menú lateral">
+                            <i class="bi bi-list" aria-hidden="true"></i>
+                        </button>
+                    </li>
                 </ul>
                 <ul class="navbar-nav ms-auto align-items-center">
-                    <li class="nav-item dropdown">
-                        <button class="btn btn-light border d-flex align-items-center gap-2 dropdown-toggle"
-                                type="button" data-bs-toggle="dropdown" aria-expanded="false"
-                                aria-label="Opciones de usuario para <?= $escape($adminUsername) ?>">
-                            <span class="rounded-circle bg-primary-subtle text-primary fw-semibold d-inline-flex align-items-center justify-content-center"
-                                  style="width: 2.25rem; height: 2.25rem" aria-hidden="true">
-                                <?= $escape($adminAvatarInitial) ?>
-                            </span>
-                            <span class="d-none d-sm-inline"><?= $escape($adminUsername) ?></span>
-                        </button>
-                        <div class="dropdown-menu dropdown-menu-end shadow">
-                            <div class="px-3 py-2 border-bottom">
-                                <strong><?= $escape($adminUsername) ?></strong>
-                                <?php if (is_string($authUser['role_name'] ?? null)): ?>
-                                    <div class="small text-secondary"><?= $escape($authUser['role_name']) ?></div>
-                                <?php endif; ?>
-                            </div>
-                            <?php if (Authorization::hasPermission($authUser, 'panel', 1)): ?>
-                                <a class="dropdown-item py-2" href="<?= $escape($adminHome) ?>">
-                                    <i class="bi bi-speedometer2 me-2" aria-hidden="true"></i>Panel administrativo
-                                </a>
-                            <?php endif; ?>
-                            <?php if ($canSeeUserPortal): ?>
-                                <a class="dropdown-item py-2" href="<?= $escape($userPortalHome) ?>">
-                                    <i class="bi bi-person-vcard me-2" aria-hidden="true"></i>Panel de usuario
-                                </a>
-                            <?php endif; ?>
-                            <div class="dropdown-divider"></div>
-                            <form method="post" action="<?= $escape($basePath) ?>/logout">
-                                <input type="hidden" name="_token" value="<?= $escape(Session::csrfToken()) ?>">
-                                <button class="dropdown-item py-2 text-danger" type="submit">
-                                    <i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Cerrar sesión
-                                </button>
-                            </form>
-                        </div>
-                    </li>
+                    <?php require dirname(__DIR__) . '/Shared/account-menu.php'; ?>
                 </ul>
             <?php else: ?>
                 <a class="navbar-brand fw-semibold text-wrap text-break mw-100" href="<?= $escape($basePath) ?>/login"><?= $escape($propertyName) ?></a>
@@ -116,147 +143,7 @@ $inMessages = $currentPath === '/mensajes';
         </div>
     </nav>
     <?php if ($authUser !== null): ?>
-        <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
-            <div class="sidebar-brand">
-                <a class="brand-link" href="<?= $escape(Authorization::hasPermission($authUser, 'panel', 1) ? $adminHome : $basePath . '/usuario') ?>" title="<?= $escape($propertyName) ?>">
-                    <span class="brand-text fw-light"><?= $escape($propertyName) ?></span>
-                </a>
-            </div>
-            <div class="sidebar-wrapper">
-                <nav class="mt-2" aria-label="Menu principal">
-                    <ul class="nav sidebar-menu flex-column" role="menu" data-lte-toggle="treeview" data-accordion="false">
-                        <?php if (Authorization::hasPermission($authUser, 'panel', 1)): ?>
-                            <li class="nav-item">
-                                <a href="<?= $escape($adminHome) ?>" class="nav-link<?= $currentPath === '/admin' ? ' active' : '' ?>">
-                                    <i class="nav-icon bi bi-speedometer2" aria-hidden="true"></i>
-                                    <p>Panel</p>
-                                </a>
-                            </li>
-                        <?php endif; ?>
-                        <?php if (Authorization::hasPermission($authUser, 'panel', 1)
-                            && ($canSeeTeam || $canSeeRoles || $canSeeParametrization || $canSeeFinancial)
-                        ): ?>
-                            <li class="nav-header">ADMINISTRACIÓN</li>
-                        <?php endif; ?>
-                        <?php if ($canSeeTeam || $canSeeRoles || $canSeeParametrization || $canSeeFinancial): ?>
-                            <li class="nav-item<?= $inConfiguration ? ' menu-open' : '' ?>">
-                                <a href="#" class="nav-link<?= $inConfiguration ? ' active' : '' ?>" aria-expanded="<?= $inConfiguration ? 'true' : 'false' ?>">
-                                    <i class="nav-icon bi bi-gear" aria-hidden="true"></i>
-                                    <p>
-                                        Configuracion
-                                        <i class="nav-arrow bi bi-chevron-right" aria-hidden="true"></i>
-                                    </p>
-                                </a>
-                                <ul class="nav nav-treeview">
-                                    <?php if ($canSeeParametrization): ?>
-                                        <li class="nav-item">
-                                            <a href="<?= $escape($basePath) ?>/configuracion/parametrizacion" class="nav-link<?= $currentPath === '/configuracion/parametrizacion' ? ' active' : '' ?>">
-                                                <i class="nav-icon bi bi-building-gear" aria-hidden="true"></i>
-                                                <p>Parametrizacion</p>
-                                            </a>
-                                        </li>
-                                        <li class="nav-item">
-                                            <a href="<?= $escape($basePath) ?>/configuracion/galeria-publica" class="nav-link<?= $currentPath === '/configuracion/galeria-publica' ? ' active' : '' ?>">
-                                                <i class="nav-icon bi bi-images" aria-hidden="true"></i>
-                                                <p>Galería pública</p>
-                                            </a>
-                                        </li>
-                                    <?php endif; ?>
-                                    <?php if ($canSeeFinancial): ?>
-                                        <li class="nav-item">
-                                            <a href="<?= $escape($basePath) ?>/configuracion/financiera" class="nav-link<?= $currentPath === '/configuracion/financiera' ? ' active' : '' ?>">
-                                                <i class="nav-icon bi bi-cash-coin" aria-hidden="true"></i>
-                                                <p>Financiera</p>
-                                            </a>
-                                        </li>
-                                    <?php endif; ?>
-                                    <?php if ($canSeeTeam): ?>
-                                        <li class="nav-item">
-                                            <a href="<?= $escape($basePath) ?>/configuracion/equipo" class="nav-link<?= $currentPath === '/configuracion/equipo' ? ' active' : '' ?>">
-                                                <i class="nav-icon bi bi-people" aria-hidden="true"></i>
-                                                <p>Equipo</p>
-                                            </a>
-                                        </li>
-                                    <?php endif; ?>
-                                    <?php if ($canSeeRoles): ?>
-                                        <li class="nav-item">
-                                            <a href="<?= $escape($basePath) ?>/configuracion/roles" class="nav-link<?= $currentPath === '/configuracion/roles' ? ' active' : '' ?>">
-                                                <i class="nav-icon bi bi-shield-lock" aria-hidden="true"></i>
-                                                <p>Roles y permisos</p>
-                                            </a>
-                                        </li>
-                                    <?php endif; ?>
-                                </ul>
-                            </li>
-                        <?php endif; ?>
-                        <?php if ($canSeeCharacterization || $canSeeComposition || $canSeeUnitAssignments): ?>
-                            <li class="nav-header">CONFORMACIÓN</li>
-                            <?php if ($canSeeCharacterization): ?>
-                                <li class="nav-item">
-                                    <a href="<?= $escape($basePath) ?>/configuracion/caracterizacion" class="nav-link<?= $currentPath === '/configuracion/caracterizacion' ? ' active' : '' ?>">
-                                        <i class="nav-icon bi bi-buildings" aria-hidden="true"></i>
-                                        <p>Caracterizacion</p>
-                                    </a>
-                                </li>
-                            <?php endif; ?>
-                            <?php if ($canSeeComposition): ?>
-                                <li class="nav-item">
-                                    <a href="<?= $escape($basePath) ?>/configuracion/conformacion" class="nav-link<?= $currentPath === '/configuracion/conformacion' ? ' active' : '' ?>">
-                                        <i class="nav-icon bi bi-diagram-3" aria-hidden="true"></i>
-                                        <p>Conformación de la copropiedad</p>
-                                    </a>
-                                </li>
-                            <?php endif; ?>
-                            <?php if ($canSeeUnitAssignments): ?>
-                                <li class="nav-item">
-                                    <a href="<?= $escape($basePath) ?>/inmuebles/asignaciones" class="nav-link<?= $inUnitAssignments ? ' active' : '' ?>">
-                                        <i class="nav-icon bi bi-person-vcard" aria-hidden="true"></i>
-                                        <p>Asignación de inmuebles</p>
-                                    </a>
-                                </li>
-                            <?php endif; ?>
-                        <?php endif; ?>
-                        <?php if ($canSeePaymentMethods): ?>
-                            <li class="nav-header">PAGOS</li>
-                            <li class="nav-item">
-                                <a href="<?= $escape($basePath) ?>/configuracion/metodos-pago" class="nav-link<?= $inPaymentMethods ? ' active' : '' ?>">
-                                    <i class="nav-icon bi bi-credit-card" aria-hidden="true"></i>
-                                    <p>Metodos de pago</p>
-                                </a>
-                            </li>
-                        <?php endif; ?>
-                        <?php if ($canSeeBilling): ?>
-                            <li class="nav-header">FINANCIERO</li>
-                            <li class="nav-item">
-                                <a href="<?= $escape($basePath) ?>/cartera/cobros" class="nav-link<?= $inBilling ? ' active' : '' ?>">
-                                    <i class="nav-icon bi bi-receipt" aria-hidden="true"></i>
-                                    <p>Cartera / Cobros</p>
-                                </a>
-                            </li>
-                        <?php endif; ?>
-                        <?php if ($canSeeMail || $canSeeMessages): ?>
-                            <li class="nav-header">COMUNICACIÓN</li>
-                            <?php if ($canSeeMail): ?>
-                                <li class="nav-item">
-                                    <a href="<?= $escape($basePath) ?>/configuracion/correo" class="nav-link<?= $inMail ? ' active' : '' ?>">
-                                        <i class="nav-icon bi bi-envelope-at" aria-hidden="true"></i>
-                                        <p>Correo</p>
-                                    </a>
-                                </li>
-                            <?php endif; ?>
-                            <?php if ($canSeeMessages): ?>
-                                <li class="nav-item">
-                                    <a href="<?= $escape($basePath) ?>/mensajes" class="nav-link<?= $inMessages ? ' active' : '' ?>">
-                                        <i class="nav-icon bi bi-envelope" aria-hidden="true"></i>
-                                        <p>Mensajes</p>
-                                    </a>
-                                </li>
-                            <?php endif; ?>
-                        <?php endif; ?>
-                    </ul>
-                </nav>
-            </div>
-        </aside>
+        <?php require dirname(__DIR__) . '/Shared/sidebar.php'; ?>
     <?php endif; ?>
     <main id="main-content" class="app-main">
         <div class="app-content">

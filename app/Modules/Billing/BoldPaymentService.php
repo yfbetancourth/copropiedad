@@ -203,6 +203,12 @@ final class BoldPaymentService
         }
 
         $billingStatement = (new BillingService())->statement($statementId);
+        if ($billingStatement['superseded_by'] !== null) {
+            throw new RuntimeException(sprintf(
+                'El saldo de esta nota ya se incluyó en la nota del período %s. Paga la nota más reciente.',
+                $billingStatement['superseded_by']['period']
+            ));
+        }
         $amountCents = (int) $billingStatement['balance'];
         if ($amountCents <= 0) {
             throw new RuntimeException('Esta nota no tiene saldo pendiente.');

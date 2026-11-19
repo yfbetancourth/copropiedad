@@ -8,6 +8,7 @@ use Dotenv\Dotenv;
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 Dotenv::createImmutable(dirname(__DIR__))->safeLoad();
+\App\Core\WebBootstrap::configureTimezone();
 
 try {
     Database::connection()->query('SELECT 1');

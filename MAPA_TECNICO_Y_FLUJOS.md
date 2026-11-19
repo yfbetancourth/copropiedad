@@ -82,11 +82,12 @@ Guía de navegación del código para mantenimiento y ampliación. Está organiz
 
 | Archivo | Responsabilidad |
 |---|---|
-| `routes.php` | Rutas administrativas de cartera/notas, conceptos, pagos, emisión y reintento. |
+| `routes.php` | Rutas administrativas de cartera/notas, conceptos, pagos, emisión y reintento. También anulación de pagos y reportes. |
 | `BillingController.php` | Valida permiso `cartera.cobros`, CSRF y formularios; presenta vista/nota. |
 | `BillingService.php` | Vista previa, conceptos, pagos, cálculo de movimientos, emisión de instantáneas, destinatarios, envíos y HTML imprimible. Revisar aquí invariantes de saldo y período. |
 | `BoldPaymentService.php` | Guarda llave/métodos, consume API HTTPS, crea/reusa enlaces, consulta estado y registra pago aprobado idempotentemente. No aceptar el webhook como prueba suficiente sin consulta remota. |
 | `PaymentWebhookController.php` | Limita cuerpo JSON, decodifica evento y delega conciliación; ruta pública necesaria para proveedor. |
+| `ReportService.php`, `ReportController.php` | Consultas de solo lectura: cartera por inmueble (nota vigente), antigüedad, recaudo, indicadores del panel y exportación CSV. |
 | `app/Scenarios/Admin/Views/Billing/index.php` | Vista de período, previsualización, conceptos, pagos, estados de envío y emisión. |
 
 ### Flujo mensual de cartera
@@ -136,7 +137,7 @@ Portal verifica que el usuario sea destinatario de la nota → calcula saldo pen
 
 ## Base de datos
 
-`database/migrations/001` a `017` crean autenticación, roles, configuración, composición, asignaciones, correo, cartera, notificaciones, pagos Bold y clasificados. Se ejecutan en orden una sola vez; no hay tabla de historial de migraciones ni comando automático en el código revisado. Antes de añadir una migración:
+`database/migrations/001` a `019` crean autenticación, roles, configuración, composición, asignaciones, correo, cartera, notificaciones, pagos Bold y clasificados. Las migraciones 018 y 019 agregan instantánea de coeficiente en notas e integración Bold de datáfono, respectivamente. La 020 agrega la anulación trazable de pagos (`voided_at`, `voided_by`, `void_reason`); los saldos excluyen pagos anulados. Se ejecutan en orden una sola vez; no hay tabla de historial de migraciones ni comando automático en el código revisado. Antes de añadir una migración:
 
 1. Identificar datos existentes y restricciones/FK afectadas.
 2. Preparar migración de avance y procedimiento de recuperación compatible con los datos.

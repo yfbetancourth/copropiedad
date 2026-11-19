@@ -2,20 +2,71 @@
 
 declare(strict_types=1);
 
+use App\Core\Authorization;
 use App\Core\Session;
+use App\Core\Url;
 
 $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-$userPortalName = isset($user['username']) && is_string($user['username']) ? $user['username'] : '';
-$avatarInitial = function_exists('mb_strtoupper')
-    ? mb_strtoupper(mb_substr($userPortalName, 0, 1, 'UTF-8'), 'UTF-8')
-    : strtoupper(substr($userPortalName, 0, 1));
-$notificationCount = (int) ($notifications['message_count'] ?? 0)
-    + (int) ($notifications['billing_count'] ?? 0);
-$requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-$requestPath = is_string($requestPath) ? $requestPath : '/';
-$activePage = str_contains($requestPath, '/usuario/pagos')
-    ? 'payments'
-    : (str_contains($requestPath, '/usuario/mensajes') ? 'messages' : 'home');
+$user = is_array($user ?? null) ? $user : [];
+$currentPath = Url::routePath($_SERVER['REQUEST_URI'] ?? '/usuario');
+$portalHome = $basePath . '/usuario';
+$canSeeAdminPanel = $user !== [] && Authorization::hasPermission($user, 'panel', 1);
+$adminHome = $basePath . '/admin';
+
+$accountName = is_string($user['username'] ?? null) ? $user['username'] : '';
+$account = [
+    'name' => $accountName,
+    'email' => is_string($user['email'] ?? null) ? $user['email'] : '',
+    'role' => is_string($user['role_name'] ?? null) ? $user['role_name'] : 'Residente',
+    'initial' => mb_strtoupper(mb_substr($accountName, 0, 1, 'UTF-8'), 'UTF-8'),
+];
+
+$unreadMessages = (int) ($notifications['message_count'] ?? 0);
+$unreadBilling = (int) ($notifications['billing_count'] ?? 0);
+$notificationCount = $unreadMessages + $unreadBilling;
+
+// Mismo menú por secciones que el panel administrativo, con las opciones del residente.
+$sidebarSections = [
+    ['title' => null, 'items' => [
+        ['href' => $portalHome, 'icon' => 'bi-house-heart', 'label' => 'Bienvenida', 'active' => $currentPath === '/usuario'],
+    ]],
+    ['title' => 'Mi inmueble', 'items' => [
+        ['href' => $portalHome . '#inmuebles', 'icon' => 'bi-house-door', 'label' => 'Mis inmuebles'],
+        ['href' => $portalHome . '#documentos', 'icon' => 'bi-receipt', 'label' => 'Documentos de cobro', 'badge' => $unreadBilling],
+    ]],
+    ['title' => 'Pagos', 'items' => [
+        ['href' => $portalHome . '/pagos', 'icon' => 'bi-credit-card', 'label' => 'Pagar mis cuotas', 'active' => str_starts_with($currentPath, '/usuario/pagos')],
+    ]],
+    ['title' => 'Comunicación', 'items' => [
+        ['href' => $portalHome . '/mensajes', 'icon' => 'bi-chat-left-text', 'label' => 'Mis mensajes', 'active' => str_starts_with($currentPath, '/usuario/mensajes'), 'badge' => $unreadMessages],
+    ]],
+    ['title' => 'Comunidad', 'items' => [
+        ['href' => $portalHome . '#clasificados', 'icon' => 'bi-megaphone', 'label' => 'Mis clasificados'],
+        ['href' => $basePath . '/clasificados', 'icon' => 'bi-shop', 'label' => 'Clasificados públicos', 'newTab' => true],
+    ]],
+    ['title' => 'Mi cuenta', 'items' => [
+        ['href' => $portalHome . '#perfil', 'icon' => 'bi-person-gear', 'label' => 'Datos y contraseña'],
+    ]],
+    ['title' => null, 'items' => $canSeeAdminPanel
+        ? [['href' => $adminHome, 'icon' => 'bi-speedometer2', 'label' => 'Panel administrativo']]
+        : []],
+];
+$sidebarBrandHref = $portalHome;
+$sidebarUser = ['name' => $account['name'], 'role' => $account['role'], 'initial' => $account['initial']];
+
+$accountGroups = [
+    ['title' => 'Ir a', 'items' => array_values(array_filter([
+        ['href' => $portalHome, 'icon' => 'bi-house-heart', 'label' => 'Bienvenida', 'active' => $currentPath === '/usuario'],
+        $canSeeAdminPanel ? ['href' => $adminHome, 'icon' => 'bi-speedometer2', 'label' => 'Panel administrativo'] : null,
+        ['href' => $basePath . '/', 'icon' => 'bi-globe2', 'label' => 'Ver sitio público', 'newTab' => true],
+    ]))],
+    ['title' => 'Mi cuenta', 'items' => [
+        ['href' => $portalHome . '#perfil', 'icon' => 'bi-person-gear', 'label' => 'Editar mis datos y contraseña'],
+        ['href' => $portalHome . '/mensajes', 'icon' => 'bi-chat-left-text', 'label' => 'Mis mensajes'],
+    ]],
+];
+$logoutAction = $basePath . '/logout';
+$csrfToken = Session::csrfToken();
 
 ?>
 <!doctype html>
@@ -25,115 +76,96 @@ $activePage = str_contains($requestPath, '/usuario/pagos')
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= $escape($pageTitle) ?> | <?= $escape($propertyName) ?></title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/css/adminlte.min.css">
 </head>
-<body class="bg-body-tertiary">
+<body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
 <a class="visually-hidden-focusable position-absolute top-0 start-0 z-3 bg-white p-2" href="#main-content">Saltar al contenido principal</a>
-<div class="d-flex min-vh-100 flex-column">
-    <header class="navbar navbar-expand bg-body shadow-sm">
+<div class="app-wrapper">
+    <nav class="app-header navbar navbar-expand bg-body">
         <div class="container-fluid">
-            <button class="btn btn-outline-secondary d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#userSidebar" aria-controls="userSidebar" aria-label="Abrir menú">
-                <i class="bi bi-list" aria-hidden="true"></i>
-            </button>
-            <a class="navbar-brand fw-semibold text-wrap" href="<?= $escape($basePath) ?>/usuario">
-                <i class="bi bi-buildings me-2" aria-hidden="true"></i><?= $escape($propertyName) ?>
-            </a>
-            <a class="btn btn-outline-primary btn-sm ms-2" href="<?= $escape($basePath) ?>/clasificados">Clasificados</a>
-            <div class="d-flex align-items-center gap-3 ms-auto">
-                <div class="dropdown">
-                    <button class="btn btn-light border position-relative rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
-                            style="width: 2.5rem; height: 2.5rem"
-                            type="button" data-bs-toggle="dropdown" aria-expanded="false"
-                            aria-label="Notificaciones y perfil de <?= $escape($userPortalName) ?>">
-                        <span class="fw-semibold"><?= $escape($avatarInitial) ?></span>
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <button class="nav-link" type="button" data-lte-toggle="sidebar" aria-label="Alternar menú lateral">
+                        <i class="bi bi-list" aria-hidden="true"></i>
+                    </button>
+                </li>
+            </ul>
+            <ul class="navbar-nav ms-auto align-items-center gap-1">
+                <li class="nav-item dropdown">
+                    <button class="nav-link position-relative px-2" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false"
+                            aria-label="Notificaciones<?= $notificationCount > 0 ? ': ' . $notificationCount . ' sin leer' : '' ?>">
+                        <i class="bi bi-bell fs-5" aria-hidden="true"></i>
                         <?php if ($notificationCount > 0): ?>
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-danger">
+                            <span class="position-absolute top-0 start-100 translate-middle-x badge rounded-pill text-bg-danger" aria-hidden="true">
                                 <?= min($notificationCount, 99) ?><?= $notificationCount > 99 ? '+' : '' ?>
-                                <span class="visually-hidden">notificaciones sin leer</span>
                             </span>
                         <?php endif; ?>
                     </button>
-                    <div class="dropdown-menu dropdown-menu-end p-0 shadow" style="min-width: min(22rem, 90vw)">
-                        <div class="px-3 py-2 border-bottom">
-                            <strong><?= $escape($userPortalName) ?></strong>
-                            <div class="small text-secondary"><?= $notificationCount ?> notificación(es) pendiente(s)</div>
+                    <div class="dropdown-menu dropdown-menu-end shadow border-0 p-0 overflow-hidden" style="min-width: min(22rem, 92vw)">
+                        <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-body-tertiary border-bottom">
+                            <strong>Notificaciones</strong>
+                            <span class="small text-secondary"><?= $notificationCount ?> sin leer</span>
                         </div>
                         <?php if ($notificationCount === 0): ?>
-                            <p class="dropdown-item-text text-secondary mb-0 py-3">No tienes notificaciones nuevas.</p>
+                            <div class="text-center text-secondary py-4 px-3">
+                                <i class="bi bi-bell-slash fs-3 d-block mb-1" aria-hidden="true"></i>
+                                No tienes notificaciones nuevas.
+                            </div>
                         <?php else: ?>
-                            <?php foreach (($notifications['messages'] ?? []) as $message): ?>
-                                <a class="dropdown-item text-wrap py-2" href="<?= $escape($basePath) ?>/usuario/mensajes">
-                                    <i class="bi bi-envelope text-primary me-2" aria-hidden="true"></i>
-                                    <strong><?= $escape($message['subject']) ?></strong>
-                                    <span class="d-block small text-secondary">Mensaje de <?= $escape($message['sender_name']) ?></span>
-                                </a>
-                            <?php endforeach; ?>
-                            <?php foreach (($notifications['billing'] ?? []) as $notice): ?>
-                                <form method="post" action="<?= $escape($basePath) ?>/usuario/notificaciones/cobro">
-                                    <input type="hidden" name="_token" value="<?= $escape(Session::csrfToken()) ?>">
-                                    <input type="hidden" name="statement_id" value="<?= (int) $notice['id'] ?>">
-                                    <button class="dropdown-item text-wrap py-2" type="submit">
-                                        <i class="bi bi-receipt text-warning me-2" aria-hidden="true"></i>
-                                        <strong>Cobro <?= $escape($notice['period']) ?> · <?= $escape($notice['unit_name']) ?></strong>
-                                        <span class="d-block small text-secondary">
-                                            <?php if ((float) $notice['administration_fee'] > 0): ?>Cuota de administración<?php endif; ?>
-                                            <?php if ((float) $notice['fine'] > 0): ?><?= (float) $notice['administration_fee'] > 0 ? ' · ' : '' ?>Multa generada<?php endif; ?>
-                                            · Marcar como leído
+                            <div style="max-height: 22rem; overflow-y: auto">
+                                <?php foreach (($notifications['messages'] ?? []) as $message): ?>
+                                    <a class="dropdown-item d-flex gap-2 text-wrap py-2 border-bottom" href="<?= $escape($portalHome) ?>/mensajes">
+                                        <i class="bi bi-envelope text-primary mt-1" aria-hidden="true"></i>
+                                        <span>
+                                            <strong class="d-block"><?= $escape($message['subject']) ?></strong>
+                                            <span class="small text-secondary">Mensaje de <?= $escape($message['sender_name']) ?></span>
                                         </span>
-                                    </button>
-                                </form>
-                            <?php endforeach; ?>
+                                    </a>
+                                <?php endforeach; ?>
+                                <?php foreach (($notifications['billing'] ?? []) as $notice): ?>
+                                    <form method="post" action="<?= $escape($portalHome) ?>/notificaciones/cobro">
+                                        <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
+                                        <input type="hidden" name="statement_id" value="<?= (int) $notice['id'] ?>">
+                                        <button class="dropdown-item d-flex gap-2 text-wrap py-2 border-bottom" type="submit">
+                                            <i class="bi bi-receipt text-warning mt-1" aria-hidden="true"></i>
+                                            <span>
+                                                <strong class="d-block">Cobro <?= $escape($notice['period']) ?> · <?= $escape($notice['unit_name']) ?></strong>
+                                                <span class="small text-secondary">
+                                                    <?php if ((float) $notice['administration_fee'] > 0): ?>Cuota de administración<?php endif; ?>
+                                                    <?php if ((float) $notice['fine'] > 0): ?><?= (float) $notice['administration_fee'] > 0 ? ' · ' : '' ?>Multa generada<?php endif; ?>
+                                                    · Marcar como leído
+                                                </span>
+                                            </span>
+                                        </button>
+                                    </form>
+                                <?php endforeach; ?>
+                            </div>
                         <?php endif; ?>
-                        <a class="dropdown-item border-top" href="<?= $escape($basePath) ?>/usuario/mensajes">
-                            <i class="bi bi-envelope me-2" aria-hidden="true"></i>
-                            Mis mensajes (<?= (int) ($notifications['message_count'] ?? 0) ?> sin leer)
-                        </a>
-                        <div class="dropdown-divider my-0"></div>
-                        <a class="dropdown-item py-2" href="<?= $escape($basePath) ?>/usuario">
-                            <i class="bi bi-person me-2" aria-hidden="true"></i>Mi perfil
-                        </a>
-                        <form method="post" action="<?= $escape($basePath) ?>/logout">
-                            <input type="hidden" name="_token" value="<?= $escape(Session::csrfToken()) ?>">
-                            <button class="dropdown-item py-2 text-danger" type="submit">
-                                <i class="bi bi-box-arrow-right me-2" aria-hidden="true"></i>Cerrar sesión
-                            </button>
-                        </form>
+                        <a class="dropdown-item text-center small fw-semibold py-2" href="<?= $escape($portalHome) ?>/mensajes">Ver todos mis mensajes</a>
                     </div>
-                </div>
-            </div>
+                </li>
+                <?php require dirname(__DIR__) . '/Shared/account-menu.php'; ?>
+            </ul>
         </div>
-    </header>
-    <div class="d-flex flex-grow-1">
-        <aside id="userSidebar" class="offcanvas-lg offcanvas-start bg-body border-end" tabindex="-1" aria-label="Navegación del usuario" style="--bs-offcanvas-width: 17rem; width: 17rem">
-            <div class="offcanvas-header border-bottom d-lg-none">
-                <h2 class="h6 mb-0">Menú del usuario</h2>
-                <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar menú"></button>
-            </div>
-            <div class="offcanvas-body d-block p-3">
-                <div class="small text-uppercase text-secondary fw-semibold px-2 mb-2">Mi copropiedad</div>
-                <nav class="nav nav-pills flex-column gap-1" aria-label="Secciones del panel">
-                    <a class="nav-link <?= $activePage === 'home' ? 'active' : 'link-body-emphasis' ?>" href="<?= $escape($basePath) ?>/usuario" <?= $activePage === 'home' ? 'aria-current="page"' : '' ?>><i class="bi bi-house-door me-2" aria-hidden="true"></i>Inicio y perfil</a>
-                    <a class="nav-link <?= $activePage === 'payments' ? 'active' : 'link-body-emphasis' ?>" href="<?= $escape($basePath) ?>/usuario/pagos" <?= $activePage === 'payments' ? 'aria-current="page"' : '' ?>><i class="bi bi-credit-card me-2" aria-hidden="true"></i>Pagos</a>
-                    <a class="nav-link <?= $activePage === 'messages' ? 'active' : 'link-body-emphasis' ?>" href="<?= $escape($basePath) ?>/usuario/mensajes" <?= $activePage === 'messages' ? 'aria-current="page"' : '' ?>><i class="bi bi-envelope me-2" aria-hidden="true"></i>Mis mensajes<?php if ((int) ($notifications['message_count'] ?? 0) > 0): ?> <span class="badge text-bg-primary ms-auto"><?= (int) $notifications['message_count'] ?></span><?php endif; ?></a>
-                    <a class="nav-link link-body-emphasis" href="<?= $escape($basePath) ?>/clasificados"><i class="bi bi-megaphone me-2" aria-hidden="true"></i>Clasificados</a>
-                </nav>
-            </div>
-        </aside>
-        <main id="main-content" class="flex-grow-1 min-w-0">
+    </nav>
+    <?php require dirname(__DIR__) . '/Shared/sidebar.php'; ?>
+    <main id="main-content" class="app-main">
+        <div class="app-content">
             <div class="container-fluid py-4">
                 <?= $content ?>
             </div>
-        </main>
-    </div>
-    <footer class="border-top bg-body py-3 mt-auto">
-        <div class="container-fluid d-flex flex-wrap justify-content-between gap-2 text-secondary small">
-            <span><?= $escape($propertyName) ?></span>
-            <a href="<?= $escape($basePath) ?>/usuario">Panel de Usuario</a>
-            <a href="<?= $escape($basePath) ?>/clasificados">Clasificados públicos</a>
         </div>
+    </main>
+    <footer class="app-footer">
+        <div class="float-end">
+            <a href="<?= $escape($basePath) ?>/clasificados" target="_blank" rel="noopener">Clasificados públicos</a>
+        </div>
+        <strong><?= $escape($propertyName) ?></strong>
     </footer>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/browser/overlayscrollbars.browser.es6.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/js/adminlte.min.js"></script>
 </body>

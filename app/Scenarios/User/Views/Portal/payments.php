@@ -64,36 +64,41 @@ $methodIcons = [
                         <?php foreach ($billingDocuments as $document): ?>
                             <?php
                             $balance = (int) $document['balance'];
+                            $supersededPeriod = is_array($document["superseded_by"] ?? null) ? (string) $document["superseded_by"]["period"] : null;
+                            $payable = $balance > 0 && $supersededPeriod === null;
                             $paymentStatus = $document['terminal_payment_status'] ?? $document['online_payment_status'] ?? null;
                             ?>
                             <tr>
                                 <td><?= $escape((string) $document['number']) ?></td>
                                 <td><?= $escape((string) $document['unit_name']) ?></td>
                                 <td><?= $escape((string) $document['period']) ?></td>
-                                <td><?= $escape($currency($balance / 100)) ?></td>
+                                <td><?= $supersededPeriod !== null ? '<span class="text-secondary">Incluido en ' . $escape($supersededPeriod) . '</span>' : $escape($currency($balance / 100)) ?></td>
                                 <td>
-                                    <?php if ($balance <= 0): ?><span class="badge text-bg-success">Pagada</span>
+                                    <?php if ($supersededPeriod !== null): ?><span class="badge text-bg-secondary">Saldo trasladado a <?= htmlspecialchars($supersededPeriod, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8") ?></span>
+                                    <?php elseif ($balance <= 0): ?><span class="badge text-bg-success">Pagada</span>
                                     <?php elseif ($paymentStatus === 'approved'): ?><span class="badge text-bg-success">Pago aprobado</span>
                                     <?php elseif ($paymentStatus === 'pending'): ?><span class="badge text-bg-warning">Pago en proceso</span>
                                     <?php elseif ($paymentStatus === 'rejected'): ?><span class="badge text-bg-danger">Pago rechazado</span>
                                     <?php else: ?><span class="badge text-bg-secondary">Pendiente</span><?php endif; ?>
                                 </td>
                                 <td>
-                                    <?php if ($balance > 0 && $onlinePaymentsReady): ?>
+                                    <?php if ($payable && $onlinePaymentsReady): ?>
                                         <form method="post" action="<?= $escape($basePath) ?>/usuario/pagar" aria-label="Pagar nota <?= $escape((string) $document['number']) ?> en línea">
                                             <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                             <input type="hidden" name="statement_id" value="<?= (int) $document['id'] ?>">
                                             <button class="btn btn-success btn-sm" type="submit"><i class="bi bi-credit-card me-1" aria-hidden="true"></i><?= $document['checkout_url'] !== null ? 'Continuar pago en línea' : 'Pagar ' . $escape($currency($balance / 100)) . ' en línea' ?></button>
                                         </form>
                                     <?php endif; ?>
-                                    <?php if ($balance > 0 && $terminalPaymentsReady): ?>
+                                    <?php if ($payable && $terminalPaymentsReady): ?>
                                         <form class="mt-1" method="post" action="<?= $escape($basePath) ?>/usuario/pagar-datafono" aria-label="Pagar nota <?= $escape((string) $document['number']) ?> en datáfono Bold">
                                             <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                             <input type="hidden" name="statement_id" value="<?= (int) $document['id'] ?>">
                                             <button class="btn btn-outline-success btn-sm" type="submit"><i class="bi bi-phone me-1" aria-hidden="true"></i>Datáfono Bold · <?= $escape($currency($balance / 100)) ?></button>
                                         </form>
                                     <?php endif; ?>
-                                    <?php if ($balance > 0 && !$onlinePaymentsReady && !$terminalPaymentsReady): ?>
+                                    <?php if ($supersededPeriod !== null): ?>
+                                        <span class="text-secondary small">Paga la nota más reciente</span>
+                                    <?php elseif ($payable && !$onlinePaymentsReady && !$terminalPaymentsReady): ?>
                                         <span class="text-secondary small">Pago en línea no disponible</span>
                                     <?php elseif ($balance <= 0): ?>
                                         <span class="text-secondary small">Sin saldo pendiente</span>

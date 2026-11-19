@@ -60,7 +60,7 @@ $propertyTypeLabels = [
         <div><p class="eyebrow"><span class="eyebrow-line"></span> Nuestro entorno</p><h2 id="spaces-title">Un lugar que <em>se siente propio.</em></h2></div>
         <p>Los pequeños momentos también hacen hogar: compartir, descansar, encontrarse y disfrutar los espacios que son de todos.</p>
     </div>
-    <div class="gallery-grid">
+    <div class="gallery-grid gallery-count-<?= min(4, count($galleryImages)) ?>">
         <?php foreach (array_slice($galleryImages, 0, 4) as $index => $image): ?>
             <figure class="gallery-tile gallery-tile-<?= $index + 1 ?>">
                 <img src="<?= $escape($basePath . $image['url']) ?>" alt="Espacio <?= $index + 1 ?> de <?= $escape($name) ?>" width="<?= $index === 0 ? '1000' : '700' ?>" height="<?= $index === 0 ? '700' : '520' ?>" loading="lazy" decoding="async">
@@ -76,9 +76,18 @@ $propertyTypeLabels = [
         <p>Esta es una invitación a encontrarnos, cuidar lo que compartimos y hacer de este lugar un hogar para todos.</p>
     </div>
     <div class="values-grid">
-        <article><span aria-hidden="true">01</span><h3>Compartir</h3><p>Los buenos momentos crecen cuando se viven en compañía.</p></article>
-        <article><span aria-hidden="true">02</span><h3>Cuidar</h3><p>Un espacio común se siente mejor cuando todos lo hacemos nuestro.</p></article>
-        <article><span aria-hidden="true">03</span><h3>Conectar</h3><p>Pequeños encuentros que hacen más cercana la vida de cada día.</p></article>
+        <article>
+            <span class="value-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5M10.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5"/></svg></span>
+            <span class="value-number" aria-hidden="true">01</span><h3>Compartir</h3><p>Los buenos momentos crecen cuando se viven en compañía.</p>
+        </article>
+        <article>
+            <span class="value-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg></span>
+            <span class="value-number" aria-hidden="true">02</span><h3>Cuidar</h3><p>Un espacio común se siente mejor cuando todos lo hacemos nuestro.</p>
+        </article>
+        <article>
+            <span class="value-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M9 15 15 9M8 12l-2 2a3.5 3.5 0 0 0 5 5l2-2M16 12l2-2a3.5 3.5 0 0 0-5-5l-2 2"/></svg></span>
+            <span class="value-number" aria-hidden="true">03</span><h3>Conectar</h3><p>Pequeños encuentros que hacen más cercana la vida de cada día.</p>
+        </article>
     </div>
 </section>
 <?php endif; ?>

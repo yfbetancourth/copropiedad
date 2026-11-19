@@ -1,8 +1,8 @@
 # Requisitos de la solución actual — Copropiedad
 
 **Tipo de documento:** especificación funcional y técnica obtenida por ingeniería inversa  
-**Fecha:** 17 de noviembre de 2026  
-**Base de análisis:** código PHP, rutas, vistas, servicios, migraciones SQL 001–016 y README del repositorio.
+**Fecha:** 18 de noviembre de 2026
+**Base de análisis:** código PHP, rutas, vistas, servicios, migraciones SQL 001–019 y README del repositorio.
 
 ## 1. Propósito y cómo usar este documento
 
@@ -107,7 +107,7 @@ La operación de cartera es deliberadamente asistida: el personal revisa concept
 
 - **Plataforma:** PHP >= 8.2, MySQL, Composer; extensiones PDO y PDO MySQL. **Implementado/documentado.**
 - **Arquitectura:** MVC modular propio; `app/Core` contiene infraestructura; `app/Modules` contiene lógica por dominio; `app/Scenarios/{Public,Admin,User}` organiza rutas, layouts y vistas por escenario, con puntos de entrada propios en `public/`. **Implementado.**
-- **Datos:** MySQL/InnoDB, `utf8mb4`; acceso PDO con consultas preparadas. Migraciones numeradas 001–017. **Implementado/documentado.**
+- **Datos:** MySQL/InnoDB, `utf8mb4`; acceso PDO con consultas preparadas. Migraciones numeradas 001–019. **Implementado/documentado.**
 - **Seguridad:** contraseñas con `password_hash`, token CSRF, control de acceso servidor, cabeceras de seguridad, secretos en `.env`, cifrado autenticado para secretos SMTP/Bold y validación TLS para MySQL remoto. **Implementado/documentado; requiere configuración correcta del despliegue.**
 - **Disponibilidad/recuperación:** no se encontró en el repositorio política de copias, restauración, retención o monitoreo. **Pendiente de operación.**
 - **Interfaz:** páginas PHP renderizadas en servidor y plantilla AdminLTE; portal con diseño separado. **Implementado.**
@@ -123,7 +123,7 @@ La operación de cartera es deliberadamente asistida: el personal revisa concept
 | Página pública | `/` con fotos de galería, dirección/mapa, clasificados recientes, enlace de login, metadatos SEO, `/robots.txt` y `/sitemap.xml` |
 | Configuración | `/configuracion/parametrizacion`, `/financiera`, `/caracterizacion`, `/conformacion`, `/equipo`, `/roles`, `/correo`, `/metodos-pago` y acciones POST asociadas |
 | Inmuebles | `/inmuebles/asignaciones` y guardado POST |
-| Cartera | `/cartera/cobros`, `/cartera/cobros/nota`, emisión, conceptos, pagos y reintento mediante POST |
+| Cartera | `/cartera/cobros`, `/cartera/cobros/nota`, emisión, conceptos, pagos y reintento mediante POST; anulación de pagos `/cartera/cobros/pago/anular`; reportes `/cartera/reportes` y exportación CSV `/cartera/reportes/exportar` |
 | Bold | `/pagos/bold/webhook` (POST), `/pagos/bold/retorno` |
 | Mensajería | `/mensajes` y envío POST |
 
@@ -152,7 +152,7 @@ Estos puntos no se deben tratar como compromisos de producto hasta validarlos co
 3. **Definir personas y titularidad:** propietario, residente, arrendatario, responsable de pago, varios contactos por inmueble, historial de ocupación y permisos sobre datos. Hoy una cuenta puede vincularse a unidades sin tipo de relación.
 4. **Completar operación:** política de backups y restauración, auditoría de acciones sensibles, monitoreo/logs estructurados, gestión de errores y plan de actualización/rollback de migraciones. Hay `created_by` en movimientos, pero no un registro general de auditoría identificado.
 5. **Validar pagos reales:** credenciales/ambientes, autenticidad y repetición de webhooks, conciliación contra reportes del comercio, reembolsos y tratamiento de pago aprobado luego de saldo modificado. El flujo existente valida estado y monto, pero requiere pruebas integrales del proveedor.
-6. **Definir reportes y exportaciones:** cartera por período/unidad, antigüedad de saldos, recaudo, pagos, ingresos, comprobantes y formatos de descarga. No se identificó módulo de reportes dedicado.
+6. **Definir reportes y exportaciones:** cartera por período/unidad, antigüedad de saldos, recaudo, pagos, ingresos, comprobantes y formatos de descarga. Implementado parcialmente: `/cartera/reportes` ofrece cartera por inmueble, antigüedad estimada, recaudo mensual y CSV de cartera y pagos; faltan comprobantes, ingresos contables y estado de cuenta del residente.
 7. **Definir alcance de notificaciones:** recordatorios automáticos, preferencias/canales, rebotes definitivos, mensajes masivos con plantillas, archivos y evidencia de entrega. Hoy hay avisos internos y correo de cobro/reintento.
 8. **Confirmar necesidades de integración/API:** si otros sistemas deben consumir la solución, definir autenticación, recursos, permisos, límites y contrato API; actualmente la aplicación es web renderizada y no presenta API pública.
 9. **Verificar despliegue y datos reales:** confirmar migraciones aplicadas en orden, usuario inicial, variables `.env`, HTTPS, SMTP/Bold, zona horaria, tamaño de copropiedad y permisos efectivos en cada rol.

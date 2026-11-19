@@ -33,10 +33,14 @@ final class PropertyAssignmentController
             $this->redirect('/inmuebles/asignaciones');
         }
 
+        $housingType = (string) ((new \App\Modules\Configuration\SettingsService())->current()['housing_type'] ?? '');
         $this->render([
             'actor' => $actor,
             ...$data,
             'selectedUserId' => $selectedUserId,
+            'conformation' => (new \App\Modules\Configuration\CompositionService())->progress(
+                in_array($housingType, ['casa', 'torres_apartamento', 'mixto'], true) ? $housingType : ''
+            ),
         ]);
     }
 
@@ -61,7 +65,9 @@ final class PropertyAssignmentController
                 throw new RuntimeException('La seleccion de inmuebles tiene un formato invalido.');
             }
             (new PropertyAssignmentService())->assign($userId, $unitIds);
-            $this->flash('success', 'Las asignaciones del usuario se guardaron correctamente.');
+            $this->flash('success', count($unitIds) === 0
+                ? 'Se guardó: el usuario quedó sin inmuebles asignados.'
+                : 'Se guardaron ' . count($unitIds) . ' inmueble(s) para este usuario.');
         } catch (\JsonException) {
             $this->flash('error', 'No se pudo leer la seleccion de inmuebles. Recarga la pagina e intenta nuevamente.');
         } catch (RuntimeException $exception) {
@@ -77,7 +83,7 @@ final class PropertyAssignmentController
     private function render(array $data): void
     {
         Session::start();
-        $data['title'] = 'Inmuebles / Asignacion de usuarios';
+        $data['title'] = 'Asignación de inmuebles';
         $data['csrfToken'] = Session::csrfToken();
         $data['flash'] = $_SESSION['property_assignment_flash'] ?? null;
         unset($_SESSION['property_assignment_flash']);
