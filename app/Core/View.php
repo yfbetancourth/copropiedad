@@ -73,7 +73,10 @@ final class View
         if ($scenario === 'Public' || $scenario === 'User') {
             $basePath = preg_replace('~/admin$~', '', $basePath) ?? $basePath;
         }
-        $propertyName = (new \App\Modules\Configuration\SettingsService())->propertyName();
+        // En la plataforma (consola del Superadmin) no hay conjunto: se muestra el nombre de la plataforma.
+        $propertyName = Tenant::isPlatform()
+            ? self::platformName()
+            : (new \App\Modules\Configuration\SettingsService())->propertyName();
 
         ob_start();
         require $templatePath;
@@ -81,5 +84,12 @@ final class View
         $pageTitle = isset($title) && is_string($title) ? $title : $propertyName;
 
         require dirname(__DIR__) . '/Scenarios/' . $layout;
+    }
+
+    public static function platformName(): string
+    {
+        $name = $_ENV['APP_NAME'] ?? $_SERVER['APP_NAME'] ?? getenv('APP_NAME');
+
+        return is_string($name) && trim($name) !== '' ? trim($name) : 'Copropiedad';
     }
 }

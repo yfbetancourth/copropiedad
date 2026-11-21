@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Configuration;
 
 use RuntimeException;
+use App\Core\Tenant;
 
 final class PropertyGalleryService
 {
@@ -23,7 +24,7 @@ final class PropertyGalleryService
             if (preg_match('/^\d{2}-[a-f0-9]{32}\.(?:jpg|jpeg|png|webp)$/D', $name) !== 1 || !is_file($file)) {
                 continue;
             }
-            $images[] = ['name' => $name, 'url' => '/uploads/property-gallery/' . rawurlencode($name)];
+            $images[] = ['name' => $name, 'url' => '/uploads/property-gallery/' . Tenant::id() . '/' . rawurlencode($name)];
         }
 
         return $images;
@@ -116,8 +117,9 @@ final class PropertyGalleryService
         return is_file($path) && unlink($path);
     }
 
+    /** Cada conjunto tiene su propia carpeta de galería. */
     private function directory(): string
     {
-        return dirname(__DIR__, 3) . '/public/uploads/property-gallery';
+        return dirname(__DIR__, 3) . '/public/uploads/property-gallery/' . Tenant::id();
     }
 }

@@ -102,7 +102,7 @@ $canManage = \App\Core\Authorization::hasPermission($actor, 'configuracion.equip
                         </tbody>
                     </table>
                 </div>
-                <div class="card-footer text-secondary">Las cuentas Superadmin del sistema estan protegidas. Desactivar un usuario invalida sus sesiones.</div>
+                <div class="card-footer text-secondary">Las cuentas del administrador principal estan protegidas: las gestiona el Superadmin. Desactivar un usuario invalida sus sesiones.</div>
             </div>
         </div>
     </div>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Auth;
 
+use App\Core\Tenant;
 use App\Modules\Configuration\MailSettingsService;
 use RuntimeException;
 
@@ -12,7 +13,8 @@ final class PasswordResetMailer
     public function send(string $email, string $username, string $token): void
     {
         $settings = (new MailSettingsService())->credentials();
-        $appUrl = rtrim(self::environmentSetting('APP_URL'), '/');
+        // El enlace lleva al subdominio del conjunto de la cuenta (o al dominio principal para el Superadmin).
+        $appUrl = self::environmentSetting('APP_URL') === '' ? '' : rtrim(Tenant::absoluteUrl('/'), '/');
 
         if ($settings['host'] === '' || $settings['from_address'] === '' || $appUrl === ''
             || $settings['username'] === '' || $settings['password'] === ''
@@ -23,7 +25,9 @@ final class PasswordResetMailer
         $urlParts = parse_url($appUrl);
         if (!is_array($urlParts) || !in_array($urlParts['scheme'] ?? '', ['https', 'http'], true)
             || !isset($urlParts['host'])
-            || (($urlParts['scheme'] ?? '') !== 'https' && !in_array($urlParts['host'], ['localhost', '127.0.0.1'], true))
+            || (($urlParts['scheme'] ?? '') !== 'https'
+                && !in_array($urlParts['host'], ['localhost', '127.0.0.1'], true)
+                && (self::environmentSetting('APP_ENV') ?: 'production') === 'production')
         ) {
             throw new RuntimeException('APP_URL debe usar HTTPS fuera de localhost.');
         }

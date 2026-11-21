@@ -20,6 +20,9 @@ final class WebBootstrap
         header("Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self' data: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self'");
         header('Cache-Control: no-store, private');
 
+        // El subdominio decide el conjunto residencial (o la plataforma) antes de registrar las rutas.
+        Tenant::resolve();
+
         return new Router();
     }
 

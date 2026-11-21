@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Classifieds;
 
 use App\Core\Database;
+use App\Core\Tenant;
 use RuntimeException;
 use Throwable;
 
@@ -39,14 +40,15 @@ final class ClassifiedsService
         try {
             $statement = $pdo->prepare(
                 'INSERT INTO property_classifieds
-                    (user_id, operation, title, property_type, location, description, price, status,
+                    (tenant_id, user_id, operation, title, property_type, location, description, price, status,
                      contact_name, contact_email, contact_phone, contact_authorized, contact_authorized_at)
                  VALUES
-                    (:user_id, :operation, :title, :property_type, :location, :description, :price, \'published\',
+                    (:tenant_id, :user_id, :operation, :title, :property_type, :location, :description, :price, \'published\',
                      :contact_name, :contact_email, :contact_phone, :contact_authorized,
                      IF(:contact_authorized_at = 1, UTC_TIMESTAMP(), NULL))'
             );
             $statement->execute([
+                'tenant_id' => Tenant::id(),
                 'user_id' => $userId,
                 'operation' => $listing['operation'],
                 'title' => $listing['title'],
@@ -108,17 +110,17 @@ final class ClassifiedsService
 
         $pdo = Database::connection();
         $lookup = $pdo->prepare(
-            'SELECT id FROM property_classifieds WHERE id = ? AND user_id = ? LIMIT 1'
+            'SELECT id FROM property_classifieds WHERE id = ? AND tenant_id = ? AND user_id = ? LIMIT 1'
         );
-        $lookup->execute([$listingId, $userId]);
+        $lookup->execute([$listingId, Tenant::id(), $userId]);
         if ($lookup->fetchColumn() === false) {
             return false;
         }
 
         $statement = $pdo->prepare(
-            'UPDATE property_classifieds SET status = ? WHERE id = ? AND user_id = ?'
+            'UPDATE property_classifieds SET status = ? WHERE id = ? AND tenant_id = ? AND user_id = ?'
         );
-        $statement->execute([$status, $listingId, $userId]);
+        $statement->execute([$status, $listingId, Tenant::id(), $userId]);
 
         return true;
     }
@@ -130,16 +132,16 @@ final class ClassifiedsService
             'SELECT images.storage_name
              FROM property_classifieds AS listings
              LEFT JOIN property_classified_images AS images ON images.listing_id = listings.id
-             WHERE listings.id = ? AND listings.user_id = ?'
+             WHERE listings.id = ? AND listings.tenant_id = ? AND listings.user_id = ?'
         );
-        $lookup->execute([$listingId, $userId]);
+        $lookup->execute([$listingId, Tenant::id(), $userId]);
         $images = $lookup->fetchAll();
         if ($images === []) {
             return false;
         }
 
-        $delete = $pdo->prepare('DELETE FROM property_classifieds WHERE id = ? AND user_id = ?');
-        $delete->execute([$listingId, $userId]);
+        $delete = $pdo->prepare('DELETE FROM property_classifieds WHERE id = ? AND tenant_id = ? AND user_id = ?');
+        $delete->execute([$listingId, Tenant::id(), $userId]);
 
         if ($delete->rowCount() !== 1) {
             return false;
@@ -165,10 +167,10 @@ final class ClassifiedsService
                     listings.status, listings.user_id
              FROM property_classified_images AS images
              INNER JOIN property_classifieds AS listings ON listings.id = images.listing_id
-             WHERE images.id = ?
+             WHERE images.id = ? AND listings.tenant_id = ?
              LIMIT 1'
         );
-        $statement->execute([$imageId]);
+        $statement->execute([$imageId, Tenant::id()]);
         $image = $statement->fetch();
         if (!is_array($image)) {
             return null;
@@ -188,11 +190,11 @@ final class ClassifiedsService
                     CASE WHEN c.contact_authorized = 1 THEN c.contact_email ELSE NULL END AS contact_email,
                     CASE WHEN c.contact_authorized = 1 THEN c.contact_phone ELSE NULL END AS contact_phone
              FROM property_classifieds AS c
-             WHERE ' . $where . '
+             WHERE c.tenant_id = ? AND (' . $where . ')
              ORDER BY c.created_at DESC, c.id DESC'
             . ($limit > 0 ? ' LIMIT ' . $limit : '')
         );
-        $statement->execute($parameters);
+        $statement->execute([Tenant::id(), ...$parameters]);
         $listings = $statement->fetchAll();
         if ($listings === []) {
             return [];

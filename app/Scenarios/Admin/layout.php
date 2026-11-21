@@ -21,8 +21,9 @@ $account = [
     'initial' => mb_strtoupper(mb_substr($accountName, 0, 1, 'UTF-8'), 'UTF-8'),
 ];
 
+$isPlatform = \App\Core\Tenant::isPlatform();
 $canSeeComposition = false;
-if ($can('configuracion.conformacion')) {
+if (!$isPlatform && $can('configuracion.conformacion')) {
     $compositionHousingType = (new \App\Modules\Configuration\SettingsService())->current()['housing_type'] ?? '';
     // El asistente de conformación solo tiene sentido cuando ya se eligió el tipo de vivienda.
     $canSeeComposition = in_array($compositionHousingType, ['casa', 'torres_apartamento', 'mixto'], true);
@@ -63,6 +64,15 @@ $menu = [
         ['configuracion.parametrizacion', '/configuracion/galeria-publica', 'bi-images', 'Galería pública', ['/configuracion/galeria-publica']],
     ]],
 ];
+if ($isPlatform) {
+    // Consola del Superadmin: en el dominio principal no hay módulos de un conjunto.
+    $menu = [
+        [null, [
+            ['panel', '/clientes', 'bi-buildings', 'Conjuntos residenciales', ['/admin', '/clientes', '/clientes/editar']],
+            ['panel', '/clientes/nuevo', 'bi-plus-circle', 'Nuevo conjunto', ['/clientes/nuevo']],
+        ]],
+    ];
+}
 $isActivePath = static function (array $patterns) use ($currentPath): bool {
     foreach ($patterns as $pattern) {
         if (str_ends_with($pattern, '*') ? str_starts_with($currentPath, rtrim($pattern, '*')) : $currentPath === $pattern) {
@@ -97,7 +107,7 @@ $accountGroups = [
     ['title' => 'Ir a', 'items' => array_values(array_filter([
         $can('panel') ? ['href' => $adminHome, 'icon' => 'bi-house-heart', 'label' => 'Bienvenida', 'active' => $currentPath === '/admin'] : null,
         $can('usuario.portal') ? ['href' => $userPortalHome, 'icon' => 'bi-house-door', 'label' => 'Portal de residente'] : null,
-        ['href' => Url::publicBasePath() . '/', 'icon' => 'bi-globe2', 'label' => 'Ver sitio público', 'newTab' => true],
+        $isPlatform ? null : ['href' => Url::publicBasePath() . '/', 'icon' => 'bi-globe2', 'label' => 'Ver sitio público', 'newTab' => true],
     ]))],
     ['title' => 'Mi cuenta', 'items' => array_values(array_filter([
         $can('usuario.portal') ? ['href' => $userPortalHome . '#perfil', 'icon' => 'bi-person-gear', 'label' => 'Editar mis datos y contraseña'] : null,
@@ -118,8 +128,8 @@ $csrfToken = Session::csrfToken();
     <title><?= $escape($pageTitle) ?> | <?= $escape($propertyName) ?></title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/css/adminlte.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.2/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.10.2/dist/css/adminlte.min.css">
 </head>
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
 <a class="visually-hidden-focusable position-absolute top-0 start-0 z-3 bg-white p-2" href="#main-content">Saltar al contenido principal</a>
@@ -162,7 +172,7 @@ $csrfToken = Session::csrfToken();
     </footer>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/browser/overlayscrollbars.browser.es6.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/js/adminlte.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.9/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/admin-lte@4.10.2/dist/js/adminlte.min.js"></script>
 </body>
 </html>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Messaging;
 
 use App\Core\Database;
+use App\Core\Tenant;
 use RuntimeException;
 use Throwable;
 
@@ -12,12 +13,15 @@ final class MessagingService
 {
     public function activeUsers(): array
     {
-        return Database::connection()->query(
+        $statement = Database::connection()->prepare(
             'SELECT id, username, email
              FROM admin_users
-             WHERE is_active = 1
+             WHERE tenant_id = ? AND is_active = 1
              ORDER BY username'
-        )->fetchAll();
+        );
+        $statement->execute([Tenant::id()]);
+
+        return $statement->fetchAll();
     }
 
     public function send(int $senderId, string $subject, string $body, ?int $recipientId): int
@@ -27,14 +31,16 @@ final class MessagingService
 
         try {
             if ($recipientId === null) {
-                $recipients = $pdo->query(
-                    'SELECT id FROM admin_users WHERE is_active = 1 ORDER BY id'
-                )->fetchAll(\PDO::FETCH_COLUMN);
+                $all = $pdo->prepare(
+                    'SELECT id FROM admin_users WHERE tenant_id = ? AND is_active = 1 ORDER BY id'
+                );
+                $all->execute([Tenant::id()]);
+                $recipients = $all->fetchAll(\PDO::FETCH_COLUMN);
             } else {
                 $recipient = $pdo->prepare(
-                    'SELECT id FROM admin_users WHERE id = ? AND is_active = 1 LIMIT 1'
+                    'SELECT id FROM admin_users WHERE id = ? AND tenant_id = ? AND is_active = 1 LIMIT 1'
                 );
-                $recipient->execute([$recipientId]);
+                $recipient->execute([$recipientId, Tenant::id()]);
                 $recipients = $recipient->fetchAll(\PDO::FETCH_COLUMN);
             }
 
@@ -43,9 +49,9 @@ final class MessagingService
             }
 
             $message = $pdo->prepare(
-                'INSERT INTO admin_messages (sender_id, subject, body) VALUES (?, ?, ?)'
+                'INSERT INTO admin_messages (tenant_id, sender_id, subject, body) VALUES (?, ?, ?, ?)'
             );
-            $message->execute([$senderId, $subject, $body]);
+            $message->execute([Tenant::id(), $senderId, $subject, $body]);
             $messageId = (int) $pdo->lastInsertId();
 
             $insertRecipient = $pdo->prepare(
@@ -75,12 +81,12 @@ final class MessagingService
                     SUM(recipients.read_at IS NOT NULL) AS read_count
              FROM admin_messages AS messages
              LEFT JOIN admin_message_recipients AS recipients ON recipients.message_id = messages.id
-             WHERE messages.sender_id = ?
+             WHERE messages.tenant_id = ? AND messages.sender_id = ?
              GROUP BY messages.id
              ORDER BY messages.created_at DESC, messages.id DESC
              LIMIT 50'
         );
-        $statement->execute([$senderId]);
+        $statement->execute([Tenant::id(), $senderId]);
 
         return $statement->fetchAll();
     }

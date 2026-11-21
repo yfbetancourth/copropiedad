@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Billing;
 
 use App\Core\Database;
+use App\Core\Tenant;
 use App\Modules\Configuration\CompositionService;
 use DateTimeImmutable;
 use RuntimeException;
@@ -36,7 +37,7 @@ final class ReportService
     {
         $today ??= new DateTimeImmutable('today');
         $pdo = Database::connection();
-        $rows = $pdo->query(
+        $portfolioQuery = $pdo->prepare(
             "SELECT statements.id, statements.unit_id, statements.unit_name, statements.unit_category,
                     statements.period, statements.total_due, statements.early_discount,
                     statements.early_payment_date, statements.payment_due_date,
@@ -46,7 +47,7 @@ final class ReportService
                      WHERE recipients.statement_id = statements.id) AS recipients
              FROM billing_statements AS statements
              JOIN (
-                 SELECT unit_id, MAX(period) AS period FROM billing_statements GROUP BY unit_id
+                 SELECT unit_id, MAX(period) AS period FROM billing_statements WHERE tenant_id = ? GROUP BY unit_id
              ) AS latest ON latest.unit_id = statements.unit_id AND latest.period = statements.period
              LEFT JOIN (
                  SELECT payments.statement_id,
@@ -54,11 +55,14 @@ final class ReportService
                         SUM(CASE WHEN payments.received_on <= owner.early_payment_date THEN payments.amount ELSE 0 END) AS early
                  FROM billing_payments AS payments
                  JOIN billing_statements AS owner ON owner.id = payments.statement_id
-                 WHERE payments.voided_at IS NULL
+                 WHERE payments.tenant_id = ? AND payments.voided_at IS NULL
                  GROUP BY payments.statement_id
              ) AS paid ON paid.statement_id = statements.id
+             WHERE statements.tenant_id = ?
              ORDER BY statements.unit_name"
-        )->fetchAll();
+        );
+        $portfolioQuery->execute([Tenant::id(), Tenant::id(), Tenant::id()]);
+        $rows = $portfolioQuery->fetchAll();
 
         $carried = $this->carriedPeriods();
         $result = [];
@@ -117,10 +121,10 @@ final class ReportService
         $query = Database::connection()->prepare(
             "SELECT DATE_FORMAT(received_on, '%Y-%m') AS month, SUM(amount) AS total, COUNT(*) AS payments
              FROM billing_payments
-             WHERE voided_at IS NULL AND received_on >= ?
+             WHERE tenant_id = ? AND voided_at IS NULL AND received_on >= ?
              GROUP BY month"
         );
-        $query->execute([$start->format('Y-m-d')]);
+        $query->execute([Tenant::id(), $start->format('Y-m-d')]);
         $byMonth = [];
         foreach ($query->fetchAll() as $row) {
             $byMonth[(string) $row['month']] = [
@@ -151,10 +155,10 @@ final class ReportService
              FROM billing_payments AS payments
              JOIN billing_statements AS statements ON statements.id = payments.statement_id
              LEFT JOIN admin_users AS creators ON creators.id = payments.created_by
-             WHERE payments.received_on BETWEEN ? AND ?
+             WHERE payments.tenant_id = ? AND payments.received_on BETWEEN ? AND ?
              ORDER BY payments.received_on, payments.id'
         );
-        $query->execute([$start->format('Y-m-d'), $start->modify('last day of this month')->format('Y-m-d')]);
+        $query->execute([Tenant::id(), $start->format('Y-m-d'), $start->modify('last day of this month')->format('Y-m-d')]);
 
         return $query->fetchAll();
     }
@@ -186,14 +190,18 @@ final class ReportService
 
         $pdo = Database::connection();
         $currentPeriod = (new DateTimeImmutable('first day of this month'))->format('Y-m');
-        $issuedThisPeriod = $pdo->prepare('SELECT COUNT(*) FROM billing_statements WHERE period = ?');
-        $issuedThisPeriod->execute([$currentPeriod]);
-        $delivery = $pdo->query(
+        $issuedThisPeriod = $pdo->prepare('SELECT COUNT(*) FROM billing_statements WHERE tenant_id = ? AND period = ?');
+        $issuedThisPeriod->execute([Tenant::id(), $currentPeriod]);
+        $deliveryQuery = $pdo->prepare(
             "SELECT
-                SUM(delivery_status = 'failed') AS failed,
-                SUM(delivery_status IN ('pending', 'sending')) AS pending
-             FROM billing_statement_recipients"
-        )->fetch();
+                SUM(recipients.delivery_status = 'failed') AS failed,
+                SUM(recipients.delivery_status IN ('pending', 'sending')) AS pending
+             FROM billing_statement_recipients AS recipients
+             JOIN billing_statements AS statements ON statements.id = recipients.statement_id
+             WHERE statements.tenant_id = ?"
+        );
+        $deliveryQuery->execute([Tenant::id()]);
+        $delivery = $deliveryQuery->fetch();
         $collections = $this->collectionsByMonth(6);
 
         return [
@@ -220,20 +228,24 @@ final class ReportService
      */
     public function paymentsOnSupersededStatements(): array
     {
-        return Database::connection()->query(
+        $query = Database::connection()->prepare(
             'SELECT payments.id, payments.amount, payments.received_on, payments.created_at,
                     statements.unit_name, statements.period, MIN(newer.period) AS newer_period
              FROM billing_payments AS payments
              JOIN billing_statements AS statements ON statements.id = payments.statement_id
              JOIN billing_statements AS newer
-               ON newer.unit_id = statements.unit_id
+               ON newer.tenant_id = statements.tenant_id
+              AND newer.unit_id = statements.unit_id
               AND newer.period > statements.period
               AND newer.issued_at < payments.created_at
-             WHERE payments.voided_at IS NULL
+             WHERE payments.tenant_id = ? AND payments.voided_at IS NULL
              GROUP BY payments.id
              ORDER BY payments.created_at DESC
              LIMIT 20'
-        )->fetchAll();
+        );
+        $query->execute([Tenant::id()]);
+
+        return $query->fetchAll();
     }
 
     /** @return array{total: int, assigned: int, unassigned: int, missing_coefficient: int}|null */
@@ -244,11 +256,14 @@ final class ReportService
             return null;
         }
         $assigned = [];
-        foreach (Database::connection()->query(
+        $assignedQuery = Database::connection()->prepare(
             'SELECT DISTINCT assignments.unit_id
              FROM property_unit_assignments AS assignments
-             JOIN admin_users AS users ON users.id = assignments.user_id AND users.is_active = 1'
-        )->fetchAll() as $row) {
+             JOIN admin_users AS users ON users.id = assignments.user_id AND users.is_active = 1
+             WHERE assignments.tenant_id = ?'
+        );
+        $assignedQuery->execute([Tenant::id()]);
+        foreach ($assignedQuery->fetchAll() as $row) {
             $assigned[(string) $row['unit_id']] = true;
         }
         $total = 0;
@@ -278,9 +293,11 @@ final class ReportService
     /** @return array<string, int> unit_id => períodos consecutivos (desde el último) con saldo arrastrado */
     private function carriedPeriods(): array
     {
-        $rows = Database::connection()->query(
-            'SELECT unit_id, opening_balance FROM billing_statements ORDER BY unit_id, period DESC'
-        )->fetchAll();
+        $carriedQuery = Database::connection()->prepare(
+            'SELECT unit_id, opening_balance FROM billing_statements WHERE tenant_id = ? ORDER BY unit_id, period DESC'
+        );
+        $carriedQuery->execute([Tenant::id()]);
+        $rows = $carriedQuery->fetchAll();
         $carried = [];
         $closed = [];
         foreach ($rows as $row) {

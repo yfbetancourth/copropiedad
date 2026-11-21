@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Configuration;
 
 use App\Core\Database;
+use App\Core\Tenant;
 use App\Core\SecretBox;
 use RuntimeException;
 
@@ -15,11 +16,7 @@ final class MailSettingsService
      */
     public function current(): array
     {
-        $row = Database::connection()->query(
-            'SELECT host, port, username, encryption, from_address, from_name, password_ciphertext
-             FROM copropiedad_mail_settings
-             WHERE id = 1'
-        )->fetch();
+        $row = $this->storedRow('host, port, username, encryption, from_address, from_name, password_ciphertext');
 
         if (is_array($row)) {
             return [
@@ -49,11 +46,7 @@ final class MailSettingsService
      */
     public function credentials(): array
     {
-        $row = Database::connection()->query(
-            'SELECT host, port, username, password_ciphertext, encryption, from_address, from_name
-             FROM copropiedad_mail_settings
-             WHERE id = 1'
-        )->fetch();
+        $row = $this->storedRow('host, port, username, password_ciphertext, encryption, from_address, from_name');
 
         if (is_array($row)) {
             return [
@@ -104,8 +97,8 @@ final class MailSettingsService
         $ciphertext = $this->encrypt($password);
         Database::connection()->prepare(
             'INSERT INTO copropiedad_mail_settings
-                (id, host, port, username, password_ciphertext, encryption, from_address, from_name)
-             VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+                (tenant_id, host, port, username, password_ciphertext, encryption, from_address, from_name)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 host = VALUES(host),
                 port = VALUES(port),
@@ -114,7 +107,26 @@ final class MailSettingsService
                 encryption = VALUES(encryption),
                 from_address = VALUES(from_address),
                 from_name = VALUES(from_name)'
-        )->execute([$host, $port, $username, $ciphertext, $encryption, $fromAddress, $fromName]);
+        )->execute([Tenant::id(), $host, $port, $username, $ciphertext, $encryption, $fromAddress, $fromName]);
+    }
+
+    /**
+     * Configuración SMTP propia del conjunto. Sin ella (o en la plataforma) se usa la cuenta de .env.
+     *
+     * @return array<string, mixed>|false
+     */
+    private function storedRow(string $columns): array|false
+    {
+        $tenantId = Tenant::scopeId();
+        if ($tenantId === null) {
+            return false;
+        }
+        $statement = Database::connection()->prepare(
+            'SELECT ' . $columns . ' FROM copropiedad_mail_settings WHERE tenant_id = ?'
+        );
+        $statement->execute([$tenantId]);
+
+        return $statement->fetch();
     }
 
     private const SECRET_CONTEXT = 'copropiedad-mail-settings-v1';

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Home;
 
+use App\Core\Tenant;
+use App\Core\ModuleCatalog;
 use App\Core\View;
 use App\Modules\Classifieds\ClassifiedsService;
 use App\Modules\Configuration\PropertyGalleryService;
@@ -13,6 +15,12 @@ final class HomeController
 {
     public function index(): void
     {
+        if (!Tenant::isActive()) {
+            http_response_code(503);
+            echo 'Este conjunto residencial no está disponible temporalmente.';
+            return;
+        }
+
         $settings = (new SettingsService())->current();
         $name = trim((string) ($settings['property_name'] ?? '')) ?: 'Copropiedad';
         $address = trim((string) ($settings['address'] ?? ''));
@@ -25,13 +33,14 @@ final class HomeController
             'canonicalUrl' => $this->canonical('/'),
             'settings' => $settings,
             'galleryImages' => (new PropertyGalleryService())->images(),
-            'listings' => (new ClassifiedsService())->publicListings(3),
+            'listings' => ModuleCatalog::enabled('clasificados') ? (new ClassifiedsService())->publicListings(3) : [],
+            'classifiedsEnabled' => ModuleCatalog::enabled('clasificados'),
         ]);
     }
 
     private function canonical(string $path): string
     {
-        $baseUrl = rtrim((string) ($_ENV['APP_URL'] ?? ''), '/');
+        $baseUrl = rtrim(Tenant::absoluteUrl('/'), '/');
 
         return $baseUrl . ($path === '/' ? '/' : $path);
     }

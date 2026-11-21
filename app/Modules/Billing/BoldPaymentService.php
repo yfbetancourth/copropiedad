@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Billing;
 
 use App\Core\Database;
+use App\Core\Tenant;
 use DateTimeImmutable;
 use RuntimeException;
 use Throwable;
@@ -21,10 +22,12 @@ final class BoldPaymentService
 
     public function settings(): array
     {
-        $row = Database::connection()->query(
+        $settingsQuery = Database::connection()->prepare(
             'SELECT environment, api_key_ciphertext, payment_methods
-             FROM bold_payment_settings WHERE id = 1'
-        )->fetch();
+             FROM bold_payment_settings WHERE tenant_id = ?'
+        );
+        $settingsQuery->execute([Tenant::id()]);
+        $row = $settingsQuery->fetch();
 
         if (!is_array($row)) {
             return [
@@ -130,13 +133,13 @@ final class BoldPaymentService
         $ciphertext = $this->encrypt($apiKey);
         $methods = implode(',', array_keys($selectedMethods));
         Database::connection()->prepare(
-            'INSERT INTO bold_payment_settings (id, environment, api_key_ciphertext, payment_methods)
-             VALUES (1, ?, ?, ?)
+            'INSERT INTO bold_payment_settings (tenant_id, environment, api_key_ciphertext, payment_methods)
+             VALUES (?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 environment = VALUES(environment),
                 api_key_ciphertext = VALUES(api_key_ciphertext),
                 payment_methods = VALUES(payment_methods)'
-        )->execute([$environment, $ciphertext, $methods]);
+        )->execute([Tenant::id(), $environment, $ciphertext, $methods]);
 
         return $unavailableMethods;
     }
@@ -148,27 +151,27 @@ final class BoldPaymentService
              FROM billing_statements AS statements
              JOIN billing_statement_recipients AS recipients
                ON recipients.statement_id = statements.id
-             WHERE recipients.user_id = ?
+             WHERE statements.tenant_id = ? AND recipients.user_id = ?
              ORDER BY statements.period DESC, statements.id DESC'
         );
-        $query->execute([$userId]);
+        $query->execute([Tenant::id(), $userId]);
 
         $documents = [];
         $billing = new BillingService();
         $paymentQuery = Database::connection()->prepare(
             'SELECT status, checkout_url
              FROM billing_online_payments
-             WHERE statement_id = ?
+             WHERE tenant_id = ? AND statement_id = ?
              ORDER BY id DESC LIMIT 1'
         );
         $terminalQuery = Database::connection()->prepare(
-            'SELECT status FROM billing_bold_terminal_payments WHERE statement_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1'
+            'SELECT status FROM billing_bold_terminal_payments WHERE tenant_id = ? AND statement_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1'
         );
         foreach ($query->fetchAll() as $row) {
             $statement = $billing->statement((int) $row['id']);
-            $paymentQuery->execute([(int) $row['id']]);
+            $paymentQuery->execute([Tenant::id(), (int) $row['id']]);
             $latestPayment = $paymentQuery->fetch();
-            $terminalQuery->execute([(int) $row['id'], $userId]);
+            $terminalQuery->execute([Tenant::id(), (int) $row['id'], $userId]);
             $latestTerminalPayment = $terminalQuery->fetch();
             $statement['online_payment_status'] = is_array($latestPayment)
                 ? (string) $latestPayment['status']
@@ -194,10 +197,10 @@ final class BoldPaymentService
              FROM billing_statements AS statements
              JOIN billing_statement_recipients AS recipients
                ON recipients.statement_id = statements.id AND recipients.user_id = ?
-             WHERE statements.id = ?
+             WHERE statements.id = ? AND statements.tenant_id = ?
              LIMIT 1'
         );
-        $statement->execute([$userId, $statementId]);
+        $statement->execute([$userId, $statementId, Tenant::id()]);
         if (!is_array($statement->fetch())) {
             throw new RuntimeException('La nota no existe o no corresponde a tu cuenta.');
         }
@@ -222,8 +225,8 @@ final class BoldPaymentService
 
         $pdo->beginTransaction();
         try {
-            $lock = $pdo->prepare('SELECT id FROM billing_statements WHERE id = ? FOR UPDATE');
-            $lock->execute([$statementId]);
+            $lock = $pdo->prepare('SELECT id FROM billing_statements WHERE id = ? AND tenant_id = ? FOR UPDATE');
+            $lock->execute([$statementId, Tenant::id()]);
             if ($lock->fetchColumn() === false) {
                 throw new RuntimeException('La nota de cobro ya no está disponible.');
             }
@@ -231,10 +234,10 @@ final class BoldPaymentService
             $pending = $pdo->prepare(
                 'SELECT reference, bold_payment_link, checkout_url, expected_amount
                  FROM billing_online_payments
-                 WHERE statement_id = ? AND status = "pending"
+                 WHERE tenant_id = ? AND statement_id = ? AND status = "pending"
                  ORDER BY id DESC LIMIT 1'
             );
-            $pending->execute([$statementId]);
+            $pending->execute([Tenant::id(), $statementId]);
             $existing = $pending->fetch();
             if (is_array($existing)) {
                 $remote = $this->paymentLink((string) $existing['bold_payment_link']);
@@ -307,9 +310,10 @@ final class BoldPaymentService
 
             $pdo->prepare(
                 'INSERT INTO billing_online_payments
-                    (statement_id, user_id, reference, bold_payment_link, checkout_url, expected_amount, status)
-                 VALUES (?, ?, ?, ?, ?, ?, "pending")'
+                    (tenant_id, statement_id, user_id, reference, bold_payment_link, checkout_url, expected_amount, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, "pending")'
             )->execute([
+                Tenant::id(),
                 $statementId,
                 $userId,
                 $reference,
@@ -349,9 +353,9 @@ final class BoldPaymentService
     public function refreshPayment(string $reference, int $timeout = 5): string
     {
         $query = Database::connection()->prepare(
-            'SELECT bold_payment_link, status FROM billing_online_payments WHERE reference = ?'
+            'SELECT bold_payment_link, status FROM billing_online_payments WHERE reference = ? AND tenant_id = ?'
         );
-        $query->execute([$reference]);
+        $query->execute([$reference, Tenant::id()]);
         $row = $query->fetch();
         if (!is_array($row)) {
             throw new RuntimeException('No se encontró el pago relacionado con la referencia recibida.');
@@ -378,33 +382,34 @@ final class BoldPaymentService
         };
     }
 
+    /** El retorno y el webhook usan el subdominio del conjunto: así Bold vuelve al cliente correcto. */
     public function callbackUrl(string $reference): string
     {
-        $appUrl = self::environmentSetting('APP_URL');
-        if (parse_url($appUrl, PHP_URL_SCHEME) !== 'https' || parse_url($appUrl, PHP_URL_HOST) === false) {
+        $url = Tenant::absoluteUrl('/pagos/bold/retorno');
+        if (parse_url($url, PHP_URL_SCHEME) !== 'https' || !is_string(parse_url($url, PHP_URL_HOST))) {
             throw new RuntimeException('Configura APP_URL con el dominio público HTTPS para recibir el retorno de Bold.');
         }
 
-        return rtrim($appUrl, '/') . '/pagos/bold/retorno?reference=' . rawurlencode($reference);
+        return $url . '?reference=' . rawurlencode($reference);
     }
 
     public function webhookUrl(): string
     {
-        $appUrl = self::environmentSetting('APP_URL');
-        if (parse_url($appUrl, PHP_URL_SCHEME) !== 'https' || parse_url($appUrl, PHP_URL_HOST) === false) {
+        $url = Tenant::absoluteUrl('/pagos/bold/webhook');
+        if (parse_url($url, PHP_URL_SCHEME) !== 'https' || !is_string(parse_url($url, PHP_URL_HOST))) {
             return '';
         }
 
-        return rtrim($appUrl, '/') . '/pagos/bold/webhook';
+        return $url;
     }
 
     private function recordApprovedPayment(string $reference, array $remote): void
     {
         $pdo = Database::connection();
         $statementQuery = $pdo->prepare(
-            'SELECT statement_id FROM billing_online_payments WHERE reference = ?'
+            'SELECT statement_id FROM billing_online_payments WHERE reference = ? AND tenant_id = ?'
         );
-        $statementQuery->execute([$reference]);
+        $statementQuery->execute([$reference, Tenant::id()]);
         $statementId = $statementQuery->fetchColumn();
         if ($statementId === false) {
             throw new RuntimeException('No se encontró el pago relacionado con la referencia recibida.');
@@ -412,17 +417,17 @@ final class BoldPaymentService
 
         $pdo->beginTransaction();
         try {
-            $lockStatement = $pdo->prepare('SELECT id FROM billing_statements WHERE id = ? FOR UPDATE');
-            $lockStatement->execute([(int) $statementId]);
+            $lockStatement = $pdo->prepare('SELECT id FROM billing_statements WHERE id = ? AND tenant_id = ? FOR UPDATE');
+            $lockStatement->execute([(int) $statementId, Tenant::id()]);
             if ($lockStatement->fetchColumn() === false) {
                 throw new RuntimeException('La nota de cobro del pago ya no existe.');
             }
 
             $query = $pdo->prepare(
                 'SELECT id, statement_id, user_id, expected_amount, status
-                 FROM billing_online_payments WHERE reference = ? FOR UPDATE'
+                 FROM billing_online_payments WHERE reference = ? AND tenant_id = ? FOR UPDATE'
             );
-            $query->execute([$reference]);
+            $query->execute([$reference, Tenant::id()]);
             $payment = $query->fetch();
             if (!is_array($payment)) {
                 throw new RuntimeException('No se encontró el pago relacionado con la referencia recibida.');
@@ -434,9 +439,9 @@ final class BoldPaymentService
             if (strtoupper((string) ($remote['status'] ?? '')) !== 'PAID') {
                 throw new RuntimeException('Bold aún no confirma el pago.');
             }
-            $environment = (string) $pdo->query(
-                'SELECT environment FROM bold_payment_settings WHERE id = 1'
-            )->fetchColumn();
+            $environmentQuery = $pdo->prepare('SELECT environment FROM bold_payment_settings WHERE tenant_id = ?');
+            $environmentQuery->execute([Tenant::id()]);
+            $environment = (string) $environmentQuery->fetchColumn();
             if (!is_bool($remote['is_sandbox'] ?? null)
                 || $remote['is_sandbox'] !== ($environment === 'sandbox')
             ) {
@@ -455,9 +460,10 @@ final class BoldPaymentService
             }
 
             $pdo->prepare(
-                'INSERT INTO billing_payments (statement_id, amount, received_on, reference, notes, created_by)
-                 VALUES (?, ?, ?, ?, ?, ?)'
+                'INSERT INTO billing_payments (tenant_id, statement_id, amount, received_on, reference, notes, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
             )->execute([
+                Tenant::id(),
                 (int) $payment['statement_id'],
                 number_format((float) $payment['expected_amount'], 2, '.', ''),
                 (new DateTimeImmutable('today'))->format('Y-m-d'),
@@ -468,8 +474,8 @@ final class BoldPaymentService
             $pdo->prepare(
                 'UPDATE billing_online_payments
                  SET status = "approved", transaction_id = ?, approved_at = CURRENT_TIMESTAMP
-                 WHERE id = ?'
-            )->execute([$transactionId, (int) $payment['id']]);
+                 WHERE id = ? AND tenant_id = ?'
+            )->execute([$transactionId, (int) $payment['id'], Tenant::id()]);
             $pdo->commit();
         } catch (Throwable $exception) {
             if ($pdo->inTransaction()) {
@@ -493,8 +499,8 @@ final class BoldPaymentService
         Database::connection()->prepare(
             'UPDATE billing_online_payments
              SET status = ?
-             WHERE reference = ? AND status <> "approved"'
-        )->execute([$mapped, $reference]);
+             WHERE reference = ? AND tenant_id = ? AND status <> "approved"'
+        )->execute([$mapped, $reference, Tenant::id()]);
     }
 
     private function paymentLink(string $paymentLink, int $timeout = 5): array
@@ -585,9 +591,11 @@ final class BoldPaymentService
 
     private function apiKey(): string
     {
-        $row = Database::connection()->query(
-            'SELECT api_key_ciphertext FROM bold_payment_settings WHERE id = 1'
-        )->fetch();
+        $keyQuery = Database::connection()->prepare(
+            'SELECT api_key_ciphertext FROM bold_payment_settings WHERE tenant_id = ?'
+        );
+        $keyQuery->execute([Tenant::id()]);
+        $row = $keyQuery->fetch();
         if (!is_array($row) || (string) $row['api_key_ciphertext'] === '') {
             return '';
         }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Configuration;
 
 use App\Core\Database;
+use App\Core\Tenant;
 use JsonException;
 use RuntimeException;
 
@@ -15,11 +16,13 @@ final class CompositionService
      */
     public function current(): ?array
     {
-        $row = Database::connection()->query(
+        $statement = Database::connection()->prepare(
             'SELECT housing_type, answers, units, completed
              FROM copropiedad_composition
-             WHERE id = 1'
-        )->fetch();
+             WHERE tenant_id = ?'
+        );
+        $statement->execute([Tenant::id()]);
+        $row = $statement->fetch();
         if (!is_array($row)) {
             return null;
         }
@@ -54,15 +57,15 @@ final class CompositionService
         $pdo->beginTransaction();
         try {
             $pdo->prepare(
-                'INSERT INTO copropiedad_composition (id, housing_type, answers, units, completed)
-                 VALUES (1, ?, ?, NULL, 0)
+                'INSERT INTO copropiedad_composition (tenant_id, housing_type, answers, units, completed)
+                 VALUES (?, ?, ?, NULL, 0)
                  ON DUPLICATE KEY UPDATE
                     housing_type = VALUES(housing_type),
                     answers = VALUES(answers),
                     units = NULL,
                     completed = 0'
-            )->execute([$housingType, $encoded]);
-            $pdo->exec('DELETE FROM property_unit_assignments');
+            )->execute([Tenant::id(), $housingType, $encoded]);
+            $pdo->prepare('DELETE FROM property_unit_assignments WHERE tenant_id = ?')->execute([Tenant::id()]);
             $pdo->commit();
         } catch (\Throwable $exception) {
             if ($pdo->inTransaction()) {
@@ -111,14 +114,14 @@ final class CompositionService
             $pdo->prepare(
                 'UPDATE copropiedad_composition
                  SET units = ?, completed = ?
-                 WHERE id = 1'
-            )->execute([$encoded, $completed ? 1 : 0]);
+                 WHERE tenant_id = ?'
+            )->execute([$encoded, $completed ? 1 : 0, Tenant::id()]);
 
             $removeAssignment = $pdo->prepare(
-                'DELETE FROM property_unit_assignments WHERE unit_id = ?'
+                'DELETE FROM property_unit_assignments WHERE tenant_id = ? AND unit_id = ?'
             );
             foreach (array_diff_key($previousIds, $ids) as $removedId => $_) {
-                $removeAssignment->execute([$removedId]);
+                $removeAssignment->execute([Tenant::id(), $removedId]);
             }
             $pdo->commit();
         } catch (\Throwable $exception) {
@@ -169,8 +172,8 @@ final class CompositionService
     public function clear(): void
     {
         $pdo = Database::connection();
-        $pdo->exec('DELETE FROM property_unit_assignments');
-        $pdo->exec('DELETE FROM copropiedad_composition WHERE id = 1');
+        $pdo->prepare('DELETE FROM property_unit_assignments WHERE tenant_id = ?')->execute([Tenant::id()]);
+        $pdo->prepare('DELETE FROM copropiedad_composition WHERE tenant_id = ?')->execute([Tenant::id()]);
     }
 
     /**
@@ -182,7 +185,9 @@ final class CompositionService
     public function unitIdsWithBillingHistory(): array
     {
         try {
-            $ids = Database::connection()->query('SELECT DISTINCT unit_id FROM billing_statements')->fetchAll(\PDO::FETCH_COLUMN);
+            $statement = Database::connection()->prepare('SELECT DISTINCT unit_id FROM billing_statements WHERE tenant_id = ?');
+            $statement->execute([Tenant::id()]);
+            $ids = $statement->fetchAll(\PDO::FETCH_COLUMN);
         } catch (\PDOException) {
             return []; // El módulo de cartera aún no está migrado.
         }
@@ -192,7 +197,10 @@ final class CompositionService
 
     public function assignmentCount(): int
     {
-        return (int) Database::connection()->query('SELECT COUNT(*) FROM property_unit_assignments')->fetchColumn();
+        $statement = Database::connection()->prepare('SELECT COUNT(*) FROM property_unit_assignments WHERE tenant_id = ?');
+        $statement->execute([Tenant::id()]);
+
+        return (int) $statement->fetchColumn();
     }
 
     /**
@@ -228,7 +236,9 @@ final class CompositionService
                     $validIds[$unit['id']] = true;
                 }
             }
-            foreach (Database::connection()->query('SELECT DISTINCT unit_id FROM property_unit_assignments')->fetchAll(\PDO::FETCH_COLUMN) as $unitId) {
+            $assigned = Database::connection()->prepare('SELECT DISTINCT unit_id FROM property_unit_assignments WHERE tenant_id = ?');
+            $assigned->execute([Tenant::id()]);
+            foreach ($assigned->fetchAll(\PDO::FETCH_COLUMN) as $unitId) {
                 if (isset($validIds[(string) $unitId])) {
                     $assignedUnits++;
                 }

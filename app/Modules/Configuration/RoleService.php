@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Configuration;
 
 use App\Core\Database;
+use App\Core\Tenant;
 use Throwable;
 
 final class RoleService
@@ -34,14 +35,17 @@ final class RoleService
 
     public function all(): array
     {
-        $roles = Database::connection()->query(
+        $statement = Database::connection()->prepare(
             'SELECT roles.id, roles.name, roles.description, roles.is_system,
                     COUNT(users.id) AS user_count
              FROM admin_roles AS roles
              LEFT JOIN admin_users AS users ON users.role_id = roles.id
+             WHERE roles.tenant_id = ?
              GROUP BY roles.id
              ORDER BY roles.is_system DESC, roles.name'
-        )->fetchAll();
+        );
+        $statement->execute([Tenant::id()]);
+        $roles = $statement->fetchAll();
 
         foreach ($roles as &$role) {
             $role['permissions'] = $this->permissions((int) $role['id']);
@@ -54,9 +58,9 @@ final class RoleService
     public function find(int $roleId): ?array
     {
         $statement = Database::connection()->prepare(
-            'SELECT id, name, description, is_system FROM admin_roles WHERE id = ? LIMIT 1'
+            'SELECT id, name, description, is_system FROM admin_roles WHERE id = ? AND tenant_id = ? LIMIT 1'
         );
-        $statement->execute([$roleId]);
+        $statement->execute([$roleId, Tenant::id()]);
         $role = $statement->fetch();
         if (!is_array($role)) {
             return null;
@@ -88,8 +92,8 @@ final class RoleService
 
         try {
             if ($roleId === null) {
-                $statement = $pdo->prepare('INSERT INTO admin_roles (name, description) VALUES (?, ?)');
-                $statement->execute([$name, $description]);
+                $statement = $pdo->prepare('INSERT INTO admin_roles (tenant_id, name, description) VALUES (?, ?, ?)');
+                $statement->execute([Tenant::id(), $name, $description]);
                 $roleId = (int) $pdo->lastInsertId();
             } else {
                 $existingRole = $this->find($roleId);
@@ -97,13 +101,13 @@ final class RoleService
                     throw new \RuntimeException('El rol seleccionado no existe.');
                 }
                 if ((bool) $existingRole['is_system']) {
-                    throw new \RuntimeException('El rol Superadmin del sistema no se puede modificar.');
+                    throw new \RuntimeException('Los roles del sistema no se pueden modificar.');
                 }
 
                 $statement = $pdo->prepare(
-                    'UPDATE admin_roles SET name = ?, description = ? WHERE id = ? AND is_system = 0'
+                    'UPDATE admin_roles SET name = ?, description = ? WHERE id = ? AND tenant_id = ? AND is_system = 0'
                 );
-                $statement->execute([$name, $description, $roleId]);
+                $statement->execute([$name, $description, $roleId, Tenant::id()]);
             }
 
             $pdo->prepare('DELETE FROM admin_role_permissions WHERE role_id = ?')->execute([$roleId]);
@@ -128,17 +132,20 @@ final class RoleService
     public function delete(int $roleId): bool
     {
         $statement = Database::connection()->prepare(
-            'DELETE FROM admin_roles WHERE id = ? AND is_system = 0'
+            'DELETE FROM admin_roles WHERE id = ? AND tenant_id = ? AND is_system = 0'
         );
-        $statement->execute([$roleId]);
+        $statement->execute([$roleId, Tenant::id()]);
 
         return $statement->rowCount() === 1;
     }
 
     public function assignableRoles(): array
     {
-        return Database::connection()->query(
-            'SELECT id, name FROM admin_roles WHERE is_system = 0 ORDER BY name'
-        )->fetchAll();
+        $statement = Database::connection()->prepare(
+            'SELECT id, name FROM admin_roles WHERE tenant_id = ? AND is_system = 0 ORDER BY name'
+        );
+        $statement->execute([Tenant::id()]);
+
+        return $statement->fetchAll();
     }
 }

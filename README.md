@@ -147,3 +147,22 @@ El diseño sigue el ciclo de vida de documentos de cobro usados habitualmente: p
 API Integrations de Bold (datáfono): la migración 019 crea el almacenamiento separado para llave, terminal, método y pagos pendientes. En Configuración / Métodos de pago guarda primero la llave API Datáfono y selecciona el método activo; recarga para elegir un terminal Smart o Smart Pro vinculado. Configura APP_URL en HTTPS, registra la URL de webhook mostrada y guarda la llave secreta de producción para verificar x-bold-signature. El residente puede iniciar el cobro desde Panel de Usuario / Pagos; no debe volver a enviarlo si el servidor indica que Bold pudo haberlo recibido. La cartera solo registra el abono cuando llega una venta aprobada, firmada, con la referencia y el monto correctos.
 
 La migración 020 permite **anular pagos manuales** registrados por error desde **Cartera / Cobros** (requiere nivel Total): el pago se conserva con fecha, usuario y motivo y deja de contar en el saldo. Cuando se emite el período siguiente, el saldo de la nota anterior queda trasladado: esa nota ya no recibe pagos manuales ni en línea, y el portal indica pagar la nota más reciente. **Reportes de cartera** (`/cartera/reportes`) muestra el estado de cada inmueble, la antigüedad estimada de saldos y el recaudo mensual, y exporta cartera y pagos a CSV; el **Panel** administrativo resume estos indicadores y los pendientes operativos.
+
+## Multicliente: conjuntos residenciales
+
+La migración 023 convierte la aplicación en multicliente: cada **conjunto residencial** es un cliente con sus propios datos, usuarios, roles, configuración, cartera, mensajes y clasificados. Todo vive en una sola base de datos; cada tabla de negocio lleva `tenant_id` y cada consulta filtra por el conjunto de la solicitud. La copropiedad existente queda como el conjunto `principal`.
+
+```powershell
+Get-Content .\database\migrations\023_create_tenants.sql | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+```
+
+**Cómo se identifica el conjunto.** Por el subdominio, configurado en `.env`:
+
+- `APP_BASE_DOMAIN=midominio.com`: `midominio.com/admin` es la **consola del Superadmin**; `{slug}.midominio.com` es el conjunto (página pública, `/usuario` y `/admin`).
+- `APP_DEFAULT_TENANT=principal`: solo fuera de producción, el conjunto que se abre con un host que no es del dominio base (por ejemplo `http://localhost/Copropiedad/public`).
+- En local, `localtest.me` resuelve cualquier subdominio a la máquina: `http://localtest.me/Copropiedad/public/admin` (consola) y `http://principal.localtest.me/Copropiedad/public/` (conjunto), sin tocar el archivo hosts.
+- En producción se necesita un DNS comodín (`*.midominio.com`) y un certificado SSL comodín. Los enlaces de correo, el retorno y el webhook de Bold usan el subdominio de cada conjunto: registra en Bold la URL que muestra *Métodos de pago* de cada conjunto.
+
+**Consola del Superadmin** (`/admin/clientes`, solo en el dominio principal): crea conjuntos con su subdominio, habilita o deshabilita módulos (portal de residentes, cartera, pagos en línea Bold, mensajes, clasificados), asigna uno o más administradores, cambia su contraseña, los desactiva y suspende o reactiva el servicio de un conjunto. Un módulo deshabilitado desaparece para todos en ese conjunto (incluido su administrador) sin borrar datos. Los módulos de núcleo (parametrización, equipo, roles, caracterización, conformación y asignaciones) siempre están disponibles.
+
+**Cuentas.** Cada cuenta pertenece a un solo conjunto; el usuario y el correo son únicos dentro del conjunto, así que una misma persona puede tener cuenta en dos conjuntos con el mismo correo. El administrador asignado tiene el rol de sistema `Administrador` (acceso total en su conjunto, no editable desde Equipo ni Roles). El Superadmin no pertenece a ningún conjunto, puede entrar al de cualquiera con sus credenciales y es el único que reinicia la conformación. La sesión queda ligada al conjunto donde se inició.

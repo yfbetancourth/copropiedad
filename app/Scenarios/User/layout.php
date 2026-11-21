@@ -26,24 +26,28 @@ $unreadBilling = (int) ($notifications['billing_count'] ?? 0);
 $notificationCount = $unreadMessages + $unreadBilling;
 
 // Mismo menú por secciones que el panel administrativo, con las opciones del residente.
+// Cada opción aparece solo si el Superadmin habilitó su módulo en este conjunto.
+$billingEnabled = \App\Core\ModuleCatalog::enabled('cartera');
+$messagesEnabled = \App\Core\ModuleCatalog::enabled('mensajes');
+$classifiedsEnabled = \App\Core\ModuleCatalog::enabled('clasificados');
 $sidebarSections = [
     ['title' => null, 'items' => [
         ['href' => $portalHome, 'icon' => 'bi-house-heart', 'label' => 'Bienvenida', 'active' => $currentPath === '/usuario'],
     ]],
     ['title' => 'Mi inmueble', 'items' => [
         ['href' => $portalHome . '#inmuebles', 'icon' => 'bi-house-door', 'label' => 'Mis inmuebles'],
-        ['href' => $portalHome . '#documentos', 'icon' => 'bi-receipt', 'label' => 'Documentos de cobro', 'badge' => $unreadBilling],
+        ...($billingEnabled ? [['href' => $portalHome . '#documentos', 'icon' => 'bi-receipt', 'label' => 'Documentos de cobro', 'badge' => $unreadBilling]] : []),
     ]],
-    ['title' => 'Pagos', 'items' => [
+    ['title' => 'Pagos', 'items' => $billingEnabled ? [
         ['href' => $portalHome . '/pagos', 'icon' => 'bi-credit-card', 'label' => 'Pagar mis cuotas', 'active' => str_starts_with($currentPath, '/usuario/pagos')],
-    ]],
-    ['title' => 'Comunicación', 'items' => [
+    ] : []],
+    ['title' => 'Comunicación', 'items' => $messagesEnabled ? [
         ['href' => $portalHome . '/mensajes', 'icon' => 'bi-chat-left-text', 'label' => 'Mis mensajes', 'active' => str_starts_with($currentPath, '/usuario/mensajes'), 'badge' => $unreadMessages],
-    ]],
-    ['title' => 'Comunidad', 'items' => [
+    ] : []],
+    ['title' => 'Comunidad', 'items' => $classifiedsEnabled ? [
         ['href' => $portalHome . '#clasificados', 'icon' => 'bi-megaphone', 'label' => 'Mis clasificados'],
         ['href' => $basePath . '/clasificados', 'icon' => 'bi-shop', 'label' => 'Clasificados públicos', 'newTab' => true],
-    ]],
+    ] : []],
     ['title' => 'Mi cuenta', 'items' => [
         ['href' => $portalHome . '#perfil', 'icon' => 'bi-person-gear', 'label' => 'Datos y contraseña'],
     ]],
@@ -60,10 +64,10 @@ $accountGroups = [
         $canSeeAdminPanel ? ['href' => $adminHome, 'icon' => 'bi-speedometer2', 'label' => 'Panel administrativo'] : null,
         ['href' => $basePath . '/', 'icon' => 'bi-globe2', 'label' => 'Ver sitio público', 'newTab' => true],
     ]))],
-    ['title' => 'Mi cuenta', 'items' => [
+    ['title' => 'Mi cuenta', 'items' => array_values(array_filter([
         ['href' => $portalHome . '#perfil', 'icon' => 'bi-person-gear', 'label' => 'Editar mis datos y contraseña'],
-        ['href' => $portalHome . '/mensajes', 'icon' => 'bi-chat-left-text', 'label' => 'Mis mensajes'],
-    ]],
+        $messagesEnabled ? ['href' => $portalHome . '/mensajes', 'icon' => 'bi-chat-left-text', 'label' => 'Mis mensajes'] : null,
+    ]))],
 ];
 $logoutAction = $basePath . '/logout';
 $csrfToken = Session::csrfToken();
@@ -77,8 +81,8 @@ $csrfToken = Session::csrfToken();
     <title><?= $escape($pageTitle) ?> | <?= $escape($propertyName) ?></title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/css/adminlte.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.2/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.10.2/dist/css/adminlte.min.css">
 </head>
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
 <a class="visually-hidden-focusable position-absolute top-0 start-0 z-3 bg-white p-2" href="#main-content">Saltar al contenido principal</a>
@@ -166,7 +170,7 @@ $csrfToken = Session::csrfToken();
     </footer>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/browser/overlayscrollbars.browser.es6.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/admin-lte@4.0.0/dist/js/adminlte.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.9/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/admin-lte@4.10.2/dist/js/adminlte.min.js"></script>
 </body>
 </html>

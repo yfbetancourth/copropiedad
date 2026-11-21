@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Auth;
 
 use App\Core\Database;
+use App\Core\Tenant;
 use PDO;
 use RuntimeException;
 use Throwable;
@@ -16,13 +17,16 @@ final class AuthService
     public function authenticate(string $identity, string $password): ?array
     {
         $pdo = Database::connection();
+        [$scopeSql, $scopeParams] = self::loginScope('admin_users');
+        // En un conjunto se prefiere la cuenta del conjunto; el Superadmin de la plataforma también puede entrar.
         $statement = $pdo->prepare(
-            'SELECT id, username, email, password_hash, is_active, failed_attempts, locked_until, auth_version
+            'SELECT id, tenant_id, username, email, password_hash, is_active, failed_attempts, locked_until, auth_version
              FROM admin_users
-             WHERE username = :username OR email = :email
+             WHERE (username = ? OR email = ?) AND ' . $scopeSql . '
+             ORDER BY tenant_id IS NULL
              LIMIT 1'
         );
-        $statement->execute(['username' => $identity, 'email' => $identity]);
+        $statement->execute([$identity, $identity, ...$scopeParams]);
         $user = $statement->fetch();
         $fallbackHash = password_hash('invalid-login-placeholder', PASSWORD_DEFAULT);
         $passwordMatches = password_verify($password, $user['password_hash'] ?? $fallbackHash);
@@ -41,7 +45,10 @@ final class AuthService
             $user['failed_attempts'] = 0;
         }
 
-        if (!$passwordMatches || !(bool) $user['is_active']) {
+        // Un conjunto suspendido solo admite al Superadmin.
+        $blockedBySuspension = $user['tenant_id'] !== null && !Tenant::isActive();
+
+        if (!$passwordMatches || !(bool) $user['is_active'] || $blockedBySuspension) {
             $attempts = (int) $user['failed_attempts'] + 1;
             $lockedUntil = $attempts >= self::MAX_LOGIN_ATTEMPTS;
             $update = $pdo->prepare(
@@ -69,12 +76,14 @@ final class AuthService
         ];
     }
 
+    /** Solo cuentas del conjunto actual (o de la plataforma en el dominio principal). */
     public function findActiveUserByEmail(string $email): ?array
     {
+        [$scopeSql, $scopeParams] = self::ownScope('admin_users');
         $statement = Database::connection()->prepare(
-            'SELECT id, email, username FROM admin_users WHERE email = ? AND is_active = 1 LIMIT 1'
+            'SELECT id, email, username FROM admin_users WHERE email = ? AND is_active = 1 AND ' . $scopeSql . ' LIMIT 1'
         );
-        $statement->execute([$email]);
+        $statement->execute([$email, ...$scopeParams]);
         $user = $statement->fetch();
 
         return is_array($user) ? $user : null;
@@ -133,14 +142,18 @@ final class AuthService
         $pdo->beginTransaction();
 
         try {
+            // El enlace solo sirve en el conjunto de la cuenta: un token de otro conjunto no es válido aquí.
+            [$scopeSql, $scopeParams] = self::ownScope('users');
             $statement = $pdo->prepare(
-                'SELECT id, user_id
-                 FROM admin_password_reset_tokens
-                 WHERE token_hash = ? AND used_at IS NULL AND expires_at > UTC_TIMESTAMP()
+                'SELECT tokens.id, tokens.user_id
+                 FROM admin_password_reset_tokens AS tokens
+                 JOIN admin_users AS users ON users.id = tokens.user_id
+                 WHERE tokens.token_hash = ? AND tokens.used_at IS NULL AND tokens.expires_at > UTC_TIMESTAMP()
+                   AND ' . $scopeSql . '
                  LIMIT 1
                  FOR UPDATE'
             );
-            $statement->execute([$tokenHash]);
+            $statement->execute([$tokenHash, ...$scopeParams]);
             $token = $statement->fetch();
 
             if (!is_array($token)) {
@@ -170,12 +183,7 @@ final class AuthService
 
     public function isCurrentSession(int $userId, int $authVersion): bool
     {
-        $statement = Database::connection()->prepare(
-            'SELECT 1 FROM admin_users WHERE id = ? AND auth_version = ? AND is_active = 1 LIMIT 1'
-        );
-        $statement->execute([$userId, $authVersion]);
-
-        return $statement->fetchColumn() !== false;
+        return $this->currentUser($userId, $authVersion) !== null;
     }
 
     public function updateOwnCredentials(
@@ -233,18 +241,22 @@ final class AuthService
 
     public function currentUser(int $userId, int $authVersion): ?array
     {
+        [$scopeSql, $scopeParams] = self::loginScope('users');
         $statement = Database::connection()->prepare(
-            'SELECT users.id, users.username, users.email, roles.id AS role_id, roles.name AS role_name,
+            'SELECT users.id, users.tenant_id, users.username, users.email, roles.id AS role_id, roles.name AS role_name,
                     roles.is_system, users.auth_version
              FROM admin_users AS users
              JOIN admin_roles AS roles ON roles.id = users.role_id
-             WHERE users.id = ? AND users.auth_version = ? AND users.is_active = 1
+             WHERE users.id = ? AND users.auth_version = ? AND users.is_active = 1 AND ' . $scopeSql . '
              LIMIT 1'
         );
-        $statement->execute([$userId, $authVersion]);
+        $statement->execute([$userId, $authVersion, ...$scopeParams]);
         $user = $statement->fetch();
         if (!is_array($user)) {
             return null;
+        }
+        if ($user['tenant_id'] !== null && !Tenant::isActive()) {
+            return null; // Conjunto suspendido: solo el Superadmin conserva el acceso.
         }
 
         $permissions = Database::connection()->prepare(
@@ -257,9 +269,38 @@ final class AuthService
         }
 
         $user['id'] = (int) $user['id'];
+        $user['tenant_id'] = $user['tenant_id'] === null ? null : (int) $user['tenant_id'];
         $user['role_id'] = (int) $user['role_id'];
         $user['is_system'] = (bool) $user['is_system'];
 
         return $user;
+    }
+
+    /**
+     * Cuentas que pueden iniciar sesión aquí: en un conjunto, las suyas y el Superadmin; en la plataforma, solo esta.
+     *
+     * @return array{0: string, 1: list<int>}
+     */
+    private static function loginScope(string $alias): array
+    {
+        $tenantId = Tenant::scopeId();
+
+        return $tenantId === null
+            ? [$alias . '.tenant_id IS NULL', []]
+            : ['(' . $alias . '.tenant_id = ? OR ' . $alias . '.tenant_id IS NULL)', [$tenantId]];
+    }
+
+    /**
+     * Cuentas que pertenecen exactamente al ámbito actual (recuperación de contraseña).
+     *
+     * @return array{0: string, 1: list<int>}
+     */
+    private static function ownScope(string $alias): array
+    {
+        $tenantId = Tenant::scopeId();
+
+        return $tenantId === null
+            ? [$alias . '.tenant_id IS NULL', []]
+            : [$alias . '.tenant_id = ?', [$tenantId]];
     }
 }

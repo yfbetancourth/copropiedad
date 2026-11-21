@@ -21,8 +21,11 @@ final class Authorization
         $authVersion = $_SESSION['admin_auth_version'] ?? null;
         $lastActivity = $_SESSION['last_activity'] ?? null;
 
+        // La sesión queda ligada al conjunto (o a la plataforma) donde se inició: nunca se reutiliza en otro.
+        $sessionScope = $_SESSION['tenant_scope'] ?? null;
         if (!is_int($userId) || !is_int($authVersion) || !is_int($lastActivity)
             || time() - $lastActivity > 1800
+            || $sessionScope !== (Tenant::scopeId() ?? 0)
         ) {
             if (isset($_SESSION['admin_user_id'])) {
                 Session::destroy();
@@ -80,6 +83,11 @@ final class Authorization
 
     public static function hasPermission(array $user, string $moduleKey, int $requiredLevel): bool
     {
+        // Un módulo deshabilitado por el Superadmin no concede acceso a nadie dentro del conjunto.
+        if (!ModuleCatalog::permissionAvailable($moduleKey)) {
+            return false;
+        }
+
         if ((bool) $user['is_system']) {
             return true;
         }
@@ -90,12 +98,15 @@ final class Authorization
     }
 
     /**
-     * El Superadmin es el único rol de sistema (protegido, no se crea ni se edita desde la interfaz).
-     * Se usa para acciones que ningún rol personalizado debe poder hacer, aunque tenga nivel «total».
+     * El Superadmin es la cuenta de la plataforma (sin conjunto) con rol de sistema. Puede entrar a cualquier
+     * conjunto. Se usa para acciones que ni el administrador del conjunto puede hacer, aunque tenga acceso total.
      */
     public static function isSuperadmin(?array $user): bool
     {
-        return $user !== null && (bool) ($user['is_system'] ?? false);
+        return $user !== null
+            && (bool) ($user['is_system'] ?? false)
+            && array_key_exists('tenant_id', $user)
+            && $user['tenant_id'] === null;
     }
 
     public static function canGrant(string $requested, string $actorLevel): bool

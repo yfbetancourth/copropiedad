@@ -96,7 +96,7 @@ $canManage = \App\Core\Authorization::hasPermission($actor, 'configuracion.roles
                         </tbody>
                     </table>
                 </div>
-                <div class="card-footer text-secondary">El rol Superadmin es del sistema y no se puede editar ni eliminar.</div>
+                <div class="card-footer text-secondary">El rol Administrador es del sistema: lo asigna el Superadmin y no se puede editar ni eliminar.</div>
             </div>
         </div>
     </div>

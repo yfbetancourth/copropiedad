@@ -19,7 +19,7 @@ use Throwable;
 final class ConfigurationController
 {
     /** Categorías sugeridas al editar la estructura; se puede escribir otra. */
-    public const UNIT_CATEGORIES = ['Apartamento', 'Casa', 'Inmueble comercial', 'Parqueadero', 'Depósito', 'Oficina'];
+    public const UNIT_CATEGORIES = ['Apartamento', 'Casa', 'Inmueble comercial', 'Parqueadero', 'Bodega', 'Depósito', 'Oficina'];
 
     public function __construct(
         private readonly TeamService $team = new TeamService(),
@@ -43,7 +43,7 @@ final class ConfigurationController
                 $this->redirect('/configuracion/equipo');
             }
             if ((bool) $user['is_system']) {
-                $this->flash('error', 'La cuenta Superadmin del sistema esta protegida.');
+                $this->flash('error', 'La cuenta del administrador principal está protegida; la gestiona el Superadmin.');
                 $this->redirect('/configuracion/equipo');
             }
         }
@@ -176,7 +176,12 @@ final class ConfigurationController
             'actor' => $actor,
             'roles' => $this->roles->all(),
             'editingRole' => $role,
-            'modules' => RoleService::MODULES,
+            // Los permisos de módulos que el Superadmin deshabilitó no se muestran en este conjunto.
+            'modules' => array_filter(
+                RoleService::MODULES,
+                static fn (string $moduleKey): bool => \App\Core\ModuleCatalog::permissionAvailable($moduleKey),
+                ARRAY_FILTER_USE_KEY
+            ),
             'levels' => RoleService::LEVELS,
         ]);
     }
@@ -203,7 +208,15 @@ final class ConfigurationController
         }
 
         $permissions = [];
+        $existingPermissions = $roleId !== null && $roleId !== false && $roleId > 0
+            ? ($this->roles->find((int) $roleId)['permissions'] ?? [])
+            : [];
         foreach (RoleService::MODULES as $moduleKey => $_label) {
+            // Un módulo deshabilitado no está en el formulario: se conserva lo que tenía el rol.
+            if (!\App\Core\ModuleCatalog::permissionAvailable($moduleKey)) {
+                $permissions[$moduleKey] = $existingPermissions[$moduleKey] ?? 'none';
+                continue;
+            }
             $level = $submitted[$moduleKey] ?? 'none';
             if (!is_string($level) || !array_key_exists($level, RoleService::LEVELS)) {
                 $this->flash('error', 'Uno de los niveles de permiso no es valido.');
@@ -831,12 +844,22 @@ final class ConfigurationController
         $settings = (new SettingsService())->current();
         $previousType = $settings['housing_type'] ?? '';
         $previousNomenclature = $settings['tower_nomenclature'] ?? 'numeric';
-        $nomenclatureInput = $this->stringInput($_POST['tower_nomenclature'] ?? null);
-        $towerNomenclature = in_array($housingType, ['torres_apartamento', 'mixto'], true)
-            ? $nomenclatureInput
+        $previousApartmentNomenclature = UnitNomenclature::isApartmentFormat($settings['apartment_nomenclature'] ?? null)
+            ? $settings['apartment_nomenclature']
+            : 'piso_numero';
+        $hasTowers = in_array($housingType, ['torres_apartamento', 'mixto'], true);
+        $towerNomenclature = $hasTowers
+            ? $this->stringInput($_POST['tower_nomenclature'] ?? null)
             : $previousNomenclature;
-        if (!in_array($towerNomenclature, ['numeric', 'alphabetic'], true)) {
+        if (!UnitNomenclature::isTowerFormat($towerNomenclature)) {
             $this->flash('error', 'Selecciona un tipo de nomenclatura valido para las torres.');
+            $this->redirect('/configuracion/caracterizacion');
+        }
+        $apartmentNomenclature = $hasTowers
+            ? $this->stringInput($_POST['apartment_nomenclature'] ?? null)
+            : $previousApartmentNomenclature;
+        if (!UnitNomenclature::isApartmentFormat($apartmentNomenclature)) {
+            $this->flash('error', 'Selecciona un tipo de nomenclatura valido para los apartamentos.');
             $this->redirect('/configuracion/caracterizacion');
         }
 
@@ -845,8 +868,8 @@ final class ConfigurationController
         $hasComposition = is_array($composition)
             && ($composition['answers'] !== [] || $composition['units'] !== null);
         $confirmedChange = $this->confirmedReset($_POST['confirm_text'] ?? null);
-        $nomenclatureChanged = in_array($housingType, ['torres_apartamento', 'mixto'], true)
-            && $towerNomenclature !== $previousNomenclature;
+        $nomenclatureChanged = $hasTowers
+            && ($towerNomenclature !== $previousNomenclature || $apartmentNomenclature !== $previousApartmentNomenclature);
         $resetsStructure = ($housingType !== $previousType || $nomenclatureChanged) && $hasComposition;
 
         if ($resetsStructure && !Authorization::isSuperadmin($actor)) {
@@ -874,7 +897,7 @@ final class ConfigurationController
         $pdo = Database::connection();
         $pdo->beginTransaction();
         try {
-            (new SettingsService())->saveCharacterization($housingType, $towerNomenclature);
+            (new SettingsService())->saveCharacterization($housingType, $towerNomenclature, $apartmentNomenclature);
             if ($resetsStructure) {
                 $compositionService->clear();
             }
@@ -915,7 +938,8 @@ final class ConfigurationController
         }
 
         $towerNomenclature = $settings['tower_nomenclature'] ?? 'numeric';
-        if (!in_array($towerNomenclature, ['numeric', 'alphabetic'], true)) {
+        $apartmentNomenclature = $settings['apartment_nomenclature'] ?? 'piso_numero';
+        if (!UnitNomenclature::isTowerFormat($towerNomenclature) || !UnitNomenclature::isApartmentFormat($apartmentNomenclature)) {
             throw new RuntimeException('El tipo de nomenclatura guardado no es valido.');
         }
 
@@ -989,6 +1013,7 @@ final class ConfigurationController
             'conformation' => $compositionService->progress($housingType),
             'housingType' => $housingType,
             'towerNomenclature' => $towerNomenclature,
+            'apartmentNomenclature' => $apartmentNomenclature,
             'answers' => $answers,
             'steps' => $steps,
             'stepIndex' => $stepIndex,
@@ -1014,9 +1039,10 @@ final class ConfigurationController
         $field = $this->stringInput($_POST['field'] ?? null);
         $value = $this->integerInput($_POST['value'] ?? null);
         $fieldIndex = array_search($field, array_column($steps, 'key'), true);
+        $minimum = $fieldIndex === false ? 1 : $steps[$fieldIndex]['min'];
 
-        if ($fieldIndex === false || $value === false || $value === null || $value < 1 || $value > 5000) {
-            $this->flash('error', 'Ingresa una cantidad como numero entero positivo, entre 1 y 5.000.');
+        if ($fieldIndex === false || $value === false || $value === null || $value < $minimum || $value > 5000) {
+            $this->flash('error', sprintf('Ingresa una cantidad como numero entero, entre %d y 5.000.', $minimum));
             $this->redirect('/configuracion/conformacion');
         }
 
@@ -1066,7 +1092,9 @@ final class ConfigurationController
         $this->requireCsrf();
 
         $housingType = $this->configuredHousingType();
-        $towerNomenclature = (new SettingsService())->current()['tower_nomenclature'] ?? 'numeric';
+        $settings = (new SettingsService())->current();
+        $towerNomenclature = $settings['tower_nomenclature'] ?? 'numeric';
+        $apartmentNomenclature = $settings['apartment_nomenclature'] ?? 'piso_numero';
         $composition = (new CompositionService())->current();
         $answers = is_array($composition) && $composition['housing_type'] === $housingType
             ? $composition['answers']
@@ -1084,15 +1112,18 @@ final class ConfigurationController
             }
         } else {
             for ($tower = 1; $tower <= $answers['towers']; $tower++) {
-                $towerName = $towerNomenclature === 'alphabetic'
-                    ? $this->alphabeticTowerName($tower)
-                    : (string) $tower;
+                $towerName = UnitNomenclature::towerName($tower, $towerNomenclature);
                 for ($floor = 1; $floor <= $answers['floors_per_tower']; $floor++) {
                     for ($unit = 1; $unit <= $answers['units_per_floor']; $unit++) {
-                        $apartmentName = str_pad((string) $unit, 2, '0', STR_PAD_LEFT);
                         $units[] = [
                             'category' => 'Apartamento',
-                            'name' => sprintf('Torre %s - Piso %d - Apartamento %s', $towerName, $floor, $apartmentName),
+                            'name' => UnitNomenclature::apartmentName(
+                                $towerName,
+                                $floor,
+                                $unit,
+                                $answers['units_per_floor'],
+                                $apartmentNomenclature
+                            ),
                         ];
                     }
                 }
@@ -1105,6 +1136,12 @@ final class ConfigurationController
                     ];
                 }
             }
+        }
+        for ($parking = 1; $parking <= ($answers['parking_spots'] ?? 0); $parking++) {
+            $units[] = ['category' => 'Parqueadero', 'name' => 'Parqueadero ' . $parking];
+        }
+        for ($storage = 1; $storage <= ($answers['storage_units'] ?? 0); $storage++) {
+            $units[] = ['category' => 'Bodega', 'name' => 'Bodega ' . $storage];
         }
 
         (new CompositionService())->saveUnits($units, false);
@@ -1183,8 +1220,8 @@ final class ConfigurationController
             } elseif ($name !== '') {
                 $seenNames[$nameKey] = $index + 1;
             }
-            if ($category === 'Apartamento' && $name !== '' && !$this->hasValidApartmentNomenclature($name)) {
-                $errors[] = $row . ': los apartamentos deben terminar en «Apartamento NN», con NN entre 01 y 99.';
+            if ($category === 'Apartamento' && $name !== '' && !UnitNomenclature::isValidApartmentName($name)) {
+                $errors[] = $row . ': los apartamentos deben terminar en «Apartamento» seguido de su número (ej. Apartamento 101 o Apartamento 01).';
             }
             $coefficient = $this->coefficientInput($unit['coefficient'] ?? null);
             if ($coefficient === false) {
@@ -1248,42 +1285,61 @@ final class ConfigurationController
     }
 
     /**
-     * @return list<array{key: string, label: string, help: string}>
+     * @return list<array{key: string, label: string, help: string, min: int}>
      */
     private function compositionSteps(string $housingType): array
     {
         if ($housingType === 'casa') {
-            return [[
+            $steps = [[
                 'key' => 'houses',
                 'label' => '¿Cuantas casas conforman la copropiedad?',
                 'help' => 'Cuenta todas las casas que hacen parte de la copropiedad.',
+                'min' => 1,
             ]];
+        } else {
+            $steps = [
+                [
+                    'key' => 'towers',
+                    'label' => '¿Cuantas torres de apartamentos hay?',
+                    'help' => 'Ingresa el numero total de torres.',
+                    'min' => 1,
+                ],
+                [
+                    'key' => 'floors_per_tower',
+                    'label' => '¿Cuantos pisos tiene cada torre?',
+                    'help' => 'Si las torres tienen alturas distintas, ingresa el mismo numero para todas por ahora; podras corregir los inmuebles al revisar.',
+                    'min' => 1,
+                ],
+                [
+                    'key' => 'units_per_floor',
+                    'label' => '¿Cuantos apartamentos hay en cada piso?',
+                    'help' => 'Ingresa la cantidad de apartamentos por piso.',
+                    'min' => 1,
+                ],
+            ];
+            if ($housingType === 'mixto') {
+                $steps[] = [
+                    'key' => 'commercial_properties',
+                    'label' => '¿Cuantos inmuebles comerciales hay?',
+                    'help' => 'Cuenta locales, oficinas u otros inmuebles comerciales por separado de los apartamentos.',
+                    'min' => 1,
+                ];
+            }
         }
 
-        $steps = [
-            [
-                'key' => 'towers',
-                'label' => '¿Cuantas torres de apartamentos hay?',
-                'help' => 'Ingresa el numero total de torres.',
-            ],
-            [
-                'key' => 'floors_per_tower',
-                'label' => '¿Cuantos pisos tiene cada torre?',
-                'help' => 'Si las torres tienen alturas distintas, ingresa el mismo numero para todas por ahora; podras corregir los inmuebles al revisar.',
-            ],
-            [
-                'key' => 'units_per_floor',
-                'label' => '¿Cuantos apartamentos hay en cada piso?',
-                'help' => 'Ingresa la cantidad de apartamentos por piso.',
-            ],
+        // Parqueaderos y bodegas privados con folio propio: son opcionales (0 si no hay o si son comunales).
+        $steps[] = [
+            'key' => 'parking_spots',
+            'label' => '¿Cuantos parqueaderos privados hay?',
+            'help' => 'Cuenta solo los parqueaderos que son inmuebles independientes (con coeficiente propio). Escribe 0 si no hay o si son comunales.',
+            'min' => 0,
         ];
-        if ($housingType === 'mixto') {
-            $steps[] = [
-                'key' => 'commercial_properties',
-                'label' => '¿Cuantos inmuebles comerciales hay?',
-                'help' => 'Cuenta locales, oficinas u otros inmuebles comerciales por separado de los apartamentos.',
-            ];
-        }
+        $steps[] = [
+            'key' => 'storage_units',
+            'label' => '¿Cuantas bodegas o depositos privados hay?',
+            'help' => 'Cuenta solo las bodegas que son inmuebles independientes (con coeficiente propio). Escribe 0 si no hay.',
+            'min' => 0,
+        ];
 
         return $steps;
     }
@@ -1314,8 +1370,8 @@ final class ConfigurationController
                 continue;
             }
             $value = $answers[$step['key']];
-            if (!is_int($value) || $value < 1 || $value > 5000) {
-                return 'Hay una cantidad faltante o invalida. Usa numeros enteros positivos de hasta 5.000.';
+            if (!is_int($value) || $value < $step['min'] || $value > 5000) {
+                return 'Hay una cantidad faltante o invalida. Usa numeros enteros de hasta 5.000.';
             }
         }
         foreach (array_keys($answers) as $key) {
@@ -1343,32 +1399,16 @@ final class ConfigurationController
         return null;
     }
 
-    private function alphabeticTowerName(int $number): string
-    {
-        $name = '';
-        while ($number > 0) {
-            $number--;
-            $name = chr(65 + ($number % 26)) . $name;
-            $number = intdiv($number, 26);
-        }
-
-        return $name;
-    }
-
-    private function hasValidApartmentNomenclature(string $name): bool
-    {
-        return preg_match('/(?:^| - )Apartamento (?:0[1-9]|[1-9][0-9])$/D', $name) === 1;
-    }
-
     private function compositionUnitCount(string $housingType, array $answers): int
     {
+        $extras = ($answers['parking_spots'] ?? 0) + ($answers['storage_units'] ?? 0);
         if ($housingType === 'casa') {
-            return $answers['houses'];
+            return $answers['houses'] + $extras;
         }
 
         $apartments = $answers['towers'] * $answers['floors_per_tower'] * $answers['units_per_floor'];
 
-        return $apartments + ($housingType === 'mixto' ? $answers['commercial_properties'] : 0);
+        return $apartments + ($housingType === 'mixto' ? $answers['commercial_properties'] : 0) + $extras;
     }
 
     private function firstUnansweredCompositionStep(array $steps, array $answers): int

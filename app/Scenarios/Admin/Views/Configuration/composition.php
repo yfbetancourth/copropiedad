@@ -17,6 +17,8 @@ $answerLabels = [
     'floors_per_tower' => 'Pisos por torre',
     'units_per_floor' => 'Apartamentos por piso',
     'commercial_properties' => 'Inmuebles comerciales',
+    'parking_spots' => 'Parqueaderos privados',
+    'storage_units' => 'Bodegas privadas',
 ];
 $billingLocked = $billingUnitIds !== [];
 $categories = \App\Modules\Configuration\ConfigurationController::UNIT_CATEGORIES;
@@ -43,6 +45,7 @@ $currentStep = 2;
         <?php
         $step = $steps[$stepIndex];
         $maximum = $step['key'] === 'units_per_floor' ? 99 : 5000;
+        $minimum = (int) ($step['min'] ?? 1);
         $editingExisting = $structureExists;
         ?>
         <div class="row g-3">
@@ -70,14 +73,14 @@ $currentStep = 2;
                                 <p class="text-secondary"><?= $escape($step['help']) ?></p>
                                 <div class="input-group mb-2" style="max-width: 16rem">
                                     <button class="btn btn-outline-secondary" type="button" data-step="-1" aria-label="Restar uno">−</button>
-                                    <input id="composition-value" name="value" class="form-control text-center fs-5" type="number" inputmode="numeric" min="1" max="<?= $maximum ?>" step="1" required autofocus
+                                    <input id="composition-value" name="value" class="form-control text-center fs-5" type="number" inputmode="numeric" min="<?= $minimum ?>" max="<?= $maximum ?>" step="1" required autofocus
                                            value="<?= $escape($answers[$step['key']] ?? '') ?>" aria-describedby="composition-limit">
                                     <button class="btn btn-outline-secondary" type="button" data-step="1" aria-label="Sumar uno">+</button>
                                 </div>
                                 <div id="composition-limit" class="form-text mb-3">
                                     <?= $step['key'] === 'units_per_floor'
-                                        ? 'Entre 1 y 99: los apartamentos se numeran de 01 a 99.'
-                                        : 'Número entero entre 1 y 5.000.' ?>
+                                        ? 'Entre 1 y 99 apartamentos por piso.'
+                                        : 'Número entero entre ' . $minimum . ' y 5.000.' ?>
                                 </div>
 
                                 <?php if ($editingExisting): ?>
@@ -144,19 +147,26 @@ $currentStep = 2;
             const format = (n) => n.toLocaleString('es-CO');
             const update = () => {
                 const value = parseInt(input?.value ?? '', 10);
+                const minimum = parseInt(input?.min ?? '1', 10);
+                const valid = Number.isInteger(value) && value >= minimum;
                 const a = { ...answers };
-                if (Number.isInteger(value) && value > 0) a[field] = value;
+                if (valid) a[field] = value;
                 const shown = document.querySelector(`[data-answer="${field}"]`);
-                if (shown && input) shown.textContent = Number.isInteger(value) && value > 0 ? value : '—';
+                if (shown && input) shown.textContent = valid ? value : '—';
+                const extras = (a.parking_spots || 0) + (a.storage_units || 0);
+                const extrasText = extras > 0
+                    ? ` + ${format(a.parking_spots || 0)} parqueaderos + ${format(a.storage_units || 0)} bodegas`
+                    : '';
                 let count = null;
                 if (housing === 'casa' && a.houses) {
-                    count = a.houses;
-                    detail.textContent = `Casa 1 … Casa ${a.houses}`;
+                    count = a.houses + extras;
+                    detail.textContent = `Casa 1 … Casa ${a.houses}${extrasText}`;
                 } else if (a.towers && a.floors_per_tower && a.units_per_floor) {
                     const apartments = a.towers * a.floors_per_tower * a.units_per_floor;
-                    count = apartments + (housing === 'mixto' ? (a.commercial_properties || 0) : 0);
+                    count = apartments + (housing === 'mixto' ? (a.commercial_properties || 0) : 0) + extras;
                     detail.textContent = `${format(apartments)} apartamentos (${a.towers} × ${a.floors_per_tower} × ${a.units_per_floor})`
-                        + (housing === 'mixto' ? ` + ${format(a.commercial_properties || 0)} comerciales` : '');
+                        + (housing === 'mixto' ? ` + ${format(a.commercial_properties || 0)} comerciales` : '')
+                        + extrasText;
                 } else {
                     detail.textContent = 'Se calcula al completar todas las preguntas.';
                 }
@@ -173,7 +183,8 @@ $currentStep = 2;
             };
             document.querySelectorAll('[data-step]').forEach((button) => button.addEventListener('click', () => {
                 const max = parseInt(input.max, 10);
-                const next = Math.min(max, Math.max(1, (parseInt(input.value, 10) || 0) + parseInt(button.dataset.step, 10)));
+                const min = parseInt(input.min, 10) || 0;
+                const next = Math.min(max, Math.max(min, (parseInt(input.value, 10) || 0) + parseInt(button.dataset.step, 10)));
                 input.value = next;
                 update();
             }));
@@ -188,12 +199,21 @@ $currentStep = 2;
         $exampleNames = $housingType === 'casa'
             ? ['Casa 1', 'Casa 2', '…', 'Casa ' . ($answers['houses'] ?? '')]
             : [
-                'Torre ' . ($towerNomenclature === 'alphabetic' ? 'A' : '1') . ' - Piso 1 - Apartamento 01',
-                'Torre ' . ($towerNomenclature === 'alphabetic' ? 'A' : '1') . ' - Piso 1 - Apartamento ' . str_pad((string) ($answers['units_per_floor'] ?? 1), 2, '0', STR_PAD_LEFT),
+                ...\App\Modules\Configuration\UnitNomenclature::examples(
+                    $towerNomenclature,
+                    $apartmentNomenclature,
+                    (int) ($answers['units_per_floor'] ?? 2)
+                ),
                 '…',
             ];
         if ($housingType === 'mixto') {
             $exampleNames[] = 'Inmueble comercial 1';
+        }
+        if (($answers['parking_spots'] ?? 0) > 0) {
+            $exampleNames[] = 'Parqueadero 1';
+        }
+        if (($answers['storage_units'] ?? 0) > 0) {
+            $exampleNames[] = 'Bodega 1';
         }
         ?>
         <div class="card border-0 shadow-sm">
@@ -390,7 +410,7 @@ $currentStep = 2;
                 };
                 const formatCoefficient = (value) => `${Math.floor(value / SCALE)}.${String(value % SCALE).padStart(4, '0')}`;
                 const formatPercent = (value) => (value / SCALE).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
-                const apartmentPattern = /(?:^| - )Apartamento (?:0[1-9]|[1-9][0-9])$/;
+                const apartmentPattern = /(?:^| - )Apartamento [0-9A-Za-z][0-9A-Za-z-]{0,9}$/;
                 const knownCategories = <?= $json($categories) ?>;
 
                 const markDirty = () => {
@@ -427,7 +447,7 @@ $currentStep = 2;
                         }
                         if (nameOk && categoryValue === 'Apartamento' && !apartmentPattern.test(nameValue)) {
                             nameOk = false;
-                            rowErrors.push('debe terminar en «Apartamento 01» a «99»');
+                            rowErrors.push('debe terminar en «Apartamento» y su número (ej. Apartamento 101)');
                         }
                         const parsed = parseCoefficient(coefficient.value);
                         const coefficientOk = parsed !== null;

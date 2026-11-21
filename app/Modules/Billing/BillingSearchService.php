@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Billing;
 
 use App\Core\Database;
+use App\Core\Tenant;
 use App\Modules\Configuration\CompositionService;
 
 /**
@@ -59,7 +60,7 @@ final class BillingSearchService
                     (SELECT GROUP_CONCAT(r.recipient_name ORDER BY r.recipient_name SEPARATOR ", ")
                      FROM billing_statement_recipients r WHERE r.statement_id = statements.id) AS recipients,
                     (SELECT MIN(newer.period) FROM billing_statements newer
-                     WHERE newer.unit_id = statements.unit_id AND newer.period > statements.period) AS superseded_by_period
+                     WHERE newer.tenant_id = statements.tenant_id AND newer.unit_id = statements.unit_id AND newer.period > statements.period) AS superseded_by_period
              FROM billing_statements AS statements
              LEFT JOIN (
                  SELECT DISTINCT statement_id FROM billing_statement_recipients
@@ -70,14 +71,14 @@ final class BillingSearchService
                         SUM(CASE WHEN payments.received_on <= owner.early_payment_date THEN payments.amount ELSE 0 END) AS early
                  FROM billing_payments payments
                  JOIN billing_statements owner ON owner.id = payments.statement_id
-                 WHERE payments.voided_at IS NULL
+                 WHERE payments.tenant_id = :tenant_paid AND payments.voided_at IS NULL
                  GROUP BY payments.statement_id
              ) AS paid ON paid.statement_id = statements.id
-             WHERE ' . implode(' OR ', $where) . '
+             WHERE statements.tenant_id = :tenant AND (' . implode(' OR ', $where) . ')
              ORDER BY statements.period DESC, statements.unit_name
              LIMIT ' . (self::LIMIT + 1)
         );
-        $statement->execute($params + ['like_recipient' => $like, 'like_email' => $like]);
+        $statement->execute($params + ['like_recipient' => $like, 'like_email' => $like, 'tenant' => Tenant::id(), 'tenant_paid' => Tenant::id()]);
         $statements = $statement->fetchAll();
         $result['truncated'] = count($statements) > self::LIMIT;
         foreach (array_slice($statements, 0, self::LIMIT) as $row) {
@@ -113,11 +114,11 @@ final class BillingSearchService
              FROM billing_payments AS payments
              JOIN billing_statements AS statements ON statements.id = payments.statement_id
              LEFT JOIN admin_users AS creators ON creators.id = payments.created_by
-             WHERE ' . implode(' OR ', $paymentWhere) . '
+             WHERE payments.tenant_id = :tenant AND (' . implode(' OR ', $paymentWhere) . ')
              ORDER BY payments.received_on DESC, payments.id DESC
              LIMIT ' . self::LIMIT
         );
-        $payments->execute($paymentParams);
+        $payments->execute($paymentParams + ['tenant' => Tenant::id()]);
         foreach ($payments->fetchAll() as $row) {
             $result['payments'][] = [
                 'id' => (int) $row['id'],
@@ -160,13 +161,13 @@ final class BillingSearchService
         $items = $pdo->prepare(
             'SELECT items.id, items.unit_id, items.period, items.category, items.description, items.amount,
                     (SELECT statements.id FROM billing_statements statements
-                     WHERE statements.unit_id = items.unit_id AND statements.period = items.period) AS statement_id
+                     WHERE statements.tenant_id = items.tenant_id AND statements.unit_id = items.unit_id AND statements.period = items.period) AS statement_id
              FROM billing_monthly_items AS items
-             WHERE ' . implode(' OR ', $itemWhere) . '
+             WHERE items.tenant_id = :tenant AND (' . implode(' OR ', $itemWhere) . ')
              ORDER BY items.period DESC, items.id DESC
              LIMIT ' . self::LIMIT
         );
-        $items->execute($itemParams);
+        $items->execute($itemParams + ['tenant' => Tenant::id()]);
         foreach ($items->fetchAll() as $row) {
             $result['items'][] = [
                 'id' => (int) $row['id'],

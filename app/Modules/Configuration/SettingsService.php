@@ -5,33 +5,38 @@ declare(strict_types=1);
 namespace App\Modules\Configuration;
 
 use App\Core\Database;
+use App\Core\Tenant;
 
 final class SettingsService
 {
     public function propertyName(): string
     {
-        $name = Database::connection()->query(
-            'SELECT property_name FROM copropiedad_settings WHERE id = 1'
-        )->fetchColumn();
+        $statement = Database::connection()->prepare(
+            'SELECT property_name FROM copropiedad_settings WHERE tenant_id = ?'
+        );
+        $statement->execute([Tenant::id()]);
+        $name = $statement->fetchColumn();
 
-        return is_string($name) && trim($name) !== '' ? $name : 'Copropiedad';
+        return is_string($name) && trim($name) !== '' ? $name : Tenant::name();
     }
 
     public function current(): array
     {
-        $settings = Database::connection()->query(
+        $statement = Database::connection()->prepare(
             'SELECT property_name, address, tax_id, account_holder, bank_name, account_type, account_number,
                     early_payment_day, payment_due_day,
                     administration_fee, effective_date, early_payment_discount,
                     late_fee_type, late_fee_value, late_fee_days, fine_amount,
                     extraordinary_fee, extraordinary_fee_start_date, extraordinary_fee_end_date,
-                    housing_type, tower_nomenclature
+                    housing_type, tower_nomenclature, apartment_nomenclature
              FROM copropiedad_settings
-             WHERE id = 1'
-        )->fetch();
+             WHERE tenant_id = ?'
+        );
+        $statement->execute([Tenant::id()]);
+        $settings = $statement->fetch();
 
         return is_array($settings) ? $settings : [
-            'property_name' => '',
+            'property_name' => Tenant::name(),
             'address' => '',
             'tax_id' => '',
             'account_holder' => '',
@@ -52,18 +57,23 @@ final class SettingsService
             'extraordinary_fee_end_date' => null,
             'housing_type' => '',
             'tower_nomenclature' => 'numeric',
+            'apartment_nomenclature' => 'piso_numero',
         ];
     }
 
-    public function saveCharacterization(string $housingType, string $towerNomenclature): void
-    {
+    public function saveCharacterization(
+        string $housingType,
+        string $towerNomenclature,
+        string $apartmentNomenclature,
+    ): void {
         Database::connection()->prepare(
-            'INSERT INTO copropiedad_settings (id, housing_type, tower_nomenclature)
-             VALUES (1, ?, ?)
+            'INSERT INTO copropiedad_settings (tenant_id, housing_type, tower_nomenclature, apartment_nomenclature)
+             VALUES (?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 housing_type = VALUES(housing_type),
-                tower_nomenclature = VALUES(tower_nomenclature)'
-        )->execute([$housingType, $towerNomenclature]);
+                tower_nomenclature = VALUES(tower_nomenclature),
+                apartment_nomenclature = VALUES(apartment_nomenclature)'
+        )->execute([Tenant::id(), $housingType, $towerNomenclature, $apartmentNomenclature]);
     }
 
     public function saveParametrization(
@@ -79,9 +89,9 @@ final class SettingsService
     ): void {
         Database::connection()->prepare(
             'INSERT INTO copropiedad_settings
-                (id, property_name, address, tax_id, account_holder, bank_name, account_type, account_number,
+                (tenant_id, property_name, address, tax_id, account_holder, bank_name, account_type, account_number,
                  early_payment_day, payment_due_day)
-             VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 property_name = VALUES(property_name),
                 address = VALUES(address),
@@ -93,6 +103,7 @@ final class SettingsService
                 early_payment_day = VALUES(early_payment_day),
                 payment_due_day = VALUES(payment_due_day)'
         )->execute([
+            Tenant::id(),
             $name,
             $address,
             $taxId,
@@ -119,10 +130,10 @@ final class SettingsService
     ): void {
         Database::connection()->prepare(
             'INSERT INTO copropiedad_settings
-                (id, administration_fee, effective_date, early_payment_discount,
+                (tenant_id, administration_fee, effective_date, early_payment_discount,
                  late_fee_type, late_fee_value, late_fee_days, fine_amount,
                  extraordinary_fee, extraordinary_fee_start_date, extraordinary_fee_end_date)
-             VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 administration_fee = VALUES(administration_fee),
                 effective_date = VALUES(effective_date),
@@ -135,6 +146,7 @@ final class SettingsService
                 extraordinary_fee_start_date = VALUES(extraordinary_fee_start_date),
                 extraordinary_fee_end_date = VALUES(extraordinary_fee_end_date)'
         )->execute([
+            Tenant::id(),
             $administrationFee,
             $effectiveDate,
             $discount,

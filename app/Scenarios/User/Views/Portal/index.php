@@ -105,6 +105,7 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                     <?php endif; ?>
                 </div>
             </div>
+            <?php if (\App\Core\ModuleCatalog::enabled('cartera')): ?>
             <div class="card card-success card-outline mt-3" id="documentos">
                 <div class="card-header">
                     <h2 class="card-title">Mis documentos de cobro</h2>
@@ -179,6 +180,7 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                     <?php endif; ?>
                 </div>
             </div>
+            <?php endif; ?>
         </div>
         <div class="col-xl-4">
             <div class="card" id="perfil">
@@ -218,6 +220,7 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
         </div>
     </div>
 
+    <?php if (\App\Core\ModuleCatalog::enabled('clasificados')): ?>
     <div class="card card-info card-outline mt-3" id="clasificados">
         <div class="card-header">
             <h2 class="card-title">Mis clasificados de inmuebles</h2>
@@ -335,4 +338,5 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
             </div>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
 </section>

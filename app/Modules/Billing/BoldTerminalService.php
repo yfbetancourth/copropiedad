@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Billing;
 
 use App\Core\Database;
+use App\Core\Tenant;
 use DateTimeImmutable;
 use RuntimeException;
 
@@ -16,12 +17,14 @@ final class BoldTerminalService
 
     public function settings(): array
     {
-        $row = Database::connection()->query(
+        $settingsQuery = Database::connection()->prepare(
             'SELECT api_integrations_environment, api_integrations_key_ciphertext, api_integrations_webhook_secret_ciphertext,
                     api_integrations_terminal_model, api_integrations_terminal_serial,
                     api_integrations_terminal_name, api_integrations_payment_method
-             FROM bold_payment_settings WHERE id = 1'
-        )->fetch();
+             FROM bold_payment_settings WHERE tenant_id = ?'
+        );
+        $settingsQuery->execute([Tenant::id()]);
+        $row = $settingsQuery->fetch();
         if (!is_array($row)) {
             return ['environment' => 'sandbox', 'api_key_configured' => false, 'configured' => false, 'terminal_model' => '',
                 'terminal_serial' => '', 'terminal_name' => '', 'payment_method' => 'POS',
@@ -115,11 +118,11 @@ final class BoldTerminalService
         $pdo = Database::connection();
         $pdo->prepare(
             'INSERT INTO bold_payment_settings
-                (id, environment, api_key_ciphertext, payment_methods, api_integrations_key_ciphertext,
+                (tenant_id, environment, api_key_ciphertext, payment_methods, api_integrations_key_ciphertext,
                  api_integrations_webhook_secret_ciphertext, api_integrations_terminal_model,
                  api_integrations_terminal_serial, api_integrations_terminal_name, api_integrations_payment_method,
                  api_integrations_environment)
-             VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 api_integrations_key_ciphertext = VALUES(api_integrations_key_ciphertext),
                 api_integrations_webhook_secret_ciphertext = VALUES(api_integrations_webhook_secret_ciphertext),
@@ -129,7 +132,7 @@ final class BoldTerminalService
                 api_integrations_payment_method = VALUES(api_integrations_payment_method),
                 api_integrations_environment = VALUES(api_integrations_environment)'
         )->execute([
-            $environment, $this->credential('api_key_ciphertext'), '', $this->encrypt($apiKey),
+            Tenant::id(), $environment, $this->credential('api_key_ciphertext'), '', $this->encrypt($apiKey),
             $webhookSecret === '' ? '' : $this->encrypt($webhookSecret), $terminalModel, $terminalSerial,
             (string) ($terminal['name'] ?? ''), $method, $environment,
         ]);
@@ -138,8 +141,8 @@ final class BoldTerminalService
     public function startPayment(int $statementId, int $userId, string $userEmail): string
     {
         $pdo = Database::connection();
-        $q = $pdo->prepare('SELECT s.id FROM billing_statements s JOIN billing_statement_recipients r ON r.statement_id=s.id WHERE s.id=? AND r.user_id=?');
-        $q->execute([$statementId, $userId]);
+        $q = $pdo->prepare('SELECT s.id FROM billing_statements s JOIN billing_statement_recipients r ON r.statement_id=s.id WHERE s.id=? AND s.tenant_id=? AND r.user_id=?');
+        $q->execute([$statementId, Tenant::id(), $userId]);
         if ($q->fetchColumn() === false) {
             throw new RuntimeException('La nota no existe o no corresponde a tu cuenta.');
         }
@@ -151,8 +154,8 @@ final class BoldTerminalService
             throw new RuntimeException('El pago con datáfono Bold no está configurado.');
         }
         $pdo->beginTransaction();
-        $lock = $pdo->prepare('SELECT id FROM billing_statements WHERE id=? FOR UPDATE');
-        $lock->execute([$statementId]);
+        $lock = $pdo->prepare('SELECT id FROM billing_statements WHERE id=? AND tenant_id=? FOR UPDATE');
+        $lock->execute([$statementId, Tenant::id()]);
         if ($lock->fetchColumn() === false) {
             $pdo->rollBack();
             throw new RuntimeException('La nota ya no está disponible.');
@@ -170,8 +173,8 @@ final class BoldTerminalService
             $pdo->rollBack();
             throw new RuntimeException('Esta nota no tiene saldo pendiente.');
         }
-        $pending = $pdo->prepare("SELECT id FROM billing_bold_terminal_payments WHERE statement_id=? AND user_id=? AND status='pending' LIMIT 1");
-        $pending->execute([$statementId, $userId]);
+        $pending = $pdo->prepare("SELECT id FROM billing_bold_terminal_payments WHERE tenant_id=? AND statement_id=? AND user_id=? AND status='pending' LIMIT 1");
+        $pending->execute([Tenant::id(), $statementId, $userId]);
         if ($pending->fetchColumn() !== false) {
             $pdo->rollBack();
             throw new RuntimeException('Ya hay un cobro pendiente en el datáfono para esta nota. Espera la confirmación de Bold antes de iniciar otro.');
@@ -179,8 +182,8 @@ final class BoldTerminalService
 
         $reference = 'CPT-' . strtoupper(bin2hex(random_bytes(16)));
         $amount = round($amountCents / 100, 2);
-        $pdo->prepare('INSERT INTO billing_bold_terminal_payments (statement_id,user_id,reference,expected_amount) VALUES (?,?,?,?)')
-            ->execute([$statementId, $userId, $reference, number_format($amount, 2, '.', '')]);
+        $pdo->prepare('INSERT INTO billing_bold_terminal_payments (tenant_id,statement_id,user_id,reference,expected_amount) VALUES (?,?,?,?,?)')
+            ->execute([Tenant::id(), $statementId, $userId, $reference, number_format($amount, 2, '.', '')]);
         $pdo->commit();
         try {
             $response = $this->request('POST', '/payments/app-checkout', [
@@ -197,12 +200,12 @@ final class BoldTerminalService
             if (!is_string($integrationId) || $integrationId === '' || strlen($integrationId) > 80) {
                 throw new RuntimeException('Bold no devolvió un identificador de cobro válido.');
             }
-            $pdo->prepare('UPDATE billing_bold_terminal_payments SET integration_id=? WHERE reference=?')
-                ->execute([$integrationId, $reference]);
+            $pdo->prepare('UPDATE billing_bold_terminal_payments SET integration_id=? WHERE reference=? AND tenant_id=?')
+                ->execute([$integrationId, $reference, Tenant::id()]);
             return $reference;
         } catch (\Throwable $exception) {
             if (str_starts_with($exception->getMessage(), 'Bold rechazó la solicitud.')) {
-                $pdo->prepare("UPDATE billing_bold_terminal_payments SET status='rejected' WHERE reference=?")->execute([$reference]);
+                $pdo->prepare("UPDATE billing_bold_terminal_payments SET status='rejected' WHERE reference=? AND tenant_id=?")->execute([$reference, Tenant::id()]);
                 throw $exception;
             }
             error_log('No se pudo confirmar la creación del cobro de datáfono Bold: ' . $exception->getMessage());
@@ -212,11 +215,12 @@ final class BoldTerminalService
 
     public function webhookUrl(): string
     {
-        $url = $_ENV['APP_URL'] ?? $_SERVER['APP_URL'] ?? getenv('APP_URL');
-        if (!is_string($url) || parse_url($url, PHP_URL_SCHEME) !== 'https' || !parse_url($url, PHP_URL_HOST)) {
+        // Webhook en el subdominio del conjunto: el evento llega al cliente dueño del pago.
+        $url = Tenant::absoluteUrl('/pagos/bold/webhook');
+        if (parse_url($url, PHP_URL_SCHEME) !== 'https' || !parse_url($url, PHP_URL_HOST)) {
             return '';
         }
-        return rtrim($url, '/') . '/pagos/bold/webhook';
+        return $url;
     }
 
     public function verifyWebhookSignature(string $rawBody, string $signature): bool
@@ -226,7 +230,9 @@ final class BoldTerminalService
         if (!is_string($reference) || !preg_match('/^CPT-[A-F0-9]{32}$/D', $reference)) {
             return false;
         }
-        $row = Database::connection()->query('SELECT api_integrations_environment FROM bold_payment_settings WHERE id=1')->fetch();
+        $environmentQuery = Database::connection()->prepare('SELECT api_integrations_environment FROM bold_payment_settings WHERE tenant_id=?');
+        $environmentQuery->execute([Tenant::id()]);
+        $row = $environmentQuery->fetch();
         if (!is_array($row)) {
             return false;
         }
@@ -251,8 +257,8 @@ final class BoldTerminalService
         $pdo = Database::connection();
         $pdo->beginTransaction();
         try {
-            $q = $pdo->prepare('SELECT * FROM billing_bold_terminal_payments WHERE reference=? FOR UPDATE');
-            $q->execute([$reference]);
+            $q = $pdo->prepare('SELECT * FROM billing_bold_terminal_payments WHERE reference=? AND tenant_id=? FOR UPDATE');
+            $q->execute([$reference, Tenant::id()]);
             $payment = $q->fetch();
             if (!is_array($payment)) {
                 throw new RuntimeException('No se encontró el pago Bold asociado.');
@@ -266,7 +272,7 @@ final class BoldTerminalService
                 if (($data['integration'] ?? '') !== 'API_INTEGRATIONS') {
                     throw new RuntimeException('El evento rechazado no corresponde a API Integrations.');
                 }
-                $pdo->prepare("UPDATE billing_bold_terminal_payments SET status='rejected' WHERE id=?")->execute([$payment['id']]);
+                $pdo->prepare("UPDATE billing_bold_terminal_payments SET status='rejected' WHERE id=? AND tenant_id=?")->execute([$payment['id'], Tenant::id()]);
                 $pdo->commit();
                 return;
             }
@@ -282,10 +288,10 @@ final class BoldTerminalService
             if ($transactionId === '' || strlen($transactionId) > 80) {
                 throw new RuntimeException('Bold no devolvió un identificador de transacción válido.');
             }
-            $pdo->prepare('INSERT INTO billing_payments (statement_id,amount,received_on,reference,notes,created_by) VALUES (?,?,?,?,?,?)')
-                ->execute([$payment['statement_id'], $payment['expected_amount'], (new DateTimeImmutable('today'))->format('Y-m-d'), $transactionId, 'Pago en datáfono Bold API Integrations aprobado', $payment['user_id']]);
-            $pdo->prepare("UPDATE billing_bold_terminal_payments SET status='approved',transaction_id=? WHERE id=?")
-                ->execute([$transactionId, $payment['id']]);
+            $pdo->prepare('INSERT INTO billing_payments (tenant_id,statement_id,amount,received_on,reference,notes,created_by) VALUES (?,?,?,?,?,?,?)')
+                ->execute([Tenant::id(), $payment['statement_id'], $payment['expected_amount'], (new DateTimeImmutable('today'))->format('Y-m-d'), $transactionId, 'Pago en datáfono Bold API Integrations aprobado', $payment['user_id']]);
+            $pdo->prepare("UPDATE billing_bold_terminal_payments SET status='approved',transaction_id=? WHERE id=? AND tenant_id=?")
+                ->execute([$transactionId, $payment['id'], Tenant::id()]);
             $pdo->commit();
         } catch (\Throwable $exception) {
             if ($pdo->inTransaction()) $pdo->rollBack();
@@ -316,7 +322,7 @@ final class BoldTerminalService
     {
         $allowed=['api_key_ciphertext','api_integrations_key_ciphertext','api_integrations_webhook_secret_ciphertext'];
         if (!in_array($column,$allowed,true)) throw new RuntimeException('Credencial no válida.');
-        $q=Database::connection()->query('SELECT '.$column.' FROM bold_payment_settings WHERE id=1'); $v=$q->fetchColumn();
+        $q=Database::connection()->prepare('SELECT '.$column.' FROM bold_payment_settings WHERE tenant_id=?'); $q->execute([Tenant::id()]); $v=$q->fetchColumn();
         return is_string($v)&&$v!==''?$this->decrypt($v):'';
     }
     private function encrypt(string $plain): string

@@ -35,7 +35,7 @@ final class PortalNotificationService
                     statements.administration_fee, statements.fine, statements.created_at
              FROM billing_statements AS statements
              JOIN property_unit_assignments AS assignments
-               ON assignments.unit_id = statements.unit_id AND assignments.user_id = ?
+               ON assignments.tenant_id = statements.tenant_id AND assignments.unit_id = statements.unit_id AND assignments.user_id = ?
              LEFT JOIN billing_statement_user_reads AS notice_reads
                ON notice_reads.statement_id = statements.id AND notice_reads.user_id = assignments.user_id
              WHERE notice_reads.statement_id IS NULL
@@ -49,7 +49,7 @@ final class PortalNotificationService
             'SELECT COUNT(*)
              FROM billing_statements AS statements
              JOIN property_unit_assignments AS assignments
-               ON assignments.unit_id = statements.unit_id AND assignments.user_id = ?
+               ON assignments.tenant_id = statements.tenant_id AND assignments.unit_id = statements.unit_id AND assignments.user_id = ?
              LEFT JOIN billing_statement_user_reads AS notice_reads
                ON notice_reads.statement_id = statements.id AND notice_reads.user_id = assignments.user_id
              WHERE notice_reads.statement_id IS NULL
@@ -88,7 +88,7 @@ final class PortalNotificationService
             'SELECT 1
              FROM billing_statements AS statements
              JOIN property_unit_assignments AS assignments
-               ON assignments.unit_id = statements.unit_id
+               ON assignments.tenant_id = statements.tenant_id AND assignments.unit_id = statements.unit_id
              WHERE statements.id = ? AND assignments.user_id = ?
              LIMIT 1'
         );
@@ -102,7 +102,7 @@ final class PortalNotificationService
              SELECT statements.id, assignments.user_id
              FROM billing_statements AS statements
              JOIN property_unit_assignments AS assignments
-               ON assignments.unit_id = statements.unit_id AND assignments.user_id = ?
+               ON assignments.tenant_id = statements.tenant_id AND assignments.unit_id = statements.unit_id AND assignments.user_id = ?
              WHERE statements.id = ?
              ON DUPLICATE KEY UPDATE read_at = CURRENT_TIMESTAMP'
         );

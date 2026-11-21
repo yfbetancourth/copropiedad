@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\PropertyAssignment;
 
 use App\Core\Database;
+use App\Core\Tenant;
 use App\Modules\Configuration\CompositionService;
 use RuntimeException;
 use Throwable;
@@ -23,13 +24,15 @@ final class PropertyAssignmentService
             $units = $composition['units'] ?? [];
         }
 
-        $users = Database::connection()->query(
+        $usersStatement = Database::connection()->prepare(
             'SELECT users.id, users.username, users.email, users.is_active, roles.name AS role_name
              FROM admin_users AS users
              JOIN admin_roles AS roles ON roles.id = users.role_id
-             WHERE roles.is_system = 0
+             WHERE users.tenant_id = ? AND roles.is_system = 0
              ORDER BY users.is_active DESC, users.username'
-        )->fetchAll();
+        );
+        $usersStatement->execute([Tenant::id()]);
+        $users = $usersStatement->fetchAll();
 
         $validUnitIds = [];
         foreach ($units as $unit) {
@@ -41,12 +44,15 @@ final class PropertyAssignmentService
         // Todas las asignaciones: sirven para contar por usuario, mostrar copropietarios y medir la cobertura.
         $userCounts = [];
         $unitOwners = [];
-        foreach (Database::connection()->query(
+        $assignmentsStatement = Database::connection()->prepare(
             'SELECT assignments.unit_id, assignments.user_id, users.username
              FROM property_unit_assignments AS assignments
              JOIN admin_users AS users ON users.id = assignments.user_id
+             WHERE assignments.tenant_id = ?
              ORDER BY users.username'
-        )->fetchAll() as $assignment) {
+        );
+        $assignmentsStatement->execute([Tenant::id()]);
+        foreach ($assignmentsStatement->fetchAll() as $assignment) {
             $unitId = (string) $assignment['unit_id'];
             if (!isset($validUnitIds[$unitId])) {
                 continue;
@@ -58,9 +64,9 @@ final class PropertyAssignmentService
         $selectedAssignments = [];
         if ($selectedUserId !== null) {
             $statement = Database::connection()->prepare(
-                'SELECT unit_id FROM property_unit_assignments WHERE user_id = ?'
+                'SELECT unit_id FROM property_unit_assignments WHERE tenant_id = ? AND user_id = ?'
             );
-            $statement->execute([$selectedUserId]);
+            $statement->execute([Tenant::id(), $selectedUserId]);
             foreach ($statement->fetchAll() as $assignment) {
                 $unitId = (string) $assignment['unit_id'];
                 if (isset($validUnitIds[$unitId])) {
@@ -98,10 +104,10 @@ final class PropertyAssignmentService
             'SELECT users.id
              FROM admin_users AS users
              JOIN admin_roles AS roles ON roles.id = users.role_id
-             WHERE users.id = ? AND roles.is_system = 0
+             WHERE users.id = ? AND users.tenant_id = ? AND roles.is_system = 0
              LIMIT 1'
         );
-        $userStatement->execute([$userId]);
+        $userStatement->execute([$userId, Tenant::id()]);
         if ($userStatement->fetchColumn() === false) {
             throw new RuntimeException('Selecciona un usuario valido.');
         }
@@ -138,12 +144,13 @@ final class PropertyAssignmentService
         $pdo = Database::connection();
         $pdo->beginTransaction();
         try {
-            $pdo->prepare('DELETE FROM property_unit_assignments WHERE user_id = ?')->execute([$userId]);
+            $pdo->prepare('DELETE FROM property_unit_assignments WHERE tenant_id = ? AND user_id = ?')
+                ->execute([Tenant::id(), $userId]);
             $insert = $pdo->prepare(
-                'INSERT INTO property_unit_assignments (unit_id, user_id) VALUES (?, ?)'
+                'INSERT INTO property_unit_assignments (tenant_id, unit_id, user_id) VALUES (?, ?, ?)'
             );
             foreach (array_keys($uniqueIds) as $unitId) {
-                $insert->execute([$unitId, $userId]);
+                $insert->execute([Tenant::id(), $unitId, $userId]);
             }
             $pdo->commit();
         } catch (Throwable $exception) {

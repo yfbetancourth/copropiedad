@@ -30,7 +30,7 @@ $propertyTypeLabels = [
         <?php endif; ?>
         <div class="hero-actions">
             <a class="button button-dark" href="<?= $escape($basePath) ?>/login?destino=usuario">Entrar a mi portal <span aria-hidden="true">↗</span></a>
-            <a class="text-link" href="#clasificados">Explorar clasificados <span aria-hidden="true">↓</span></a>
+            <?php if ($classifiedsEnabled ?? true): ?><a class="text-link" href="#clasificados">Explorar clasificados <span aria-hidden="true">↓</span></a><?php endif; ?>
         </div>
         <div class="hero-footnote"><span class="avatar-stack" aria-hidden="true"><i></i><i></i><i></i></span><span>Un espacio compartido. Muchas formas de sentirse en casa.</span></div>
     </div>
@@ -113,6 +113,7 @@ $propertyTypeLabels = [
     </div>
 </section>
 
+<?php if ($classifiedsEnabled ?? true): ?>
 <section class="classifieds-section section-block" id="clasificados" aria-labelledby="classifieds-title">
     <div class="section-heading">
         <div><p class="eyebrow"><span class="eyebrow-line"></span> Oportunidades de la comunidad</p><h2 id="classifieds-title">Algo bueno puede <em>estar más cerca.</em></h2></div>
@@ -145,3 +146,4 @@ $propertyTypeLabels = [
     <?php endif; ?>
     <div class="resident-cta"><div><p class="eyebrow">¿Ya haces parte de <?= $escape($name) ?>?</p><h3>Tu comunidad también está en línea.</h3><p>Consulta tu inmueble, revisa tus mensajes y comparte un clasificado desde tu panel.</p></div><a class="button button-dark" href="<?= $escape($basePath) ?>/login?destino=usuario">Entrar al panel de usuario <span aria-hidden="true">↗</span></a></div>
 </section>
+<?php endif; ?>

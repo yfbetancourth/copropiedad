@@ -7,7 +7,8 @@ $isHomePage = ($viewName ?? '') === 'Home/index';
 $settings = is_array($settings ?? null) ? $settings : [];
 $galleryImages = is_array($galleryImages ?? null) ? $galleryImages : [];
 $address = trim((string) ($settings['address'] ?? ''));
-$appUrl = rtrim((string) ($_ENV['APP_URL'] ?? ''), '/');
+$appUrl = rtrim(\App\Core\Tenant::absoluteUrl('/'), '/');
+$classifiedsEnabled = \App\Core\ModuleCatalog::enabled('clasificados');
 $canonicalUrl = is_string($canonicalUrl ?? null) && $canonicalUrl !== ''
     ? $canonicalUrl
     : $appUrl . '/clasificados';
@@ -33,8 +34,10 @@ $navLinks = [
     ['Comunidad', $homeLink . '#comunidad', false],
     ['Espacios', $homeLink . '#espacios', false],
     ['Ubicación', $homeLink . '#ubicacion', false],
-    ['Clasificados', $isHomePage ? '#clasificados' : $basePath . '/clasificados', !$isHomePage],
 ];
+if ($classifiedsEnabled) {
+    $navLinks[] = ['Clasificados', $isHomePage ? '#clasificados' : $basePath . '/clasificados', !$isHomePage];
+}
 $loginUrl = $basePath . '/login?destino=usuario';
 $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 6l13 8.5V29H5Z"/><path d="M12 29V18h12v11M9.5 15h17"/></svg>';
 ?>
@@ -100,7 +103,7 @@ $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 
         <nav class="footer-links" aria-label="Enlaces del pie de página">
             <h2>Explora</h2>
             <a href="<?= $escape($basePath) ?>/">Inicio</a>
-            <a href="<?= $escape($basePath) ?>/clasificados">Clasificados</a>
+            <?php if ($classifiedsEnabled): ?><a href="<?= $escape($basePath) ?>/clasificados">Clasificados</a><?php endif; ?>
             <a href="<?= $escape($loginUrl) ?>">Portal de residentes</a>
         </nav>
         <?php if ($address !== ''): ?>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Classifieds;
 
 use App\Core\Authorization;
+use App\Core\ModuleCatalog;
 use App\Core\Session;
 use App\Core\Url;
 use App\Core\View;
@@ -19,6 +20,7 @@ final class ClassifiedsController
 
     public function index(): void
     {
+        $this->requireModule();
         View::renderPublic('Classifieds/index', [
             'title' => 'Clasificados de inmuebles',
             'listings' => $this->service->publicListings(),
@@ -29,6 +31,7 @@ final class ClassifiedsController
 
     public function save(): void
     {
+        $this->requireModule();
         $user = Authorization::requirePermission('usuario.portal', 'read');
         if ($user === null) {
             return;
@@ -49,6 +52,7 @@ final class ClassifiedsController
 
     public function changeStatus(): void
     {
+        $this->requireModule();
         $user = Authorization::requirePermission('usuario.portal', 'read');
         if ($user === null) {
             return;
@@ -75,6 +79,7 @@ final class ClassifiedsController
 
     public function delete(): void
     {
+        $this->requireModule();
         $user = Authorization::requirePermission('usuario.portal', 'read');
         if ($user === null) {
             return;
@@ -98,6 +103,7 @@ final class ClassifiedsController
 
     public function image(): void
     {
+        $this->requireModule();
         $imageId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
         if (!is_int($imageId) || $imageId < 1) {
             $this->notFound();
@@ -149,6 +155,16 @@ final class ClassifiedsController
     {
         header('Location: ' . Url::to($path), true, 303);
         exit;
+    }
+
+    /** Los clasificados solo existen en los conjuntos que tienen el módulo habilitado. */
+    private function requireModule(): void
+    {
+        if (!ModuleCatalog::enabled('clasificados')) {
+            http_response_code(404);
+            echo 'Página no encontrada.';
+            exit;
+        }
     }
 
     private function notFound(): never

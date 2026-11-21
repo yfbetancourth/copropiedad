@@ -18,7 +18,7 @@ if (!is_string($password) || strlen($password) < 12) {
 
 $pdo = Database::connection();
 $roleId = $pdo->query(
-    "SELECT id FROM admin_roles WHERE name = 'Superadmin' AND is_system = 1 LIMIT 1"
+    "SELECT id FROM admin_roles WHERE name = 'Superadmin' AND is_system = 1 AND tenant_id IS NULL LIMIT 1"
 )->fetchColumn();
 
 if ($roleId === false) {

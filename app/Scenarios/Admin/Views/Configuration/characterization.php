@@ -11,17 +11,30 @@ $canWrite = \App\Core\Authorization::hasPermission($actor, 'configuracion.caract
 $housingType = in_array($settings['housing_type'] ?? null, ['casa', 'torres_apartamento', 'mixto'], true)
     ? $settings['housing_type']
     : '';
-$towerNomenclature = in_array($settings['tower_nomenclature'] ?? null, ['numeric', 'alphabetic'], true)
+use App\Modules\Configuration\UnitNomenclature;
+
+$towerNomenclature = UnitNomenclature::isTowerFormat($settings['tower_nomenclature'] ?? null)
     ? $settings['tower_nomenclature']
     : 'numeric';
+$apartmentNomenclature = UnitNomenclature::isApartmentFormat($settings['apartment_nomenclature'] ?? null)
+    ? $settings['apartment_nomenclature']
+    : 'piso_numero';
+// Vista previa de cada combinación, calculada con la misma regla que genera los inmuebles.
+$nomenclaturePreviews = [];
+foreach (array_keys(UnitNomenclature::TOWER_FORMATS) as $towerFormat) {
+    foreach (array_keys(UnitNomenclature::APARTMENT_FORMATS) as $apartmentFormat) {
+        $nomenclaturePreviews[$towerFormat . '|' . $apartmentFormat] = implode(', ', UnitNomenclature::examples($towerFormat, $apartmentFormat)) . '…';
+    }
+}
+$towerExample = static fn (): string => UnitNomenclature::examples($towerNomenclature, $apartmentNomenclature)[0];
 $locked = $billingLocked && $hasComposition;
 // Con una estructura ya creada, cambiar la caracterización la reinicia: solo el Superadmin puede hacerlo.
 $superadminOnly = $hasComposition && !$locked && !\App\Core\Authorization::isSuperadmin($actor);
 $editable = $canWrite && !$locked && !$superadminOnly;
 $housingOptions = [
     'casa' => ['bi-house', 'Casas', 'La copropiedad está formada solo por casas.', 'Casa 1, Casa 2, Casa 3…'],
-    'torres_apartamento' => ['bi-building', 'Torres de apartamentos', 'Uno o varios edificios con apartamentos por piso.', 'Torre 1 - Piso 3 - Apartamento 02'],
-    'mixto' => ['bi-buildings', 'Mixto', 'Torres de apartamentos y además locales u oficinas.', 'Torre 1 - Piso 3 - Apartamento 02 · Inmueble comercial 1'],
+    'torres_apartamento' => ['bi-building', 'Torres de apartamentos', 'Uno o varios edificios con apartamentos por piso.', $towerExample()],
+    'mixto' => ['bi-buildings', 'Mixto', 'Torres de apartamentos y además locales u oficinas.', $towerExample() . ' · Inmueble comercial 1'],
 ];
 $currentStep = 1;
 ?>
@@ -61,7 +74,9 @@ $currentStep = 1;
 
     <form id="characterization-form" method="post" action="<?= $escape($basePath) ?>/configuracion/caracterizacion/guardar"
           data-has-composition="<?= $hasComposition ? 'true' : 'false' ?>"
-          data-saved-type="<?= $escape($housingType) ?>" data-saved-nomenclature="<?= $escape($towerNomenclature) ?>">
+          data-saved-type="<?= $escape($housingType) ?>" data-saved-nomenclature="<?= $escape($towerNomenclature) ?>"
+          data-saved-apartment-nomenclature="<?= $escape($apartmentNomenclature) ?>"
+          data-previews="<?= $escape(json_encode($nomenclaturePreviews, JSON_UNESCAPED_UNICODE)) ?>">
         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
 
         <div class="card border-0 shadow-sm mb-3">
@@ -86,21 +101,30 @@ $currentStep = 1;
         </div>
 
         <div id="tower-nomenclature-group" class="card border-0 shadow-sm mb-3" <?= in_array($housingType, ['torres_apartamento', 'mixto'], true) ? '' : 'hidden' ?>>
-            <div class="card-header bg-transparent"><h2 class="card-title h6 mb-0">¿Cómo se identifican las torres?</h2></div>
+            <div class="card-header bg-transparent"><h2 class="card-title h6 mb-0">¿Cómo se identifican las torres y los apartamentos?</h2></div>
             <div class="card-body">
-                <fieldset class="border-0 p-0 m-0" <?= $editable ? '' : 'disabled' ?>>
-                    <legend class="visually-hidden">Nomenclatura de las torres</legend>
-                    <div class="d-flex flex-wrap gap-2 mb-3">
-                        <input class="btn-check" type="radio" name="tower_nomenclature" id="nomenclature-numeric" value="numeric" <?= $towerNomenclature === 'numeric' ? 'checked' : '' ?>>
-                        <label class="btn btn-outline-primary" for="nomenclature-numeric">Con números · Torre 1, Torre 2…</label>
-                        <input class="btn-check" type="radio" name="tower_nomenclature" id="nomenclature-alphabetic" value="alphabetic" <?= $towerNomenclature === 'alphabetic' ? 'checked' : '' ?>>
-                        <label class="btn btn-outline-primary" for="nomenclature-alphabetic">Con letras · Torre A, Torre B…</label>
+                <fieldset class="border-0 p-0 m-0 mb-3" <?= $editable ? '' : 'disabled' ?>>
+                    <legend class="form-label fs-6 fw-semibold">Torres</legend>
+                    <div class="d-flex flex-wrap gap-2">
+                        <?php foreach (UnitNomenclature::TOWER_FORMATS as $value => $label): ?>
+                            <input class="btn-check" type="radio" name="tower_nomenclature" id="nomenclature-<?= $escape($value) ?>" value="<?= $escape($value) ?>" <?= $towerNomenclature === $value ? 'checked' : '' ?>>
+                            <label class="btn btn-outline-primary" for="nomenclature-<?= $escape($value) ?>"><?= $escape($label) ?></label>
+                        <?php endforeach; ?>
+                    </div>
+                </fieldset>
+                <fieldset class="border-0 p-0 m-0 mb-3" <?= $editable ? '' : 'disabled' ?>>
+                    <legend class="form-label fs-6 fw-semibold">Apartamentos</legend>
+                    <div class="d-flex flex-wrap gap-2">
+                        <?php foreach (UnitNomenclature::APARTMENT_FORMATS as $value => $label): ?>
+                            <input class="btn-check" type="radio" name="apartment_nomenclature" id="apartment-nomenclature-<?= $escape($value) ?>" value="<?= $escape($value) ?>" <?= $apartmentNomenclature === $value ? 'checked' : '' ?>>
+                            <label class="btn btn-outline-primary" for="apartment-nomenclature-<?= $escape($value) ?>"><?= $escape($label) ?></label>
+                        <?php endforeach; ?>
                     </div>
                 </fieldset>
                 <div class="bg-body-tertiary rounded p-3">
                     <div class="small text-secondary mb-1">Así se nombrarán los apartamentos:</div>
-                    <code id="nomenclature-preview" class="fs-6"><?= $towerNomenclature === 'alphabetic' ? 'Torre A' : 'Torre 1' ?> - Piso 1 - Apartamento 01</code>
-                    <div class="small text-secondary mt-1">El número del apartamento siempre tiene dos dígitos, de 01 a 99.</div>
+                    <code id="nomenclature-preview" class="fs-6"><?= $escape($nomenclaturePreviews[$towerNomenclature . '|' . $apartmentNomenclature] ?? '') ?></code>
+                    <div class="small text-secondary mt-1">Hasta 99 apartamentos por piso. Después podrás editar cualquier nombre en la lista de inmuebles.</div>
                 </div>
             </div>
         </div>
@@ -142,16 +166,19 @@ $currentStep = 1;
     const submit = document.getElementById('characterization-submit');
     const status = document.getElementById('characterization-status');
     const value = (name) => form.querySelector(`[name="${name}"]:checked`)?.value ?? '';
+    const previews = JSON.parse(form.dataset.previews || '{}');
 
     const refresh = () => {
         const type = value('housing_type');
         const nomenclature = value('tower_nomenclature');
+        const apartmentNomenclature = value('apartment_nomenclature');
         const hasTowers = ['torres_apartamento', 'mixto'].includes(type);
         group.hidden = !hasTowers;
-        preview.textContent = `${nomenclature === 'alphabetic' ? 'Torre A' : 'Torre 1'} - Piso 1 - Apartamento 01`;
+        preview.textContent = previews[`${nomenclature}|${apartmentNomenclature}`] ?? '';
 
         const changed = type !== form.dataset.savedType
-            || (hasTowers && nomenclature !== form.dataset.savedNomenclature);
+            || (hasTowers && (nomenclature !== form.dataset.savedNomenclature
+                || apartmentNomenclature !== form.dataset.savedApartmentNomenclature));
         const resets = changed && form.dataset.hasComposition === 'true';
         if (impact) {
             impact.hidden = !resets;

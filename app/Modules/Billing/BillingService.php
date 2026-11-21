@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Billing;
 
 use App\Core\Database;
+use App\Core\Tenant;
 use App\Modules\Auth\SmtpMailer;
 use App\Modules\Configuration\CompositionService;
 use App\Modules\Configuration\MailSettingsService;
@@ -250,9 +251,9 @@ final class BillingService
                 throw new RuntimeException('El período ya fue emitido para este inmueble; el documento cerrado no se puede modificar.');
             }
             $pdo->prepare(
-                'INSERT INTO billing_monthly_items (unit_id, period, category, description, amount, created_by)
-                 VALUES (?, ?, ?, ?, ?, ?)'
-            )->execute([$unitId, $period, $category, $description, self::decimal($amountCents), $actorId]);
+                'INSERT INTO billing_monthly_items (tenant_id, unit_id, period, category, description, amount, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
+            )->execute([Tenant::id(), $unitId, $period, $category, $description, self::decimal($amountCents), $actorId]);
             $pdo->commit();
         } catch (Throwable $exception) {
             if ($pdo->inTransaction()) {
@@ -277,9 +278,9 @@ final class BillingService
         }
 
         $statement = Database::connection()->prepare(
-            'SELECT id FROM billing_statements WHERE id = ?'
+            'SELECT id FROM billing_statements WHERE id = ? AND tenant_id = ?'
         );
-        $statement->execute([$statementId]);
+        $statement->execute([$statementId, Tenant::id()]);
         if ($statement->fetchColumn() === false) {
             throw new RuntimeException('La nota de cobro seleccionada no existe.');
         }
@@ -287,8 +288,8 @@ final class BillingService
         $pdo = Database::connection();
         $pdo->beginTransaction();
         try {
-            $lock = $pdo->prepare('SELECT id, unit_id, period FROM billing_statements WHERE id = ? FOR UPDATE');
-            $lock->execute([$statementId]);
+            $lock = $pdo->prepare('SELECT id, unit_id, period FROM billing_statements WHERE id = ? AND tenant_id = ? FOR UPDATE');
+            $lock->execute([$statementId, Tenant::id()]);
             $locked = $lock->fetch();
             if (!is_array($locked)) {
                 throw new RuntimeException('La nota de cobro seleccionada no existe.');
@@ -301,9 +302,9 @@ final class BillingService
                 ));
             }
             $pdo->prepare(
-                'INSERT INTO billing_payments (statement_id, amount, received_on, reference, notes, created_by)
-                 VALUES (?, ?, ?, ?, ?, ?)'
-            )->execute([$statementId, self::decimal($amountCents), $receivedOn, $reference, $notes, $actorId]);
+                'INSERT INTO billing_payments (tenant_id, statement_id, amount, received_on, reference, notes, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
+            )->execute([Tenant::id(), $statementId, self::decimal($amountCents), $receivedOn, $reference, $notes, $actorId]);
             $pdo->commit();
         } catch (Throwable $exception) {
             if ($pdo->inTransaction()) {
@@ -332,10 +333,10 @@ final class BillingService
                         statements.unit_id, statements.period
                  FROM billing_payments AS payments
                  JOIN billing_statements AS statements ON statements.id = payments.statement_id
-                 WHERE payments.id = ?
+                 WHERE payments.id = ? AND payments.tenant_id = ?
                  FOR UPDATE'
             );
-            $query->execute([$paymentId]);
+            $query->execute([$paymentId, Tenant::id()]);
             $payment = $query->fetch();
             if (!is_array($payment)) {
                 throw new RuntimeException('El pago seleccionado no existe.');
@@ -356,8 +357,8 @@ final class BillingService
             $pdo->prepare(
                 'UPDATE billing_payments
                  SET voided_at = CURRENT_TIMESTAMP, voided_by = ?, void_reason = ?
-                 WHERE id = ? AND voided_at IS NULL'
-            )->execute([$actorId, $reason, $paymentId]);
+                 WHERE id = ? AND tenant_id = ? AND voided_at IS NULL'
+            )->execute([$actorId, $reason, $paymentId, Tenant::id()]);
             $pdo->commit();
         } catch (Throwable $exception) {
             if ($pdo->inTransaction()) {
@@ -381,10 +382,10 @@ final class BillingService
              JOIN billing_statements AS statements ON statements.id = payments.statement_id
              LEFT JOIN admin_users AS creators ON creators.id = payments.created_by
              LEFT JOIN admin_users AS voiders ON voiders.id = payments.voided_by
-             WHERE statements.period = ?
+             WHERE statements.tenant_id = ? AND statements.period = ?
              ORDER BY payments.received_on DESC, payments.id DESC'
         );
-        $query->execute([$period]);
+        $query->execute([Tenant::id(), $period]);
 
         return $query->fetchAll();
     }
@@ -397,9 +398,9 @@ final class BillingService
         try {
             $this->lockPeriodItems($pdo, $period);
             $query = $pdo->prepare(
-                'SELECT unit_id FROM billing_monthly_items WHERE id = ? AND period = ?'
+                'SELECT unit_id FROM billing_monthly_items WHERE id = ? AND tenant_id = ? AND period = ?'
             );
-            $query->execute([$itemId, $period]);
+            $query->execute([$itemId, Tenant::id(), $period]);
             $unitId = $query->fetchColumn();
             if ($unitId === false) {
                 throw new RuntimeException('El concepto no existe o ya fue eliminado.');
@@ -408,9 +409,9 @@ final class BillingService
                 throw new RuntimeException('Los conceptos de un inmueble con nota emitida no se pueden eliminar.');
             }
             $delete = $pdo->prepare(
-                'DELETE FROM billing_monthly_items WHERE id = ? AND period = ?'
+                'DELETE FROM billing_monthly_items WHERE id = ? AND tenant_id = ? AND period = ?'
             );
-            $delete->execute([$itemId, $period]);
+            $delete->execute([$itemId, Tenant::id(), $period]);
             if ($delete->rowCount() !== 1) {
                 throw new RuntimeException('El concepto no existe o ya fue eliminado.');
             }
@@ -436,9 +437,9 @@ final class BillingService
         try {
             $this->lockPeriodItems($pdo, $period);
             $lockPrevious = $pdo->prepare(
-                'SELECT id FROM billing_statements WHERE period = ? FOR UPDATE'
+                'SELECT id FROM billing_statements WHERE tenant_id = ? AND period = ? FOR UPDATE'
             );
-            $lockPrevious->execute([$previousPeriod]);
+            $lockPrevious->execute([Tenant::id(), $previousPeriod]);
             $lockPrevious->fetchAll();
             $preview = $this->preview($period, $actorId);
             if (!$preview['ready']) {
@@ -540,7 +541,7 @@ final class BillingService
                     statements.id AS statement_id, statements.period
              FROM billing_statement_recipients AS recipients
              JOIN billing_statements AS statements ON statements.id = recipients.statement_id
-             WHERE statements.period = ?
+             WHERE statements.tenant_id = ? AND statements.period = ?
                AND (
                     recipients.delivery_status IN ('pending', 'failed')
                     OR (recipients.delivery_status = 'sending'
@@ -548,7 +549,7 @@ final class BillingService
                )
              ORDER BY statements.id, recipients.id"
         );
-        $query->execute([$period]);
+        $query->execute([Tenant::id(), $period]);
         $recipients = array_slice($query->fetchAll(), 0, 50);
         $sent = 0;
         foreach ($recipients as $recipient) {
@@ -596,11 +597,11 @@ final class BillingService
             "SELECT delivery_status, COUNT(*) AS status_count
              FROM billing_statement_recipients AS recipients
              JOIN billing_statements AS statements ON statements.id = recipients.statement_id
-             WHERE statements.period = ?
+             WHERE statements.tenant_id = ? AND statements.period = ?
                AND recipients.delivery_status IN ('pending', 'failed', 'sending')
              GROUP BY delivery_status"
         );
-        $remaining->execute([$period]);
+        $remaining->execute([Tenant::id(), $period]);
         $remainingCounts = ['pending' => 0, 'failed' => 0];
         foreach ($remaining->fetchAll() as $row) {
             $remainingCounts[$row['delivery_status']] = (int) $row['status_count'];
@@ -643,12 +644,12 @@ final class BillingService
                     (SELECT COUNT(*) FROM billing_statement_recipients r WHERE r.statement_id = statements.id AND r.delivery_status IN ("pending", "sending")) AS pending_count,
                     (SELECT COALESCE(SUM(payments.amount), 0) FROM billing_payments payments WHERE payments.statement_id = statements.id AND payments.voided_at IS NULL) AS payments_total,
                     (SELECT COALESCE(SUM(payments.amount), 0) FROM billing_payments payments WHERE payments.statement_id = statements.id AND payments.voided_at IS NULL AND payments.received_on <= statements.early_payment_date) AS early_payments_total,
-                    (SELECT MIN(newer.period) FROM billing_statements newer WHERE newer.unit_id = statements.unit_id AND newer.period > statements.period) AS superseded_by_period
+                    (SELECT MIN(newer.period) FROM billing_statements newer WHERE newer.tenant_id = statements.tenant_id AND newer.unit_id = statements.unit_id AND newer.period > statements.period) AS superseded_by_period
              FROM billing_statements statements
-             WHERE statements.period = ?
+             WHERE statements.tenant_id = ? AND statements.period = ?
              ORDER BY statements.unit_name'
         );
-        $query->execute([$period]);
+        $query->execute([Tenant::id(), $period]);
 
         return $query->fetchAll();
     }
@@ -656,9 +657,9 @@ final class BillingService
     public function statement(int $statementId): array
     {
         $query = Database::connection()->prepare(
-            'SELECT * FROM billing_statements WHERE id = ?'
+            'SELECT * FROM billing_statements WHERE id = ? AND tenant_id = ?'
         );
-        $query->execute([$statementId]);
+        $query->execute([$statementId, Tenant::id()]);
         $statement = $query->fetch();
         if (!is_array($statement)) {
             throw new RuntimeException('La nota de cobro no existe.');
@@ -899,6 +900,7 @@ final class BillingService
         $mail = (new MailSettingsService())->current();
 
         return [
+            'tenant_id' => Tenant::id(),
             'unit_id' => $row['id'],
             'period' => $preview['period'],
             'unit_name' => $row['name'],
@@ -1000,10 +1002,10 @@ final class BillingService
     {
         $query = Database::connection()->prepare(
             'SELECT id, period FROM billing_statements
-             WHERE unit_id = ? AND period > ?
+             WHERE tenant_id = ? AND unit_id = ? AND period > ?
              ORDER BY period LIMIT 1'
         );
-        $query->execute([$unitId, $period]);
+        $query->execute([Tenant::id(), $unitId, $period]);
         $row = $query->fetch();
 
         return is_array($row) ? ['id' => (int) $row['id'], 'period' => (string) $row['period']] : null;
@@ -1048,9 +1050,9 @@ final class BillingService
                 $query = Database::connection()->prepare(
                     "SELECT COUNT(*) FROM {$table} AS pending
                      JOIN billing_statements AS statements ON statements.id = pending.statement_id
-                     WHERE statements.period < ? AND pending.status = 'pending'"
+                     WHERE statements.tenant_id = ? AND statements.period < ? AND pending.status = 'pending'"
                 );
-                $query->execute([$period]);
+                $query->execute([Tenant::id(), $period]);
                 $count += (int) $query->fetchColumn();
             } catch (PDOException $exception) {
                 if (!self::isMissingTable($exception)) {
@@ -1084,13 +1086,15 @@ final class BillingService
         if ($unitMap === []) {
             return [];
         }
-        $assignments = Database::connection()->query(
+        $assignmentsStatement = Database::connection()->prepare(
             'SELECT assignments.unit_id, users.id, users.username, users.email
              FROM property_unit_assignments AS assignments
              JOIN admin_users AS users ON users.id = assignments.user_id
-             WHERE users.is_active = 1
+             WHERE assignments.tenant_id = ? AND users.is_active = 1
              ORDER BY assignments.unit_id, users.username'
-        )->fetchAll();
+        );
+        $assignmentsStatement->execute([Tenant::id()]);
+        $assignments = $assignmentsStatement->fetchAll();
         foreach ($assignments as $assignment) {
             $unitId = (string) $assignment['unit_id'];
             if (isset($unitMap[$unitId])) {
@@ -1121,9 +1125,9 @@ final class BillingService
     private function lockPeriodItems(PDO $pdo, string $period): void
     {
         $query = $pdo->prepare(
-            'SELECT id FROM billing_monthly_items WHERE period = ? FOR UPDATE'
+            'SELECT id FROM billing_monthly_items WHERE tenant_id = ? AND period = ? FOR UPDATE'
         );
-        $query->execute([$period]);
+        $query->execute([Tenant::id(), $period]);
         $query->fetchAll();
     }
 
@@ -1134,10 +1138,10 @@ final class BillingService
                     GROUP_CONCAT(recipients.delivery_status ORDER BY recipients.id) AS delivery_status
              FROM billing_statements statements
              LEFT JOIN billing_statement_recipients recipients ON recipients.statement_id = statements.id
-             WHERE statements.period = ?
+             WHERE statements.tenant_id = ? AND statements.period = ?
              GROUP BY statements.id'
         );
-        $query->execute([$period]);
+        $query->execute([Tenant::id(), $period]);
         $map = [];
         foreach ($query->fetchAll() as $row) {
             $map[(string) $row['unit_id']] = [
@@ -1156,10 +1160,10 @@ final class BillingService
         $query = Database::connection()->prepare(
             'SELECT id, unit_id, category, description, amount
              FROM billing_monthly_items
-             WHERE period = ?
+             WHERE tenant_id = ? AND period = ?
              ORDER BY id'
         );
-        $query->execute([$period]);
+        $query->execute([Tenant::id(), $period]);
         $map = [];
         foreach ($query->fetchAll() as $row) {
             $map[(string) $row['unit_id']][] = [
@@ -1181,12 +1185,13 @@ final class BillingService
              JOIN (
                  SELECT unit_id, MAX(period) AS latest_period
                  FROM billing_statements
-                 WHERE period < ?
+                 WHERE tenant_id = ? AND period < ?
                  GROUP BY unit_id
              ) AS latest
-               ON latest.unit_id = statements.unit_id AND latest.latest_period = statements.period'
+               ON latest.unit_id = statements.unit_id AND latest.latest_period = statements.period
+             WHERE statements.tenant_id = ?'
         );
-        $query->execute([$period]);
+        $query->execute([Tenant::id(), $period, Tenant::id()]);
         $map = [];
         foreach ($query->fetchAll() as $row) {
             $map[(string) $row['unit_id']] = $row;
@@ -1213,10 +1218,11 @@ final class BillingService
              FROM billing_payments AS payments
              JOIN billing_statements AS statements ON statements.id = payments.statement_id
              WHERE payments.statement_id IN ($placeholders)
+               AND payments.tenant_id = ?
                AND payments.voided_at IS NULL
              GROUP BY payments.statement_id"
         );
-        $query->execute($ids);
+        $query->execute([...$ids, Tenant::id()]);
         $map = [];
         foreach ($query->fetchAll() as $row) {
             $map[(int) $row['statement_id']] = [

@@ -7,6 +7,8 @@ namespace App\Modules\Auth;
 use App\Core\Session;
 use App\Core\Authorization;
 use App\Core\Database;
+use App\Core\ModuleCatalog;
+use App\Core\Tenant;
 use App\Core\Url;
 use App\Core\View;
 use App\Modules\Billing\BoldPaymentService;
@@ -61,10 +63,15 @@ final class AuthController
         $_SESSION['admin_user_id'] = $user['id'];
         $_SESSION['admin_username'] = $user['username'];
         $_SESSION['admin_auth_version'] = $user['auth_version'];
+        $_SESSION['tenant_scope'] = Tenant::scopeId() ?? 0;
         $_SESSION['last_activity'] = time();
         $authenticatedUser = Authorization::currentUser();
         if ($authenticatedUser === null) {
             $this->redirect('/login');
+        }
+
+        if (Tenant::isPlatform()) {
+            $this->redirect('/admin'); // En la plataforma solo existe la consola del Superadmin.
         }
 
         $requestedDestination = $this->requestedDestination($_POST['destination'] ?? null);
@@ -200,9 +207,9 @@ final class AuthController
         }
 
         $statement = Database::connection()->prepare(
-            'SELECT unit_id FROM property_unit_assignments WHERE user_id = ? ORDER BY unit_id'
+            'SELECT unit_id FROM property_unit_assignments WHERE tenant_id = ? AND user_id = ? ORDER BY unit_id'
         );
-        $statement->execute([$user['id']]);
+        $statement->execute([Tenant::id(), $user['id']]);
         $assignedUnitIds = [];
         foreach ($statement->fetchAll() as $assignment) {
             $assignedUnitIds[(string) $assignment['unit_id']] = true;
@@ -214,21 +221,29 @@ final class AuthController
             }
         }
 
+        $billingEnabled = ModuleCatalog::enabled('cartera');
+        $onlinePaymentsEnabled = ModuleCatalog::enabled('pagos_en_linea');
         $paymentService = new BoldPaymentService();
-        $paymentSettings = $paymentService->settings();
+        $paymentSettings = $onlinePaymentsEnabled
+            ? $paymentService->settings()
+            : ['api_key_configured' => false, 'payment_methods' => []];
         Session::start();
         View::renderPortal('Portal/index', [
             'title' => 'Bienvenida',
             'user' => $user,
             'units' => $assignedUnits,
-            'billingDocuments' => $paymentService->payableStatements((int) $user['id']),
-            'onlinePaymentsReady' => $paymentSettings['api_key_configured']
+            'billingDocuments' => $billingEnabled ? $paymentService->payableStatements((int) $user['id']) : [],
+            'onlinePaymentsReady' => $onlinePaymentsEnabled
+                && $paymentSettings['api_key_configured']
                 && $paymentSettings['payment_methods'] !== []
                 && $paymentService->webhookUrl() !== '',
-            'terminalPaymentsReady' => (new BoldTerminalService())->settings()['configured']
+            'terminalPaymentsReady' => $onlinePaymentsEnabled
+                && (new BoldTerminalService())->settings()['configured']
                 && (new BoldTerminalService())->webhookUrl() !== '',
             'notifications' => (new PortalNotificationService())->unreadForUser((int) $user['id']),
-            'classifieds' => (new ClassifiedsService())->listingsForUser((int) $user['id']),
+            'classifieds' => ModuleCatalog::enabled('clasificados')
+                ? (new ClassifiedsService())->listingsForUser((int) $user['id'])
+                : [],
             'settings' => (new \App\Modules\Configuration\SettingsService())->current(),
             'flash' => $_SESSION['user_profile_flash'] ?? null,
             'csrfToken' => Session::csrfToken(),
@@ -239,7 +254,7 @@ final class AuthController
     public function userStartPayment(): void
     {
         $user = Authorization::requirePermission('usuario.portal', 'read');
-        if ($user === null) {
+        if ($user === null || !$this->requireModule('pagos_en_linea')) {
             return;
         }
         $this->requireCsrf();
@@ -263,7 +278,7 @@ final class AuthController
     public function userStartTerminalPayment(): void
     {
         $user = Authorization::requirePermission('usuario.portal', 'read');
-        if ($user === null) return;
+        if ($user === null || !$this->requireModule('pagos_en_linea')) return;
         $this->requireCsrf();
         $statementId = filter_var($_POST['statement_id'] ?? null, FILTER_VALIDATE_INT);
         if (!is_int($statementId) || $statementId < 1) {
@@ -282,7 +297,7 @@ final class AuthController
     public function userPayments(): void
     {
         $user = Authorization::requirePermission('usuario.portal', 'read');
-        if ($user === null) {
+        if ($user === null || !$this->requireModule('cartera')) {
             return;
         }
 
@@ -303,18 +318,23 @@ final class AuthController
             ];
         }
 
+        $onlinePaymentsEnabled = ModuleCatalog::enabled('pagos_en_linea');
         $paymentService = new BoldPaymentService();
-        $paymentSettings = $paymentService->settings();
+        $paymentSettings = $onlinePaymentsEnabled
+            ? $paymentService->settings()
+            : ['api_key_configured' => false, 'payment_methods' => []];
         Session::start();
         View::renderPortal('Portal/payments', [
             'title' => 'Pagos',
             'user' => $user,
             'billingDocuments' => $paymentService->payableStatements((int) $user['id']),
-            'paymentMethods' => $paymentService->configuredMethods(),
-            'onlinePaymentsReady' => $paymentSettings['api_key_configured']
+            'paymentMethods' => $onlinePaymentsEnabled ? $paymentService->configuredMethods() : [],
+            'onlinePaymentsReady' => $onlinePaymentsEnabled
+                && $paymentSettings['api_key_configured']
                 && $paymentSettings['payment_methods'] !== []
                 && $paymentService->webhookUrl() !== '',
-            'terminalPaymentsReady' => (new BoldTerminalService())->settings()['configured']
+            'terminalPaymentsReady' => $onlinePaymentsEnabled
+                && (new BoldTerminalService())->settings()['configured']
                 && (new BoldTerminalService())->webhookUrl() !== '',
             'notifications' => (new PortalNotificationService())->unreadForUser((int) $user['id']),
             'flash' => $_SESSION['user_profile_flash'] ?? null,
@@ -326,7 +346,7 @@ final class AuthController
     public function userMessages(): void
     {
         $user = Authorization::requirePermission('usuario.portal', 'read');
-        if ($user === null) {
+        if ($user === null || !$this->requireModule('mensajes')) {
             return;
         }
 
@@ -473,6 +493,18 @@ final class AuthController
             'username' => $user['username'],
             'dashboard' => $dashboard,
         ]);
+    }
+
+    /** Responde 404 cuando el Superadmin deshabilitó el módulo en este conjunto. */
+    private function requireModule(string $module): bool
+    {
+        if (ModuleCatalog::enabled($module)) {
+            return true;
+        }
+        http_response_code(404);
+        echo 'Esta opción no está habilitada en tu conjunto.';
+
+        return false;
     }
 
     private function isAuthenticated(): bool
