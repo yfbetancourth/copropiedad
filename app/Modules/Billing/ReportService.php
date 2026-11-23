@@ -81,7 +81,7 @@ final class ReportService
 
             $result[] = [
                 'statement_id' => (int) $row['id'],
-                'number' => sprintf('NC-%s-%06d', str_replace('-', '', (string) $row['period']), (int) $row['id']),
+                'number' => BillingService::statementNumber((string) $row['period'], (int) $row['id']),
                 'unit_id' => (string) $row['unit_id'],
                 'unit_name' => (string) $row['unit_name'],
                 'unit_category' => (string) $row['unit_category'],

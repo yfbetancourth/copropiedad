@@ -106,6 +106,124 @@ $tenantId = (int) $tenant['id'];
                     </form>
                 </div>
             </div>
+
+            <div class="card border-danger mt-3" id="reiniciar">
+                <div class="card-header bg-danger-subtle"><h2 class="card-title text-danger"><i class="bi bi-exclamation-octagon me-1" aria-hidden="true"></i>Zona de peligro: reiniciar</h2></div>
+                <form id="reset-form" method="post" action="<?= $escape($basePath) ?>/clientes/reiniciar" autocomplete="off">
+                    <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
+                    <input type="hidden" name="tenant_id" value="<?= $tenantId ?>">
+                    <div class="card-body pb-2">
+                        <p class="mb-2">Marca lo que quieres borrar <strong>de forma definitiva</strong>. Lo que depende de otro dato se marca solo, para no dejar registros sueltos.</p>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0" id="reset-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th scope="col" class="ps-3" style="width: 2.75rem"><input class="form-check-input" type="checkbox" id="reset-all" aria-label="Marcar todo (reinicio completo)"></th>
+                                    <th scope="col">Dato</th>
+                                    <th scope="col" class="text-end pe-3">Se borran</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($resetSummary as $key => $item): ?>
+                                    <tr>
+                                        <td class="ps-3"><input class="form-check-input reset-category" type="checkbox" name="categories[]" value="<?= $escape($key) ?>" id="reset-<?= $escape($key) ?>"
+                                                   data-label="<?= $escape($item['label']) ?>" data-requires="<?= $escape(implode(' ', $item['requires'])) ?>"></td>
+                                        <td>
+                                            <label class="fw-semibold mb-0" for="reset-<?= $escape($key) ?>"><?= $escape($item['label']) ?></label>
+                                            <span class="badge text-bg-warning ms-1 reset-required" hidden></span>
+                                            <div class="small text-secondary"><?= $escape($item['detail']) ?></div>
+                                        </td>
+                                        <td class="text-end small text-nowrap pe-3 <?= $item['total'] === 0 ? 'text-secondary' : '' ?>">
+                                            <?= $item['counts'] === [] ? 'Configuración' : ($item['total'] === 0 ? 'Sin datos' : $escape(implode(' · ', $item['counts']))) ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-secondary">Siempre se conservan el conjunto, su subdominio, su estado y los módulos habilitados. No se puede deshacer: si necesitas los datos, haz antes una copia de la base de datos.</p>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="form-label small" for="confirm-slug">Escribe el subdominio: <code><?= $escape((string) $tenant['slug']) ?></code></label>
+                                <input class="form-control" id="confirm-slug" name="confirm_slug" required autocomplete="off" spellcheck="false"
+                                       pattern="<?= $escape((string) $tenant['slug']) ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small" for="superadmin-password">Tu contraseña de Superadmin</label>
+                                <input class="form-control" id="superadmin-password" name="superadmin_password" type="password" required autocomplete="current-password">
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap align-items-center gap-2 mt-3">
+                            <span id="reset-selection" class="small text-secondary" aria-live="polite">Nada seleccionado.</span>
+                            <button id="reset-submit" class="btn btn-danger ms-auto" type="submit" disabled><i class="bi bi-trash3 me-1" aria-hidden="true"></i><span>Borrar lo seleccionado</span></button>
+                        </div>
+                    </div>
+                </form>
+                <script>
+                (() => {
+                    const form = document.getElementById('reset-form');
+                    const boxes = [...form.querySelectorAll('.reset-category')];
+                    const byKey = new Map(boxes.map((box) => [box.value, box]));
+                    const requires = (box) => box.dataset.requires.split(' ').filter(Boolean).map((key) => byKey.get(key)).filter(Boolean);
+                    const all = document.getElementById('reset-all');
+                    const tenantName = <?= json_encode((string) $tenant['name'], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
+
+                    // Marca una categoría y, en cadena, todo lo que necesita borrarse antes.
+                    const check = (box) => {
+                        box.checked = true;
+                        requires(box).forEach((needed) => { if (!needed.checked) check(needed); });
+                    };
+                    // Categorías marcadas que obligan a mantener esta marcada.
+                    const requiredBy = (box) => boxes.filter((other) => other.checked && requires(other).includes(box));
+
+                    const refresh = () => {
+                        const selected = boxes.filter((box) => box.checked);
+                        boxes.forEach((box) => {
+                            const holders = requiredBy(box);
+                            const badge = box.closest('tr').querySelector('.reset-required');
+                            badge.hidden = holders.length === 0;
+                            badge.textContent = `Requerido por: ${holders.map((h) => h.dataset.label).join(', ')}`;
+                            box.closest('tr').classList.toggle('table-danger', box.checked);
+                        });
+                        all.checked = selected.length === boxes.length;
+                        all.indeterminate = selected.length > 0 && selected.length < boxes.length;
+                        const submit = document.getElementById('reset-submit');
+                        submit.disabled = selected.length === 0;
+                        submit.querySelector('span').textContent = all.checked ? 'Borrar todo y reiniciar' : `Borrar ${selected.length} dato(s) seleccionado(s)`;
+                        document.getElementById('reset-selection').textContent = selected.length === 0
+                            ? 'Nada seleccionado.'
+                            : all.checked ? 'Reinicio completo: el conjunto quedará como recién creado.' : `Se borrará: ${selected.map((b) => b.dataset.label).join(', ')}.`;
+                    };
+
+                    boxes.forEach((box) => box.addEventListener('click', (event) => {
+                        if (!box.checked) {
+                            const holders = requiredBy(box);
+                            if (holders.length > 0) {
+                                event.preventDefault(); // sigue marcada: otra categoría la necesita
+                                window.alert(`«${box.dataset.label}» se debe borrar porque también marcaste: ${holders.map((h) => h.dataset.label).join(', ')}. Desmarca primero esas.`);
+                                return;
+                            }
+                        } else {
+                            check(box);
+                        }
+                        refresh();
+                    }));
+                    all.addEventListener('change', () => {
+                        boxes.forEach((box) => { box.checked = all.checked; });
+                        refresh();
+                    });
+                    form.addEventListener('submit', (event) => {
+                        const selected = boxes.filter((box) => box.checked).map((box) => `• ${box.dataset.label}`);
+                        if (!window.confirm(`Última confirmación: en «${tenantName}» se borrará de forma definitiva:\n${selected.join('\n')}\n\n¿Continuar?`)) {
+                            event.preventDefault();
+                        }
+                    });
+                    refresh();
+                })();
+                </script>
+            </div>
         </div>
 
         <div class="col-lg-6" id="administradores">

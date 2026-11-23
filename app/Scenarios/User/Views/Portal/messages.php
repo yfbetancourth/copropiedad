@@ -1,7 +1,7 @@
 <section class="content">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-            <h1 class="h3 mb-1">Mis mensajes</h1>
+            <h1 class="h3 mb-1">Comunicados</h1>
             <p class="text-secondary mb-0">Mensajes internos recibidos de la administración.</p>
         </div>
         <a class="btn btn-outline-secondary" href="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario">

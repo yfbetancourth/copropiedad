@@ -35,7 +35,60 @@ $currentStep = 2;
         <?php endif; ?>
     </div>
 
-    <?php require __DIR__ . '/conformation-steps.php'; ?>
+    <?php
+    // «Reiniciar» aparece en el paso 2 cuando ya hay algo guardado (respuestas o inmuebles).
+    $conformationResetTarget = $canWrite && ($structureExists || $answers !== []) ? 'reset-composition-modal' : null;
+    require __DIR__ . '/conformation-steps.php';
+    ?>
+    <?php if ($conformationResetTarget !== null): ?>
+        <?php $isSuperadmin = \App\Core\Authorization::isSuperadmin($actor); ?>
+        <div class="modal fade" id="reset-composition-modal" tabindex="-1" aria-labelledby="reset-composition-title" aria-hidden="true">
+            <div class="modal-dialog">
+                <form class="modal-content" method="post" action="<?= $escape($basePath) ?>/configuracion/conformacion/reiniciar">
+                    <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
+                    <div class="modal-header">
+                        <h2 class="modal-title h5" id="reset-composition-title">Reiniciar la conformación</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <?php if ($billingLocked): ?>
+                            <div class="alert alert-info mb-0">
+                                <i class="bi bi-lock-fill me-1" aria-hidden="true"></i>
+                                No se puede reiniciar: ya hay notas de cobro emitidas para estos inmuebles y su cartera quedaría desconectada.
+                                Corrige, agrega o quita inmuebles directamente en la lista.
+                            </div>
+                        <?php elseif (!$isSuperadmin): ?>
+                            <div class="alert alert-info mb-0">
+                                <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>
+                                Solo el perfil Superadmin puede reiniciar la conformación, porque borra toda la estructura.
+                                Si solo necesitas ajustar algunos inmuebles, hazlo en la lista sin reiniciar.
+                            </div>
+                        <?php else: ?>
+                            <p>Se volverá a empezar desde la primera pregunta del asistente. Se borrarán:</p>
+                            <ul class="small">
+                                <li>Las cantidades respondidas en el asistente.</li>
+                                <?php if ($structureExists): ?>
+                                    <li>Los <?= count($units) ?> inmuebles con sus nombres editados y coeficientes.</li>
+                                <?php endif; ?>
+                                <?php if ($assignmentCount > 0): ?>
+                                    <li>Las <?= (int) $assignmentCount ?> asignaciones vigentes a usuarios (quedan cerradas en Trazabilidad).</li>
+                                <?php endif; ?>
+                            </ul>
+                            <p class="small text-secondary">La caracterización (tipo de vivienda y nomenclatura) se conserva.</p>
+                            <label for="reset-confirm-text" class="form-label small">Para continuar, escribe <strong>REINICIAR</strong></label>
+                            <input id="reset-confirm-text" name="confirm_text" class="form-control" style="max-width: 14rem" autocomplete="off" spellcheck="false" required pattern="[Rr][Ee][Ii][Nn][Ii][Cc][Ii][Aa][Rr]">
+                        <?php endif; ?>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <?php if ($isSuperadmin && !$billingLocked): ?>
+                            <button type="submit" class="btn btn-danger"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reiniciar conformación</button>
+                        <?php endif; ?>
+                    </div>
+                </form>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <?php if (is_array($flash)): ?>
         <div class="alert alert-<?= $flash['type'] === 'success' ? 'success' : 'danger' ?>" role="status"><?= $escape($flash['message']) ?></div>
@@ -276,6 +329,7 @@ $currentStep = 2;
             </div>
         </div>
 
+        <script src="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/js/data-grid.js?v=1"></script>
         <?php if ($canWrite): ?>
             <form id="composition-units-form" method="post" action="<?= $escape($basePath) ?>/configuracion/conformacion/finalizar" novalidate>
                 <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
@@ -325,14 +379,22 @@ $currentStep = 2;
                                 <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#paste-modal"><i class="bi bi-clipboard me-2" aria-hidden="true"></i>Pegar desde Excel…</button></li>
                                 <li><button class="dropdown-item" type="button" id="distribute-equally"><i class="bi bi-distribute-vertical me-2" aria-hidden="true"></i>Repartir 100 % en partes iguales</button></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><button class="dropdown-item text-danger" type="button" id="clear-coefficients"><i class="bi bi-eraser me-2" aria-hidden="true"></i>Borrar coeficientes visibles</button></li>
+                                <li><button class="dropdown-item text-danger" type="button" id="clear-coefficients"><i class="bi bi-eraser me-2" aria-hidden="true"></i>Borrar coeficientes filtrados</button></li>
                             </ul>
                         </div>
+                        <div id="unit-grid-tools" class="d-flex flex-wrap gap-2"></div>
                     </div>
+                    <div id="unit-grid-bulk" class="px-3 py-2 bg-primary-subtle border-bottom" hidden></div>
                     <div class="table-responsive" style="max-height: 62vh">
-                        <table class="table table-sm table-hover align-middle mb-0">
+                        <table id="composition-unit-table" class="table table-sm table-hover align-middle mb-0">
                             <thead class="table-light sticky-top">
-                                <tr><th scope="col" class="text-secondary" style="width: 3.5rem">#</th><th scope="col" style="width: 22%">Categoría</th><th scope="col">Nombre del inmueble</th><th scope="col" style="width: 11rem">Coeficiente (%)</th><th scope="col" style="width: 3rem"><span class="visually-hidden">Acciones</span></th></tr>
+                                <tr>
+                                    <th scope="col" class="text-secondary" style="width: 4rem" data-column="position" data-label="#" data-sortable>#</th>
+                                    <th scope="col" style="width: 22%" data-column="category" data-label="Categoría" data-sortable>Categoría</th>
+                                    <th scope="col" data-column="name" data-label="Nombre del inmueble" data-hideable="false" data-sortable>Nombre del inmueble</th>
+                                    <th scope="col" style="width: 11rem" data-column="coefficient" data-label="Coeficiente (%)" data-sortable>Coeficiente (%)</th>
+                                    <th scope="col" style="width: 3rem" data-export="false"><span class="visually-hidden">Acciones</span></th>
+                                </tr>
                             </thead>
                             <tbody id="composition-unit-list">
                                 <?php foreach ($units as $index => $unit): ?>
@@ -354,6 +416,7 @@ $currentStep = 2;
                             </tbody>
                         </table>
                     </div>
+                    <div id="unit-grid-pager" class="px-3 py-2 border-top"></div>
                     <div class="card-footer bg-transparent d-flex flex-wrap gap-2 align-items-center">
                         <button id="add-composition-unit" class="btn btn-outline-primary btn-sm" type="button"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Agregar inmueble</button>
                         <span id="dirty-indicator" class="small text-warning ms-2" hidden><i class="bi bi-circle-fill me-1" style="font-size: .5rem" aria-hidden="true"></i>Cambios sin guardar</span>
@@ -373,7 +436,7 @@ $currentStep = 2;
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                         </div>
                         <div class="modal-body">
-                            <p class="small">Copia la columna de coeficientes del reglamento o de Excel (un valor por línea) y pégala aquí. Se aplicarán <strong>en orden a las filas visibles</strong>; filtra primero si quieres llenar solo una torre.</p>
+                            <p class="small">Copia la columna de coeficientes del reglamento o de Excel (un valor por línea) y pégala aquí. Se aplicarán <strong>en orden a las filas filtradas</strong> (todas las páginas, en el orden en que se ven); filtra primero si quieres llenar solo una torre.</p>
                             <p class="small text-secondary">Se aceptan comas o puntos decimales y el signo %: <code>1,2500</code>, <code>1.25</code>, <code>0,85%</code>.</p>
                             <textarea id="paste-values" class="form-control font-monospace" rows="10" aria-describedby="paste-status"></textarea>
                             <div id="paste-status" class="small mt-2" aria-live="polite"></div>
@@ -386,6 +449,27 @@ $currentStep = 2;
                 </div>
             </div>
 
+            <div class="modal fade" id="bulk-value-modal" tabindex="-1" aria-labelledby="bulk-value-title" aria-hidden="true">
+                <div class="modal-dialog">
+                    <form class="modal-content" id="bulk-value-form" novalidate>
+                        <div class="modal-header">
+                            <h2 class="modal-title h5" id="bulk-value-title"></h2>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label class="form-label" for="bulk-value-input" id="bulk-value-label"></label>
+                            <input class="form-control" id="bulk-value-input" autocomplete="off" aria-describedby="bulk-value-hint">
+                            <div class="invalid-feedback" id="bulk-value-error"></div>
+                            <div class="form-text" id="bulk-value-hint"></div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Aplicar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
             <script>
             (() => {
                 const SCALE = 10000; // los coeficientes se manejan en diezmilésimas para evitar errores de redondeo
@@ -395,10 +479,13 @@ $currentStep = 2;
                 const filter = document.getElementById('unit-filter');
                 const submit = document.getElementById('composition-submit');
                 const dirtyIndicator = document.getElementById('dirty-indicator');
-                const rows = () => [...list.querySelectorAll('.composition-unit')];
-                const visibleRows = () => rows().filter((row) => !row.hidden);
                 const field = (row, name) => row.querySelector(`[data-unit-field="${name}"]`);
                 let dirty = false;
+                let grid = null;
+                // Orden original de la estructura (el orden visual puede cambiar al ordenar por columna).
+                const rows = () => grid.rowsInOrder();
+                // Filas que coinciden con el filtro, en todas las páginas y en el orden en que se ven.
+                const filteredRows = () => grid.matching();
 
                 // "1,25 %" → 12500 diezmilésimas; null si no es válido.
                 const parseCoefficient = (raw) => {
@@ -494,7 +581,7 @@ $currentStep = 2;
                             filter.value = '';
                             document.getElementById('view-all').checked = true;
                             applyFilter();
-                            error.row.scrollIntoView({ block: 'center' });
+                            grid.showRow(error.row);
                             error.row.querySelector('.is-invalid')?.focus();
                         });
                         item.append(link, `: ${error.text}`);
@@ -516,16 +603,16 @@ $currentStep = 2;
                     validateTimer = setTimeout(validate, 120);
                 };
 
-                const applyFilter = () => {
+                const matchesFilter = (row) => {
                     const query = filter.value.trim().toLowerCase();
                     const onlyErrors = document.getElementById('view-errors').checked;
-                    rows().forEach((row) => {
-                        const text = `${field(row, 'category').value} ${field(row, 'name').value}`.toLowerCase();
-                        row.hidden = (query !== '' && !text.includes(query)) || (onlyErrors && row.dataset.hasError !== '1');
-                    });
+                    const text = `${field(row, 'category').value} ${field(row, 'name').value}`.toLowerCase();
+                    return (query === '' || text.includes(query)) && (!onlyErrors || row.dataset.hasError === '1');
                 };
+                const applyFilter = () => grid.refresh(true);
 
                 list.addEventListener('input', (event) => {
+                    if (event.target.dataset.gridSelect) return; // marcar una fila no es un cambio de datos
                     const row = event.target.closest('.composition-unit');
                     if (row) row.dataset.touched = '1';
                     markDirty();
@@ -533,6 +620,7 @@ $currentStep = 2;
                 });
                 // Al salir del campo se normaliza: «1,25» → «1.2500».
                 list.addEventListener('change', (event) => {
+                    if (event.target.dataset.gridSelect) return;
                     if (event.target.dataset.unitField === 'coefficient') {
                         const parsed = parseCoefficient(event.target.value);
                         if (parsed !== null) event.target.value = formatCoefficient(parsed);
@@ -559,6 +647,7 @@ $currentStep = 2;
                     row.remove();
                     markDirty();
                     validate();
+                    grid.refresh();
                 });
 
                 document.getElementById('add-composition-unit').addEventListener('click', () => {
@@ -580,10 +669,9 @@ $currentStep = 2;
                     list.append(row);
                     filter.value = '';
                     document.getElementById('view-all').checked = true;
-                    applyFilter();
                     markDirty();
                     validate();
-                    row.scrollIntoView({ block: 'center' });
+                    grid.showRow(row);
                     field(row, 'name').focus();
                 });
 
@@ -606,8 +694,8 @@ $currentStep = 2;
                 });
 
                 document.getElementById('clear-coefficients').addEventListener('click', () => {
-                    const targets = visibleRows();
-                    if (targets.length === 0 || !window.confirm(`¿Borrar el coeficiente de ${targets.length} inmueble(s) visibles?`)) return;
+                    const targets = filteredRows();
+                    if (targets.length === 0 || !window.confirm(`¿Borrar el coeficiente de ${targets.length} inmueble(s) filtrados (todas las páginas)?`)) return;
                     targets.forEach((row) => { field(row, 'coefficient').value = ''; });
                     markDirty();
                     validate();
@@ -620,7 +708,7 @@ $currentStep = 2;
                 const pastedValues = () => pasteArea.value.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== '');
                 pasteArea.addEventListener('input', () => {
                     const values = pastedValues();
-                    const targets = visibleRows().length;
+                    const targets = filteredRows().length;
                     const invalid = values.map((v, i) => [i + 1, v]).filter(([, v]) => parseCoefficient(v) === null);
                     if (values.length === 0) {
                         pasteStatus.textContent = '';
@@ -630,7 +718,7 @@ $currentStep = 2;
                         pasteStatus.className = 'small mt-2 text-danger';
                     } else {
                         const sum = values.reduce((acc, v) => acc + parseCoefficient(v), 0);
-                        pasteStatus.textContent = `${values.length} valores para ${targets} filas visibles · suman ${formatPercent(sum)} %`
+                        pasteStatus.textContent = `${values.length} valores para ${targets} filas filtradas · suman ${formatPercent(sum)} %`
                             + (values.length !== targets ? ' · ⚠ la cantidad no coincide' : '');
                         pasteStatus.className = `small mt-2 ${values.length === targets ? 'text-success' : 'text-warning'}`;
                     }
@@ -638,9 +726,9 @@ $currentStep = 2;
                 });
                 applyPaste.addEventListener('click', () => {
                     const values = pastedValues();
-                    const targets = visibleRows();
+                    const targets = filteredRows();
                     if (values.length !== targets.length
-                        && !window.confirm(`Pegaste ${values.length} valores pero hay ${targets.length} filas visibles. Se llenarán ${Math.min(values.length, targets.length)} filas en orden. ¿Continuar?`)) {
+                        && !window.confirm(`Pegaste ${values.length} valores pero hay ${targets.length} filas filtradas. Se llenarán ${Math.min(values.length, targets.length)} filas en orden. ¿Continuar?`)) {
                         return;
                     }
                     targets.slice(0, values.length).forEach((row, i) => {
@@ -680,15 +768,156 @@ $currentStep = 2;
                     if (dirty) event.preventDefault();
                 });
 
+                // Ventana para pedir un valor que se aplica a las filas seleccionadas.
+                const bulkModal = document.getElementById('bulk-value-modal');
+                const bulkForm = document.getElementById('bulk-value-form');
+                const bulkInput = document.getElementById('bulk-value-input');
+                const bulkError = document.getElementById('bulk-value-error');
+                let bulkApply = null;
+                const askValue = ({ title, label, hint, value = '', list = '', inputmode = 'text', apply }) => {
+                    document.getElementById('bulk-value-title').textContent = title;
+                    document.getElementById('bulk-value-label').textContent = label;
+                    document.getElementById('bulk-value-hint').textContent = hint;
+                    bulkInput.value = value;
+                    bulkInput.inputMode = inputmode;
+                    if (list) bulkInput.setAttribute('list', list); else bulkInput.removeAttribute('list');
+                    bulkInput.classList.remove('is-invalid');
+                    bulkApply = apply;
+                    bootstrap.Modal.getOrCreateInstance(bulkModal).show();
+                };
+                bulkModal.addEventListener('shown.bs.modal', () => bulkInput.focus());
+                bulkForm.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    const problem = bulkApply ? bulkApply(bulkInput.value) : null;
+                    if (problem) {
+                        bulkError.textContent = problem;
+                        bulkInput.classList.add('is-invalid');
+                        return;
+                    }
+                    bootstrap.Modal.getInstance(bulkModal)?.hide();
+                    markDirty();
+                    validate();
+                    grid.refresh();
+                });
+                const touch = (row) => { row.dataset.touched = '1'; };
+
+                grid = new DataGrid(document.getElementById('composition-unit-table'), {
+                    storageKey: 'composition-units',
+                    rowSelector: '.composition-unit',
+                    filter: matchesFilter,
+                    sortValue: (row, key) => (key === 'position' ? row.dataset.gridOrder : undefined),
+                    selectable: true,
+                    toolbar: document.getElementById('unit-grid-tools'),
+                    bulkBar: document.getElementById('unit-grid-bulk'),
+                    pager: document.getElementById('unit-grid-pager'),
+                    exportName: 'inmuebles',
+                    bulkActions: [
+                        {
+                            label: 'Cambiar categoría', icon: 'bi-tag',
+                            run: (selected) => askValue({
+                                title: `Cambiar categoría de ${selected.length} inmueble(s)`,
+                                label: 'Nueva categoría',
+                                hint: 'Elige una de la lista o escribe una nueva.',
+                                list: 'unit-categories',
+                                apply: (raw) => {
+                                    const text = raw.trim();
+                                    if (text === '' || text.length > 80) return 'Escribe una categoría de hasta 80 caracteres.';
+                                    const value = knownCategories.find((c) => c.toLowerCase() === text.toLowerCase()) ?? text;
+                                    selected.forEach((row) => { field(row, 'category').value = value; touch(row); });
+                                    return null;
+                                },
+                            }),
+                        },
+                        {
+                            label: 'Asignar coeficiente', icon: 'bi-percent',
+                            run: (selected) => askValue({
+                                title: `Asignar coeficiente a ${selected.length} inmueble(s)`,
+                                label: 'Coeficiente para cada uno (%)',
+                                hint: 'Ejemplo: 0,8500. Se escribe el mismo valor en cada inmueble seleccionado.',
+                                inputmode: 'decimal',
+                                apply: (raw) => {
+                                    const parsed = parseCoefficient(raw);
+                                    if (parsed === null) return 'Coeficiente inválido: mayor que 0, hasta 100 y con máximo 4 decimales.';
+                                    selected.forEach((row) => { field(row, 'coefficient').value = formatCoefficient(parsed); touch(row); });
+                                    return null;
+                                },
+                            }),
+                        },
+                        {
+                            label: 'Repartir un total', icon: 'bi-distribute-vertical',
+                            run: (selected) => askValue({
+                                title: `Repartir un porcentaje entre ${selected.length} inmueble(s)`,
+                                label: 'Porcentaje total a repartir (%)',
+                                hint: 'Ejemplo: si los parqueaderos suman 12 %, escribe 12. Se reparte en partes iguales y el residuo de 0,0001 va a los primeros.',
+                                inputmode: 'decimal',
+                                apply: (raw) => {
+                                    const total = parseCoefficient(raw);
+                                    if (total === null) return 'Porcentaje inválido: mayor que 0, hasta 100 y con máximo 4 decimales.';
+                                    const base = Math.floor(total / selected.length);
+                                    if (base < 1) return `No alcanza: ${selected.length} inmuebles necesitan al menos ${formatPercent(selected.length)} %.`;
+                                    const remainder = total - base * selected.length;
+                                    selected.forEach((row, index) => {
+                                        field(row, 'coefficient').value = formatCoefficient(base + (index < remainder ? 1 : 0));
+                                        touch(row);
+                                    });
+                                    return null;
+                                },
+                            }),
+                        },
+                        {
+                            label: 'Borrar coeficiente', icon: 'bi-eraser', className: 'btn-outline-secondary',
+                            run: (selected) => {
+                                if (!window.confirm(`¿Borrar el coeficiente de ${selected.length} inmueble(s) seleccionados?`)) return;
+                                selected.forEach((row) => { field(row, 'coefficient').value = ''; touch(row); });
+                                markDirty();
+                                validate();
+                                grid.refresh();
+                            },
+                        },
+                        {
+                            label: 'Quitar', icon: 'bi-trash', className: 'btn-outline-danger',
+                            run: (selected) => {
+                                const removable = selected.filter((row) => row.dataset.locked !== '1');
+                                const locked = selected.length - removable.length;
+                                if (removable.length === 0) {
+                                    window.alert('Los inmuebles seleccionados tienen notas de cobro y no se pueden quitar.');
+                                    return;
+                                }
+                                const message = `¿Quitar ${removable.length} inmueble(s) de la estructura?`
+                                    + (locked > 0 ? `\n\n${locked} se conservarán porque tienen notas de cobro.` : '')
+                                    + '\n\nSi tienen usuarios asignados, esas asignaciones también se eliminarán al guardar.';
+                                if (!window.confirm(message)) return;
+                                removable.forEach((row) => row.remove());
+                                markDirty();
+                                validate();
+                                grid.refresh();
+                            },
+                        },
+                    ],
+                });
+
                 <?php if ($restoredDraft): ?>form.dataset.showErrors = '1'; markDirty();<?php endif; ?>
                 validate();
+                grid.refresh();
             })();
             </script>
         <?php else: ?>
             <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent d-flex flex-wrap gap-2 align-items-center">
+                    <h2 class="card-title h6 mb-0 me-auto">Lista de inmuebles</h2>
+                    <input id="unit-filter" class="form-control form-control-sm" style="max-width: 16rem" type="search" placeholder="Filtrar: Torre 2, comercial…" aria-label="Filtrar inmuebles">
+                    <div id="unit-grid-tools" class="d-flex flex-wrap gap-2"></div>
+                </div>
                 <div class="table-responsive" style="max-height: 70vh">
-                    <table class="table table-sm table-striped mb-0">
-                        <thead class="table-light sticky-top"><tr><th>#</th><th>Categoría</th><th>Nombre del inmueble</th><th class="text-end">Coeficiente (%)</th></tr></thead>
+                    <table id="composition-unit-table" class="table table-sm table-striped mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th scope="col" data-column="position" data-label="#" data-sortable>#</th>
+                                <th scope="col" data-column="category" data-label="Categoría" data-sortable>Categoría</th>
+                                <th scope="col" data-column="name" data-label="Nombre del inmueble" data-hideable="false" data-sortable>Nombre del inmueble</th>
+                                <th scope="col" class="text-end" data-column="coefficient" data-label="Coeficiente (%)" data-sortable>Coeficiente (%)</th>
+                            </tr>
+                        </thead>
                         <tbody>
                             <?php foreach ($units as $index => $unit): ?>
                                 <tr><td class="text-secondary"><?= $index + 1 ?></td><td><?= $escape($unit['category'] ?? '') ?></td><td><?= $escape($unit['name'] ?? '') ?></td><td class="text-end"><?= isset($unit['coefficient']) && $unit['coefficient'] !== '' ? $escape(number_format((float) $unit['coefficient'], 4, ',', '.')) : '<span class="text-warning">Pendiente</span>' ?></td></tr>
@@ -696,7 +925,22 @@ $currentStep = 2;
                         </tbody>
                     </table>
                 </div>
+                <div id="unit-grid-pager" class="px-3 py-2 border-top"></div>
             </div>
+            <script>
+            (() => {
+                const filter = document.getElementById('unit-filter');
+                const grid = new DataGrid(document.getElementById('composition-unit-table'), {
+                    storageKey: 'composition-units-read',
+                    filter: (row) => filter.value.trim() === '' || row.textContent.toLowerCase().includes(filter.value.trim().toLowerCase()),
+                    sortValue: (row, key) => (key === 'position' ? row.dataset.gridOrder : undefined),
+                    toolbar: document.getElementById('unit-grid-tools'),
+                    pager: document.getElementById('unit-grid-pager'),
+                    exportName: 'inmuebles',
+                });
+                filter.addEventListener('input', () => grid.refresh(true));
+            })();
+            </script>
         <?php endif; ?>
     <?php endif; ?>
 </section>

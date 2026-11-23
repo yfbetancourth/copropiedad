@@ -11,13 +11,16 @@ use Throwable;
 
 final class MessagingService
 {
+    /** Residentes activos: los comunicados se leen en el portal, que es solo para residentes. */
     public function activeUsers(): array
     {
         $statement = Database::connection()->prepare(
-            'SELECT id, username, email
-             FROM admin_users
-             WHERE tenant_id = ? AND is_active = 1
-             ORDER BY username'
+            "SELECT users.id, users.username, users.email, profiles.full_name
+             FROM admin_users AS users
+             JOIN admin_roles AS roles ON roles.id = users.role_id AND roles.kind = 'resident'
+             LEFT JOIN resident_profiles AS profiles ON profiles.user_id = users.id
+             WHERE users.tenant_id = ? AND users.is_active = 1
+             ORDER BY COALESCE(profiles.full_name, users.username)"
         );
         $statement->execute([Tenant::id()]);
 
@@ -32,20 +35,24 @@ final class MessagingService
         try {
             if ($recipientId === null) {
                 $all = $pdo->prepare(
-                    'SELECT id FROM admin_users WHERE tenant_id = ? AND is_active = 1 ORDER BY id'
+                    "SELECT users.id FROM admin_users AS users
+                     JOIN admin_roles AS roles ON roles.id = users.role_id AND roles.kind = 'resident'
+                     WHERE users.tenant_id = ? AND users.is_active = 1 ORDER BY users.id"
                 );
                 $all->execute([Tenant::id()]);
                 $recipients = $all->fetchAll(\PDO::FETCH_COLUMN);
             } else {
                 $recipient = $pdo->prepare(
-                    'SELECT id FROM admin_users WHERE id = ? AND tenant_id = ? AND is_active = 1 LIMIT 1'
+                    "SELECT users.id FROM admin_users AS users
+                     JOIN admin_roles AS roles ON roles.id = users.role_id AND roles.kind = 'resident'
+                     WHERE users.id = ? AND users.tenant_id = ? AND users.is_active = 1 LIMIT 1"
                 );
                 $recipient->execute([$recipientId, Tenant::id()]);
                 $recipients = $recipient->fetchAll(\PDO::FETCH_COLUMN);
             }
 
             if ($recipients === []) {
-                throw new RuntimeException('Selecciona al menos un usuario activo como destinatario.');
+                throw new RuntimeException('Selecciona al menos un residente activo como destinatario.');
             }
 
             $message = $pdo->prepare(

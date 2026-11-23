@@ -18,7 +18,7 @@ use Throwable;
 
 final class BillingService
 {
-    private const PROVIDER_PAYMENT_TABLES = ['billing_online_payments', 'billing_bold_terminal_payments'];
+    private const PROVIDER_PAYMENT_TABLES = ['billing_online_payments', 'billing_bold_terminal_payments', 'billing_wompi_payments'];
 
     private const ITEM_COLUMNS = [
         'interest' => 'interest',
@@ -263,7 +263,12 @@ final class BillingService
         }
     }
 
-    public function addPayment(int $statementId, string $amount, string $receivedOn, string $reference, string $notes, int $actorId): void
+    /**
+     * Registra un pago y programa su aviso al residente y a la administración.
+     *
+     * @param string $origin manual (personal de cartera) o report (pago reportado y aprobado)
+     */
+    public function addPayment(int $statementId, string $amount, string $receivedOn, string $reference, string $notes, int $actorId, string $origin = 'manual'): int
     {
         $amountCents = self::cents($amount);
         if ($amountCents < 1 || $amountCents > 999999999999999) {
@@ -305,6 +310,7 @@ final class BillingService
                 'INSERT INTO billing_payments (tenant_id, statement_id, amount, received_on, reference, notes, created_by)
                  VALUES (?, ?, ?, ?, ?, ?, ?)'
             )->execute([Tenant::id(), $statementId, self::decimal($amountCents), $receivedOn, $reference, $notes, $actorId]);
+            $paymentId = (int) $pdo->lastInsertId();
             $pdo->commit();
         } catch (Throwable $exception) {
             if ($pdo->inTransaction()) {
@@ -312,6 +318,9 @@ final class BillingService
             }
             throw $exception;
         }
+        PaymentNotificationService::defer('payment', ['payment_id' => $paymentId, 'origin' => $origin]);
+
+        return $paymentId;
     }
 
     /**
@@ -574,7 +583,7 @@ final class BillingService
                     $settings,
                     (string) $recipient['recipient_email'],
                     (string) $recipient['recipient_name'],
-                    sprintf('Nota de cobro %s · %s', $this->number($statement), $statement['period']),
+                    sprintf('Nota de cobro %s · %s', self::statementNumber((string) $statement['period'], (int) $statement['id']), $statement['period']),
                     $this->statementHtml($statement),
                     $this->statementText($statement)
                 );
@@ -689,7 +698,7 @@ final class BillingService
         );
         $statement['discount_applied'] = $settlement['discount'];
         $statement['balance'] = $settlement['balance'];
-        $statement['number'] = $this->number($statement);
+        $statement['number'] = self::statementNumber((string) $statement['period'], (int) $statement['id']);
         // Una nota con una nota posterior del mismo inmueble ya trasladó su saldo: no se paga ni se ajusta.
         $statement['superseded_by'] = $this->newerStatement((string) $statement['unit_id'], (string) $statement['period']);
         $statement['payable_balance'] = $statement['superseded_by'] === null ? max(0, $settlement['balance']) : 0;
@@ -1248,7 +1257,7 @@ final class BillingService
     private function statementRecipients(int $statementId): array
     {
         $query = Database::connection()->prepare(
-            'SELECT recipient_name, recipient_email, delivery_status, delivery_attempts, sent_at
+            'SELECT user_id, recipient_name, recipient_email, delivery_status, delivery_attempts, sent_at
              FROM billing_statement_recipients WHERE statement_id = ? ORDER BY recipient_name'
         );
         $query->execute([$statementId]);
@@ -1267,11 +1276,49 @@ final class BillingService
         return $query->fetchAll();
     }
 
-    private function number(array $statement): string
+    /**
+     * Nota que todavía se puede pagar: su saldo no pasó a una nota posterior y tiene saldo pendiente.
+     *
+     * @throws RuntimeException con el motivo para mostrarlo al usuario
+     */
+    public function payableStatement(int $statementId): array
     {
-        $period = str_replace('-', '', (string) $statement['period']);
+        $statement = $this->statement($statementId);
+        if ($statement['superseded_by'] !== null) {
+            throw new RuntimeException(sprintf(
+                'El saldo de esta nota ya se incluyó en la nota del período %s. Usa la nota más reciente.',
+                $statement['superseded_by']['period']
+            ));
+        }
+        if ((int) $statement['payable_balance'] <= 0) {
+            throw new RuntimeException('Esta nota no tiene saldo pendiente.');
+        }
 
-        return sprintf('NC-%s-%06d', $period, (int) $statement['id']);
+        return $statement;
+    }
+
+    /** La cuenta recibió la nota (es destinataria de su envío). $statement es el resultado de statement(). */
+    public static function isRecipient(array $statement, int $userId): bool
+    {
+        foreach ($statement['recipients'] as $recipient) {
+            if ((int) ($recipient['user_id'] ?? 0) === $userId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Consecutivo visible de una nota de cobro: NC-AAAAMM-000123. */
+    public static function statementNumber(string $period, int $statementId): string
+    {
+        return sprintf('NC-%s-%06d', str_replace('-', '', $period), $statementId);
+    }
+
+    /** Consecutivo visible de un comprobante de pago: RC-000123. */
+    public static function receiptNumber(int $paymentId): string
+    {
+        return sprintf('RC-%06d', $paymentId);
     }
 
     private function formatDate(string $date): string

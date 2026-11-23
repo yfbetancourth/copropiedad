@@ -8,8 +8,19 @@ use App\Core\Database;
 use App\Core\Tenant;
 use RuntimeException;
 
+/**
+ * Cuentas del conjunto de un tipo: «staff» (equipo con acceso al panel, en Configuración / Equipo) o «resident»
+ * (residentes, en Comunidad / Residentes). Cada sección solo ve y asigna roles de su tipo.
+ */
 final class TeamService
 {
+    public function __construct(private readonly string $kind = 'staff')
+    {
+        if (!in_array($kind, ['staff', 'resident'], true)) {
+            throw new RuntimeException('Tipo de cuenta no válido.');
+        }
+    }
+
     public function all(): array
     {
         $statement = Database::connection()->prepare(
@@ -17,10 +28,10 @@ final class TeamService
                     roles.id AS role_id, roles.name AS role_name, roles.is_system
              FROM admin_users AS users
              JOIN admin_roles AS roles ON roles.id = users.role_id
-             WHERE users.tenant_id = ?
+             WHERE users.tenant_id = ? AND roles.kind = ?
              ORDER BY roles.is_system DESC, users.username'
         );
-        $statement->execute([Tenant::id()]);
+        $statement->execute([Tenant::id(), $this->kind]);
 
         return $statement->fetchAll();
     }
@@ -32,15 +43,15 @@ final class TeamService
                     roles.id AS role_id, roles.name AS role_name, roles.is_system
              FROM admin_users AS users
              JOIN admin_roles AS roles ON roles.id = users.role_id
-             WHERE users.id = ? AND users.tenant_id = ? LIMIT 1'
+             WHERE users.id = ? AND users.tenant_id = ? AND roles.kind = ? LIMIT 1'
         );
-        $statement->execute([$userId, Tenant::id()]);
+        $statement->execute([$userId, Tenant::id(), $this->kind]);
         $user = $statement->fetch();
 
         return is_array($user) ? $user : null;
     }
 
-    public function create(string $username, string $email, string $password, int $roleId): void
+    public function create(string $username, string $email, string $password, int $roleId): int
     {
         $this->assertAssignableRole($roleId);
         $statement = Database::connection()->prepare(
@@ -48,6 +59,8 @@ final class TeamService
              VALUES (?, ?, ?, ?, ?)'
         );
         $statement->execute([Tenant::id(), $username, $email, password_hash($password, PASSWORD_DEFAULT), $roleId]);
+
+        return (int) Database::connection()->lastInsertId();
     }
 
     public function update(int $userId, string $username, string $email, int $roleId, ?string $password): void
@@ -111,9 +124,9 @@ final class TeamService
     private function assertAssignableRole(int $roleId): void
     {
         $statement = Database::connection()->prepare(
-            'SELECT id FROM admin_roles WHERE id = ? AND tenant_id = ? AND is_system = 0 LIMIT 1'
+            'SELECT id FROM admin_roles WHERE id = ? AND tenant_id = ? AND is_system = 0 AND kind = ? LIMIT 1'
         );
-        $statement->execute([$roleId, Tenant::id()]);
+        $statement->execute([$roleId, Tenant::id(), $this->kind]);
 
         if ($statement->fetchColumn() === false) {
             throw new RuntimeException('Selecciona un rol personalizado valido.');

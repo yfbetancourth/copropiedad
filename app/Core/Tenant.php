@@ -49,7 +49,7 @@ final class Tenant
         if ($baseDomain !== '' && str_ends_with($host, '.' . $baseDomain)) {
             $slug = substr($host, 0, -strlen('.' . $baseDomain));
         } elseif (!self::isProduction()) {
-            $slug = self::setting('APP_DEFAULT_TENANT');
+            $slug = Env::get('APP_DEFAULT_TENANT');
             if ($slug === '') {
                 self::set(null);
                 return;
@@ -136,7 +136,7 @@ final class Tenant
      */
     public static function absoluteUrl(string $path, ?string $slug = null, bool $platform = false): string
     {
-        $appUrl = self::setting('APP_URL');
+        $appUrl = Env::get('APP_URL');
         $parts = parse_url($appUrl);
         $scheme = is_array($parts) && is_string($parts['scheme'] ?? null) ? $parts['scheme'] : 'https';
         $port = is_array($parts) && isset($parts['port']) ? ':' . (int) $parts['port'] : '';
@@ -157,7 +157,7 @@ final class Tenant
 
     public static function baseDomain(): string
     {
-        return strtolower(trim(self::setting('APP_BASE_DOMAIN'), ". \t\n\r\0\x0B"));
+        return strtolower(trim(Env::get('APP_BASE_DOMAIN'), ". \t\n\r\0\x0B"));
     }
 
     private static function findBySlug(string $slug): ?array
@@ -205,13 +205,7 @@ final class Tenant
 
     private static function isProduction(): bool
     {
-        return (self::setting('APP_ENV') ?: 'production') === 'production';
+        return (Env::get('APP_ENV') ?: 'production') === 'production';
     }
 
-    private static function setting(string $name): string
-    {
-        $value = $_ENV[$name] ?? $_SERVER[$name] ?? getenv($name);
-
-        return is_string($value) ? trim($value) : '';
-    }
 }

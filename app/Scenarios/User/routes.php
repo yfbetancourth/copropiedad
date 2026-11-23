@@ -12,4 +12,7 @@ if (Tenant::isPlatform()) {
 }
 
 require dirname(__DIR__, 2) . '/Modules/Auth/user-routes.php';
+require dirname(__DIR__, 2) . '/Modules/Billing/user-routes.php';
 require dirname(__DIR__, 2) . '/Modules/Classifieds/user-routes.php';
+require dirname(__DIR__, 2) . '/Modules/CommonAreas/user-routes.php';
+require dirname(__DIR__, 2) . '/Modules/Messaging/user-routes.php';

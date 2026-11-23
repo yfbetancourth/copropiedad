@@ -9,3 +9,4 @@ use App\Modules\PropertyAssignment\PropertyAssignmentController;
 $assignments = new PropertyAssignmentController();
 $router->get('/inmuebles/asignaciones', [$assignments, 'index']);
 $router->post('/inmuebles/asignaciones/guardar', [$assignments, 'save']);
+$router->get('/inmuebles/historial', [$assignments, 'history']);

@@ -353,6 +353,7 @@ em { font-family: var(--serif); font-style: italic; font-weight: 400; color: var
 }
 .catalog-operation { left: 14px; }
 .catalog-operation-purchase { background: var(--orange-tint); color: #8a4a23; }
+.catalog-operation-rent { background: var(--green-tint); color: var(--green-deep); }
 .catalog-image-count { right: 14px; background: rgba(31, 39, 33, .72); color: #fff; text-transform: none; letter-spacing: 0; }
 .catalog-thumbnails { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 6px 6px 0; }
 .catalog-thumbnails img { width: 100%; height: 64px; display: block; border-radius: 6px; object-fit: cover; background: var(--paper-deep); }

@@ -4,23 +4,23 @@ declare(strict_types=1);
 
 namespace App\Modules\Classifieds;
 
+use App\Core\Http;
 use App\Core\Authorization;
 use App\Core\ModuleCatalog;
-use App\Core\Session;
-use App\Core\Url;
 use App\Core\View;
 use PDOException;
 use RuntimeException;
 
 final class ClassifiedsController
 {
+    private const FLASH = 'user_profile_flash';
     public function __construct(private readonly ClassifiedsService $service = new ClassifiedsService())
     {
     }
 
     public function index(): void
     {
-        $this->requireModule();
+        ModuleCatalog::requireEnabled('clasificados');
         View::renderPublic('Classifieds/index', [
             'title' => 'Clasificados de inmuebles',
             'listings' => $this->service->publicListings(),
@@ -31,79 +31,101 @@ final class ClassifiedsController
 
     public function save(): void
     {
-        $this->requireModule();
-        $user = Authorization::requirePermission('usuario.portal', 'read');
-        if ($user === null) {
-            return;
-        }
-        $this->requireCsrf();
+        ModuleCatalog::requireEnabled('clasificados');
+        $user = Authorization::requireResident();
+        Http::requireCsrf();
 
         try {
             $this->service->createListing((int) $user['id'], $_POST, $_FILES['images'] ?? []);
-            $this->flash('success', 'Tu clasificado se publicó en la página pública.');
+            Http::flash(self::FLASH, 'success', 'Tu clasificado se publicó en la página pública.');
         } catch (PDOException $exception) {
             throw $exception;
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
 
-        $this->redirect('/usuario#clasificados');
+        Http::redirect('/usuario#clasificados');
+    }
+
+    public function update(): void
+    {
+        ModuleCatalog::requireEnabled('clasificados');
+        $user = Authorization::requireResident();
+        Http::requireCsrf();
+
+        $listingId = filter_var($_POST['listing_id'] ?? null, FILTER_VALIDATE_INT);
+        if (!is_int($listingId) || $listingId < 1) {
+            Http::flash(self::FLASH, 'error', 'El clasificado seleccionado no es válido.');
+            Http::redirect('/usuario#clasificados');
+        }
+        $removeImages = is_array($_POST['remove_images'] ?? null)
+            ? array_values(array_filter(
+                array_map(static fn (mixed $id): int|false => filter_var($id, FILTER_VALIDATE_INT), $_POST['remove_images']),
+                static fn (int|false $id): bool => is_int($id) && $id > 0
+            ))
+            : [];
+
+        try {
+            if (!$this->service->updateListing($listingId, (int) $user['id'], $_POST, $_FILES['images'] ?? [], $removeImages)) {
+                Http::flash(self::FLASH, 'error', 'No se encontró un clasificado tuyo para editar.');
+            } else {
+                Http::flash(self::FLASH, 'success', 'Los cambios del clasificado quedaron guardados.');
+            }
+        } catch (RuntimeException $exception) {
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
+        }
+
+        Http::redirect('/usuario#clasificado-' . $listingId);
     }
 
     public function changeStatus(): void
     {
-        $this->requireModule();
-        $user = Authorization::requirePermission('usuario.portal', 'read');
-        if ($user === null) {
-            return;
-        }
-        $this->requireCsrf();
+        ModuleCatalog::requireEnabled('clasificados');
+        $user = Authorization::requireResident();
+        Http::requireCsrf();
 
         $listingId = filter_var($_POST['listing_id'] ?? null, FILTER_VALIDATE_INT);
         $status = is_string($_POST['status'] ?? null) ? $_POST['status'] : '';
         if (!is_int($listingId) || $listingId < 1 || !in_array($status, ['published', 'closed'], true)) {
-            $this->flash('error', 'El clasificado seleccionado no es válido.');
-            $this->redirect('/usuario#clasificados');
+            Http::flash(self::FLASH, 'error', 'El clasificado seleccionado no es válido.');
+            Http::redirect('/usuario#clasificados');
         }
 
         if (!$this->service->setStatus($listingId, (int) $user['id'], $status)) {
-            $this->flash('error', 'No se encontró un clasificado tuyo para actualizar.');
+            Http::flash(self::FLASH, 'error', 'No se encontró un clasificado tuyo para actualizar.');
         } else {
-            $this->flash('success', $status === 'published'
+            Http::flash(self::FLASH, 'success', $status === 'published'
                 ? 'El clasificado volvió a publicarse.'
                 : 'El clasificado se cerró y ya no aparece al público.');
         }
 
-        $this->redirect('/usuario#clasificados');
+        Http::redirect('/usuario#clasificados');
     }
 
     public function delete(): void
     {
-        $this->requireModule();
-        $user = Authorization::requirePermission('usuario.portal', 'read');
-        if ($user === null) {
-            return;
-        }
-        $this->requireCsrf();
+        ModuleCatalog::requireEnabled('clasificados');
+        $user = Authorization::requireResident();
+        Http::requireCsrf();
 
         $listingId = filter_var($_POST['listing_id'] ?? null, FILTER_VALIDATE_INT);
         if (!is_int($listingId) || $listingId < 1) {
-            $this->flash('error', 'El clasificado seleccionado no es válido.');
-            $this->redirect('/usuario#clasificados');
+            Http::flash(self::FLASH, 'error', 'El clasificado seleccionado no es válido.');
+            Http::redirect('/usuario#clasificados');
         }
 
         if (!$this->service->deleteListing($listingId, (int) $user['id'])) {
-            $this->flash('error', 'No se encontró un clasificado tuyo para eliminar.');
+            Http::flash(self::FLASH, 'error', 'No se encontró un clasificado tuyo para eliminar.');
         } else {
-            $this->flash('success', 'El clasificado y sus imágenes se eliminaron.');
+            Http::flash(self::FLASH, 'success', 'El clasificado y sus imágenes se eliminaron.');
         }
 
-        $this->redirect('/usuario#clasificados');
+        Http::redirect('/usuario#clasificados');
     }
 
     public function image(): void
     {
-        $this->requireModule();
+        ModuleCatalog::requireEnabled('clasificados');
         $imageId = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
         if (!is_int($imageId) || $imageId < 1) {
             $this->notFound();
@@ -136,36 +158,6 @@ final class ClassifiedsController
         readfile($image['path']);
     }
 
-    private function requireCsrf(): void
-    {
-        if (!Session::verifyCsrf($_POST['_token'] ?? null)) {
-            http_response_code(419);
-            echo 'La sesion del formulario vencio. Recarga la pagina e intenta nuevamente.';
-            exit;
-        }
-    }
-
-    private function flash(string $type, string $message): void
-    {
-        Session::start();
-        $_SESSION['user_profile_flash'] = ['type' => $type, 'message' => $message];
-    }
-
-    private function redirect(string $path): never
-    {
-        header('Location: ' . Url::to($path), true, 303);
-        exit;
-    }
-
-    /** Los clasificados solo existen en los conjuntos que tienen el módulo habilitado. */
-    private function requireModule(): void
-    {
-        if (!ModuleCatalog::enabled('clasificados')) {
-            http_response_code(404);
-            echo 'Página no encontrada.';
-            exit;
-        }
-    }
 
     private function notFound(): never
     {

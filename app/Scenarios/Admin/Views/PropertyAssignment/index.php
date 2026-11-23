@@ -13,6 +13,19 @@ $assignedUnitLookup = array_fill_keys($assignedUnitIds, true);
 $totalUnits = count($units);
 $coverage = $totalUnits > 0 ? (int) round($coveredUnits * 100 / $totalUnits) : 0;
 $currentStep = 3;
+$relationOptions = [
+    'propietario' => 'Propietario',
+    'propietario_residente' => 'Propietario residente',
+    'inquilino' => 'Inquilino',
+    'residente' => 'Residente',
+];
+$relationValue = static function (?array $link): string {
+    if ($link === null) {
+        return 'propietario';
+    }
+
+    return $link['relation'] === 'propietario' && $link['resides'] ? 'propietario_residente' : (string) $link['relation'];
+};
 // Agrupa por torre (o por categoría) para que la lista larga se pueda recorrer.
 $groupOf = static function (array $unit): string {
     $name = (string) ($unit['name'] ?? '');
@@ -22,7 +35,8 @@ $groupOf = static function (array $unit): string {
 <section class="content">
     <div class="mb-3">
         <h1 class="h3 mb-1">Asignación de inmuebles</h1>
-        <p class="text-secondary mb-0">Paso 3 de 3 · Relaciona cada usuario con los inmuebles que le pertenecen. Así recibe sus notas de cobro y los ve en su portal.</p>
+        <p class="text-secondary mb-0">Paso 3 de 3 · Vincula cada usuario con sus inmuebles como propietario, inquilino o residente. Así recibe sus notas de cobro y los ve en su portal.</p>
+        <a class="small" href="<?= $escape($basePath) ?>/inmuebles/historial"><i class="bi bi-clock-history me-1" aria-hidden="true"></i>Ver la trazabilidad por inmueble</a>
     </div>
 
     <?php require dirname(__DIR__) . '/Configuration/conformation-steps.php'; ?>
@@ -101,7 +115,7 @@ $groupOf = static function (array $unit): string {
                                 <form id="unit-assignment-form" method="post" action="<?= $escape($basePath) ?>/inmuebles/asignaciones/guardar">
                                     <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                     <input type="hidden" name="user_id" value="<?= (int) $selectedUser['id'] ?>">
-                                    <input id="unit-ids-json" type="hidden" name="unit_ids_json" value="">
+                                    <input id="assignments-json" type="hidden" name="assignments_json" value="">
 
                                     <div class="mb-3">
                                         <div class="small text-secondary mb-1">Seleccionados (<span id="selected-unit-count"><?= count($assignedUnitIds) ?></span>):</div>
@@ -124,6 +138,8 @@ $groupOf = static function (array $unit): string {
                                             $unitId = (string) ($unit['id'] ?? '');
                                             $group = $groupOf($unit);
                                             $others = array_values(array_filter($unitOwners[$unitId] ?? [], static fn (array $owner): bool => $owner['id'] !== (int) $selectedUser['id']));
+                                            $link = $assignedLinks[$unitId] ?? null;
+                                            $currentRelation = $relationValue($link);
                                             ?>
                                             <?php if ($group !== $currentGroup): $currentGroup = $group; ?>
                                                 <div class="unit-group-header px-3 py-1 bg-body-tertiary small fw-semibold text-secondary border-bottom sticky-top" data-group="<?= $escape($group) ?>"><?= $escape($group) ?></div>
@@ -133,20 +149,35 @@ $groupOf = static function (array $unit): string {
                                                    data-search="<?= $escape(mb_strtolower(($unit['category'] ?? '') . ' ' . ($unit['name'] ?? ''), 'UTF-8')) ?>">
                                                 <input class="form-check-input mt-0 unit-assignment-check" type="checkbox" value="<?= $escape($unitId) ?>"
                                                        data-name="<?= $escape($unit['name'] ?? '') ?>" <?= isset($assignedUnitLookup[$unitId]) ? 'checked data-initial="1"' : 'data-initial="0"' ?>>
-                                                <span class="flex-grow-1">
+                                                <span class="flex-grow-1" style="min-width: 0">
                                                     <?= $escape($unit['name'] ?? '') ?>
                                                     <span class="text-secondary small"> · <?= $escape($unit['category'] ?? '') ?></span>
+                                                    <?php if ($link !== null): ?>
+                                                        <span class="d-block small text-secondary">Desde <?= $escape($link['started_on']) ?></span>
+                                                    <?php endif; ?>
+                                                    <?php if ($others !== []): ?>
+                                                        <span class="d-block small text-secondary text-truncate" title="Otras personas vinculadas a este inmueble">
+                                                            <i class="bi bi-people me-1" aria-hidden="true"></i><?= $escape(implode(', ', array_map(static fn (array $o): string => $o['username'] . ' (' . $o['relation'] . ')', $others))) ?>
+                                                        </span>
+                                                    <?php endif; ?>
                                                 </span>
-                                                <?php if ($others !== []): ?>
-                                                    <span class="badge text-bg-light border fw-normal" title="Este inmueble también está asignado a otros usuarios">
-                                                        <i class="bi bi-people me-1" aria-hidden="true"></i><?= $escape(implode(', ', array_column($others, 'username'))) ?>
-                                                    </span>
-                                                <?php endif; ?>
+                                                <select class="form-select form-select-sm unit-relation flex-shrink-0" style="width: 12rem"
+                                                        aria-label="Tipo de vínculo con <?= $escape($unit['name'] ?? '') ?>"
+                                                        data-initial="<?= $escape($currentRelation) ?>"<?= $link === null ? ' hidden' : '' ?>>
+                                                    <?php foreach ($relationOptions as $value => $label): ?>
+                                                        <option value="<?= $escape($value) ?>"<?= $value === $currentRelation ? ' selected' : '' ?>><?= $escape($label) ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <a class="btn btn-sm btn-link px-1 flex-shrink-0" href="<?= $escape($basePath) ?>/inmuebles/historial?unidad=<?= $escape($unitId) ?>"
+                                                   title="Historial del inmueble" aria-label="Historial de <?= $escape($unit['name'] ?? '') ?>"><i class="bi bi-clock-history" aria-hidden="true"></i></a>
                                             </label>
                                         <?php endforeach; ?>
                                         <p id="no-unit-results" class="text-secondary text-center small py-4 mb-0" hidden>Ningún inmueble coincide con la búsqueda.</p>
                                     </div>
                                     <div class="d-flex flex-wrap gap-2 align-items-center mt-3">
+                                        <label class="small text-secondary" for="effective-date">Fecha del cambio</label>
+                                        <input id="effective-date" class="form-control form-control-sm" style="width: 10rem" type="date" name="effective_date"
+                                               value="<?= $escape(date('Y-m-d')) ?>" max="<?= $escape(date('Y-m-d')) ?>" required>
                                         <button id="select-visible-units" class="btn btn-outline-secondary btn-sm" type="button">Marcar visibles</button>
                                         <button id="clear-visible-units" class="btn btn-outline-secondary btn-sm" type="button">Desmarcar visibles</button>
                                         <span id="assignment-changes" class="small ms-auto" aria-live="polite"></span>
@@ -157,14 +188,48 @@ $groupOf = static function (array $unit): string {
                             <?php else: ?>
                                 <ul class="list-group">
                                     <?php foreach ($units as $unit): ?>
-                                        <?php if (isset($assignedUnitLookup[(string) ($unit['id'] ?? '')])): ?>
-                                            <li class="list-group-item"><?= $escape($unit['name'] ?? '') ?> <span class="text-secondary small">· <?= $escape($unit['category'] ?? '') ?></span></li>
+                                        <?php $readLink = $assignedLinks[(string) ($unit['id'] ?? '')] ?? null; ?>
+                                        <?php if ($readLink !== null): ?>
+                                            <li class="list-group-item d-flex justify-content-between gap-2">
+                                                <span><?= $escape($unit['name'] ?? '') ?> <span class="text-secondary small">· <?= $escape($unit['category'] ?? '') ?></span></span>
+                                                <span class="small"><?= $escape($relationOptions[$relationValue($readLink)] ?? '') ?> · desde <?= $escape($readLink['started_on']) ?></span>
+                                            </li>
                                         <?php endif; ?>
                                     <?php endforeach; ?>
                                     <?php if ($assignedUnitIds === []): ?><li class="list-group-item text-secondary">No tiene inmuebles asignados.</li><?php endif; ?>
                                 </ul>
                             <?php endif; ?>
                         </div>
+                    </div>
+                    <div class="card border-0 shadow-sm mt-3">
+                        <div class="card-header bg-transparent">
+                            <h2 class="h6 mb-0"><i class="bi bi-clock-history me-1" aria-hidden="true"></i>Historial de vínculos de <?= $escape($selectedUser['username']) ?></h2>
+                        </div>
+                        <?php if ($userHistory === []): ?>
+                            <div class="card-body small text-secondary">Aún no tiene vínculos registrados.</div>
+                        <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead><tr><th>Inmueble</th><th>Vínculo</th><th>Desde</th><th>Hasta</th></tr></thead>
+                                    <tbody>
+                                    <?php foreach ($userHistory as $entry): ?>
+                                        <tr>
+                                            <td><a href="<?= $escape($basePath) ?>/inmuebles/historial?unidad=<?= $escape($entry['unit_id']) ?>"><?= $escape($entry['unit_name'] !== '' ? $entry['unit_name'] : 'Inmueble') ?></a></td>
+                                            <td><?= $escape($entry['relation_label']) ?></td>
+                                            <td><?= $escape($entry['started_on']) ?></td>
+                                            <td>
+                                                <?php if ($entry['ended_on'] === null): ?>
+                                                    <span class="badge text-bg-success">Vigente</span>
+                                                <?php else: ?>
+                                                    <?= $escape($entry['ended_on']) ?> <span class="small text-secondary">· <?= $escape($entry['end_reason_label']) ?></span>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 <?php else: ?>
                     <div class="card border-0 shadow-sm">
@@ -206,10 +271,12 @@ $groupOf = static function (array $unit): string {
     const reset = document.getElementById('assignment-reset');
     let saving = false;
 
+    const relationOf = (checkbox) => checkbox.closest('.unit-assignment-row').querySelector('.unit-relation');
     const diff = () => {
         const added = checkboxes.filter((c) => c.checked && c.dataset.initial === '0');
         const removed = checkboxes.filter((c) => !c.checked && c.dataset.initial === '1');
-        return { added, removed };
+        const changed = checkboxes.filter((c) => c.checked && c.dataset.initial === '1' && relationOf(c).value !== relationOf(c).dataset.initial);
+        return { added, removed, changed };
     };
 
     const refresh = () => {
@@ -222,15 +289,18 @@ $groupOf = static function (array $unit): string {
                 chip.type = 'button';
                 chip.className = 'btn btn-sm btn-primary py-0';
                 chip.innerHTML = `<span></span> <i class="bi bi-x" aria-hidden="true"></i>`;
-                chip.querySelector('span').textContent = checkbox.dataset.name;
+                const relation = relationOf(checkbox);
+                chip.querySelector('span').textContent = `${checkbox.dataset.name} · ${relation.options[relation.selectedIndex].text}`;
                 chip.setAttribute('aria-label', `Quitar ${checkbox.dataset.name}`);
                 chip.addEventListener('click', () => { checkbox.checked = false; refresh(); });
                 return chip;
             })));
-        const { added, removed } = diff();
+        checkboxes.forEach((c) => { relationOf(c).hidden = !c.checked; });
+        const { added, removed, changed } = diff();
         const parts = [];
         if (added.length) parts.push(`<span class="text-success">+${added.length} por agregar</span>`);
         if (removed.length) parts.push(`<span class="text-danger">−${removed.length} por quitar</span>`);
+        if (changed.length) parts.push(`<span class="text-warning-emphasis">${changed.length} con vínculo cambiado</span>`);
         changes.innerHTML = parts.length ? parts.join(' · ') : '<span class="text-secondary">Sin cambios</span>';
         submit.disabled = parts.length === 0;
         reset.hidden = parts.length === 0;
@@ -255,7 +325,10 @@ $groupOf = static function (array $unit): string {
 
     search.addEventListener('input', applyFilter);
     form.querySelectorAll('[name="unit-view"]').forEach((radio) => radio.addEventListener('change', applyFilter));
-    checkboxes.forEach((checkbox) => checkbox.addEventListener('change', refresh));
+    checkboxes.forEach((checkbox) => {
+        checkbox.addEventListener('change', refresh);
+        relationOf(checkbox).addEventListener('change', refresh);
+    });
     document.getElementById('select-visible-units').addEventListener('click', () => {
         const targets = visibleChecks();
         if (targets.length > 20 && !window.confirm(`¿Marcar ${targets.length} inmuebles para este usuario?`)) return;
@@ -267,7 +340,7 @@ $groupOf = static function (array $unit): string {
         refresh();
     });
     reset.addEventListener('click', () => {
-        checkboxes.forEach((c) => { c.checked = c.dataset.initial === '1'; });
+        checkboxes.forEach((c) => { c.checked = c.dataset.initial === '1'; relationOf(c).value = relationOf(c).dataset.initial; });
         refresh();
         applyFilter();
     });
@@ -285,14 +358,15 @@ $groupOf = static function (array $unit): string {
                 return;
             }
         }
-        document.getElementById('unit-ids-json').value = JSON.stringify(checkboxes.filter((c) => c.checked).map((c) => c.value));
+        document.getElementById('assignments-json').value = JSON.stringify(checkboxes.filter((c) => c.checked)
+            .map((c) => ({ unit_id: c.value, relation: relationOf(c).value })));
         saving = true;
         submit.disabled = true;
         submit.textContent = 'Guardando…';
     });
     window.addEventListener('beforeunload', (event) => {
-        const { added, removed } = diff();
-        if (!saving && (added.length || removed.length)) event.preventDefault();
+        const { added, removed, changed } = diff();
+        if (!saving && (added.length || removed.length || changed.length)) event.preventDefault();
     });
 
     refresh();

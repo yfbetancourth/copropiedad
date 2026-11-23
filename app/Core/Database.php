@@ -40,7 +40,7 @@ final class Database
         }
 
         $isLocalHost = in_array(strtolower($host), ['localhost', '127.0.0.1'], true);
-        $sslCa = self::setting('DB_SSL_CA');
+        $sslCa = Env::get('DB_SSL_CA', false);
         $options = [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -76,7 +76,7 @@ final class Database
 
     private static function requiredSetting(string $name): string
     {
-        $value = self::setting($name);
+        $value = Env::get($name, false);
 
         if ($value === '') {
             throw new RuntimeException(sprintf('%s debe configurarse en el archivo .env.', $name));
@@ -85,10 +85,4 @@ final class Database
         return $value;
     }
 
-    private static function setting(string $name): string
-    {
-        $value = $_ENV[$name] ?? $_SERVER[$name] ?? getenv($name);
-
-        return is_string($value) ? $value : '';
-    }
 }

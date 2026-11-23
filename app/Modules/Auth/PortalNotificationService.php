@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Auth;
 
 use App\Core\Database;
+use App\Core\Tenant;
 use RuntimeException;
 
 final class PortalNotificationService
@@ -57,12 +58,40 @@ final class PortalNotificationService
         );
         $billingCount->execute([$userId]);
 
+        [$notices, $noticeCount] = $this->unreadNotices($userId);
+
         return [
             'messages' => $messages->fetchAll(),
             'message_count' => (int) $messageCount->fetchColumn(),
             'billing' => $billing->fetchAll(),
             'billing_count' => (int) $billingCount->fetchColumn(),
+            'notices' => $notices,
+            'notice_count' => $noticeCount,
         ];
+    }
+
+    /**
+     * Avisos de pagos (recibido, reporte aprobado o rechazado).
+     *
+     * @return array{0: list<array>, 1: int}
+     */
+    private function unreadNotices(int $userId): array
+    {
+        try {
+            $pdo = Database::connection();
+            $list = $pdo->prepare(
+                'SELECT id, kind, title, body, created_at FROM user_notices
+                 WHERE tenant_id = ? AND user_id = ? AND read_at IS NULL
+                 ORDER BY created_at DESC, id DESC LIMIT 5'
+            );
+            $list->execute([Tenant::id(), $userId]);
+            $count = $pdo->prepare('SELECT COUNT(*) FROM user_notices WHERE tenant_id = ? AND user_id = ? AND read_at IS NULL');
+            $count->execute([Tenant::id(), $userId]);
+
+            return [$list->fetchAll(), (int) $count->fetchColumn()];
+        } catch (\PDOException) {
+            return [[], 0]; // Sin la migración 025 no hay avisos de pagos.
+        }
     }
 
     public function messagesForUser(int $userId): array
@@ -107,6 +136,23 @@ final class PortalNotificationService
              ON DUPLICATE KEY UPDATE read_at = CURRENT_TIMESTAMP'
         );
         $statement->execute([$userId, $statementId]);
+    }
+
+    /** Marca como leído un aviso (pagos, reservas…) y devuelve su destino dentro del portal (null si no es del usuario). */
+    public function openNotice(int $noticeId, int $userId): ?string
+    {
+        $pdo = Database::connection();
+        $query = $pdo->prepare('SELECT link FROM user_notices WHERE id = ? AND tenant_id = ? AND user_id = ?');
+        $query->execute([$noticeId, Tenant::id(), $userId]);
+        $link = $query->fetchColumn();
+        if ($link === false) {
+            return null;
+        }
+        $pdo->prepare(
+            'UPDATE user_notices SET read_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ? AND user_id = ? AND read_at IS NULL'
+        )->execute([$noticeId, Tenant::id(), $userId]);
+
+        return str_starts_with((string) $link, '/usuario') ? (string) $link : '/usuario';
     }
 
     public function markMessageRead(int $messageId, int $userId): void

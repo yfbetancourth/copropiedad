@@ -48,8 +48,7 @@ final class SecretBox
 
     private static function key(): string
     {
-        $value = $_ENV['APP_KEY'] ?? $_SERVER['APP_KEY'] ?? getenv('APP_KEY');
-        $setting = is_string($value) ? trim($value) : '';
+        $setting = Env::get('APP_KEY');
         if (!str_starts_with($setting, 'base64:')) {
             throw new RuntimeException('Configura APP_KEY con una clave base64 de 32 bytes para proteger las credenciales.');
         }

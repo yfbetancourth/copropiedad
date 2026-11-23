@@ -120,6 +120,8 @@ En **Configuracion / Metodos de pago**, configura la llave de identidad del **Bo
 
 La migracion 005 agrega el tipo de vivienda como un dato opcional y un permiso independiente para Caracterizacion; la migracion 006 habilita el tipo Mixto y crea el almacenamiento de la estructura de bienes; las migraciones 007 a 009 agregan y separan la nomenclatura de torres y apartamentos. En **Configuracion / Caracterizacion**, para **Torres de apartamentos** y **Mixto** se puede elegir nomenclatura de torres numerica (Torre 1, Torre 2…) o alfabetica (Torre A, Torre B… Torre Z, Torre AA…). Los apartamentos usan siempre numeracion de dos digitos, del 01 al 99; 00 no es valido. En **Configuracion / Conformación de la copropiedad**, el administrador completa un asistente que guarda el avance, genera inmuebles a partir de las cantidades y permite corregir o agregar categorias (por ejemplo, locales u oficinas) antes de finalizar. La estructura admite hasta 5.000 inmuebles. En cada inmueble se registra un coeficiente porcentual mayor que cero, de hasta cuatro decimales. La cuota mensual se calcula como base mensual × coeficiente / 100 y se redondea al centavo; la emisión se bloquea si falta un coeficiente. La migración 018 agrega a cada nota una instantánea del coeficiente aplicado; aplícala una sola vez en bases existentes. Si se cambia la caracterizacion o la nomenclatura despues de comenzar, se solicita confirmacion y se reinician los datos de conformacion. El permiso de Conformacion se inicializa a partir del permiso de Caracterizacion; los permisos se pueden ajustar en **Configuracion / Roles y permisos**. Guardar parametros no emite facturas, crea cobros ni aplica mora o multas automaticamente.
 
+**Lista de inmuebles como tabla de datos.** En Conformación, la lista de inmuebles tiene paginación (10, 25, 50, 100 o todas las filas, recordado por navegador), orden por columna (el tercer clic restaura el orden original; el orden guardado de la estructura no cambia), columnas visibles, selección de varias filas (la página o todas las filtradas) con acciones masivas —cambiar categoría, asignar coeficiente, repartir un porcentaje total, borrar coeficiente y quitar (los inmuebles con notas de cobro se conservan)— y exportación CSV de las filas filtradas o seleccionadas. Los cambios siguen aplicándose solo al pulsar Guardar. El componente es reutilizable: `public/assets/js/data-grid.js` (`new DataGrid(tabla, opciones)`), configurado con atributos `data-column`, `data-sortable`, `data-hideable` y `data-export` en el encabezado. **Reiniciar conformación:** en la guía de pasos, el paso 2 tiene el botón *Reiniciar* (POST `/configuracion/conformacion/reiniciar`), que borra las respuestas del asistente, los inmuebles, coeficientes y asignaciones vigentes (cerradas en Trazabilidad) y vuelve a la primera pregunta; conserva la caracterización. Solo el Superadmin puede hacerlo, exige escribir REINICIAR y se bloquea si ya hay notas de cobro emitidas.
+
 La migracion 010 crea el registro de asignaciones entre usuarios e inmuebles y agrega el permiso independiente **Inmuebles / Asignacion de usuarios** (inicializado con el nivel de **Configuracion / Equipo**). En la seccion **Asignacion de inmuebles**, selecciona un usuario y marca uno o varios inmuebles; las asignaciones se mantienen al editar el nombre del inmueble y se eliminan al quitarlo de la estructura.
 
 La migracion 011 habilita el permiso de lectura **Usuario / Portal de inmuebles asignados** para las cuentas existentes. El acceso **Iniciar sesión de usuario** aparece en el pie de pagina; cada cuenta puede consultar unicamente los inmuebles asignados a su usuario en el **Panel de Usuario** y actualizar su nombre de usuario, correo y contrasena confirmando su contrasena actual. El panel muestra el canon y descuento configurados; las notas de cobro se notifican por correo y se consultan desde **Cartera / Cobros** en el panel administrativo. Al iniciar desde el acceso del portal, se prioriza el Panel de Usuario; el ingreso administrativo sigue disponible en `/login`.
@@ -166,3 +168,156 @@ Get-Content .\database\migrations\023_create_tenants.sql | & C:\xampp84\mysql\bi
 **Consola del Superadmin** (`/admin/clientes`, solo en el dominio principal): crea conjuntos con su subdominio, habilita o deshabilita módulos (portal de residentes, cartera, pagos en línea Bold, mensajes, clasificados), asigna uno o más administradores, cambia su contraseña, los desactiva y suspende o reactiva el servicio de un conjunto. Un módulo deshabilitado desaparece para todos en ese conjunto (incluido su administrador) sin borrar datos. Los módulos de núcleo (parametrización, equipo, roles, caracterización, conformación y asignaciones) siempre están disponibles.
 
 **Cuentas.** Cada cuenta pertenece a un solo conjunto; el usuario y el correo son únicos dentro del conjunto, así que una misma persona puede tener cuenta en dos conjuntos con el mismo correo. El administrador asignado tiene el rol de sistema `Administrador` (acceso total en su conjunto, no editable desde Equipo ni Roles). El Superadmin no pertenece a ningún conjunto, puede entrar al de cualquiera con sus credenciales y es el único que reinicia la conformación. La sesión queda ligada al conjunto donde se inició.
+
+## Vínculo con el inmueble y trazabilidad
+
+En **Asignación de inmuebles** cada usuario se vincula a sus inmuebles como *Propietario*,
+*Propietario residente*, *Inquilino* o *Residente*, con una **fecha del cambio** (hoy por defecto, nunca futura).
+
+- `property_unit_assignments` guarda los vínculos **vigentes** (portal, cobro y notificaciones).
+- `property_unit_relationship_history` guarda **todos** los vínculos con fecha de inicio, fecha de fin,
+  motivo de cierre y quién registró cada cambio. Nunca se borra y conserva los nombres del inmueble y
+  de la persona.
+- Un cambio de tipo de vínculo cierra el registro anterior y abre uno nuevo; quitar un inmueble lo cierra
+  con motivo *Se desvinculó*. Eliminar inmuebles de la estructura o reiniciar la conformación también
+  cierra los vínculos afectados.
+- **Trazabilidad de inmuebles** (`/admin/inmuebles/historial`) muestra la línea de tiempo de cada inmueble,
+  incluso si ya salió de la estructura. El portal del residente muestra su vínculo y desde cuándo.
+
+Migración: `database/migrations/024_add_unit_relationship_history.sql` (los vínculos existentes quedan como
+*Propietario* desde la fecha en que se asignaron).
+
+### Avisos de pago, pagos reportados y arriendos (migración 025)
+
+- **Aviso de pago:** cada pago registrado (pago en línea Bold, datáfono, pago manual de cartera o pago
+  reportado y aprobado) genera un aviso en la campana del portal y un correo con el **comprobante**
+  (`RC-000123`) a las cuentas de la nota, y un correo a la administración (remitente de la cuenta general de
+  correo). Los avisos se envían después de responder, así que no frenan el webhook ni la redirección; una falla
+  de SMTP queda en el log y no afecta el pago. El comprobante imprimible está en **Pagos / Mis pagos y
+  comprobantes** del portal y en la pestaña **Pagos** de **Cartera / Cobros**.
+- **Reportar un pago:** en **Pagos** el residente informa un pago por transferencia, consignación o efectivo
+  con su soporte (imagen o PDF de máximo 5 MB, guardado fuera del directorio público en
+  `storage/payment-proofs`). La administración lo revisa en **Cartera / Pagos reportados** (el menú muestra los
+  pendientes): al aprobar, puede corregir valor y fecha, y el pago se registra en la nota vigente del inmueble;
+  al rechazar, el residente recibe el motivo. Revisar requiere el permiso de cartera en nivel Escritura.
+- **Clasificados:** se pueden publicar inmuebles **en arriendo** (el valor se muestra como canon mensual) y el
+  autor puede **editar** sus avisos: datos, contacto e imágenes (entre 1 y 5).
+
+Migración (con una cuenta MySQL administradora):
+
+```powershell
+Get-Content .\database\migrations\025_add_payment_notifications_reports_and_rentals.sql | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+```
+
+### Enlaces de pago temporales y QR (migración 026)
+
+- **Desde la administración:** en **Cartera / Cobros**, cada nota con saldo tiene **Enlace / QR**. Se elige a
+  nombre de qué cuenta destinataria queda el pago y la vigencia (24 h, 3, 7 o 15 días). El enlace se puede
+  enviar por correo (desde el correo personal del administrador o la cuenta general), copiar, compartir por
+  WhatsApp o mostrar/descargar como QR. Se ve cuándo se envió y cuántas veces se abrió, y se puede revocar.
+- **Desde el portal:** en **Pagos**, **QR / compartir** genera un enlace de 24 horas para pagar desde el
+  celular o para que otra persona pague; el pago queda a nombre del residente.
+- El enlace abre `/pagar?t=…` sin iniciar sesión: muestra la nota y el saldo vigente y lleva al checkout de Bold.
+  Al volver, quien no tiene sesión ve `/pagar/resultado`. Requiere el módulo de pagos en línea y Bold configurado.
+- El token se guarda como hash (para buscarlo) y cifrado con `APP_KEY` (para volver a mostrar el enlace y su
+  QR). El QR se dibuja en el navegador con `qrcode-generator` 1.4.4 desde jsDelivr, con verificación SRI.
+- La política CSP ahora permite `form-action https://checkout.bold.co`: sin eso, Chrome bloquea la redirección
+  al checkout después de enviar el formulario de pago.
+
+```powershell
+Get-Content .\database\migrations\026_create_billing_payment_links.sql | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+```
+
+### Reiniciar un conjunto desde cero (solo Superadmin)
+
+En la consola del Superadmin (dominio principal), la ficha de cada conjunto tiene la **Zona de peligro**: una tabla
+con casillas para elegir qué reiniciar (cartera y pagos, avisos, comunicados, atención a residentes, reservas, espacios comunes,
+clasificados, asignaciones, conformación, parametrización y caracterización, correo, credenciales de pasarelas, galería,
+cuentas de residentes o todas las cuentas y roles), con lo que se borraría de cada una. Al marcar una categoría se marcan
+las que necesita borrar antes (por ejemplo, Conformación arrastra Asignaciones y Cartera) y el servidor rechaza
+selecciones incompletas (`TenantResetService::CATEGORIES` / `validateSelection`). Pide escribir el subdominio del conjunto
+y la contraseña del Superadmin. Con todo marcado (reinicio completo) borra en una sola transacción todas las cuentas (administradores, equipo y residentes), roles, parametrización,
+caracterización y conformación, asignaciones e historial, cartera (notas, pagos, reportes, enlaces), mensajes,
+avisos, clasificados, configuración de correo y de Bold; después elimina sus archivos (fotos, soportes y galería).
+Conserva el conjunto, su subdominio, su estado y sus módulos, y lo deja como recién creado con el rol
+Administrador vacío: luego se asigna el nuevo administrador. No se puede deshacer; haz una copia de la base antes.
+Cada reinicio queda en el registro de errores de PHP con el Superadmin, el conjunto y los archivos eliminados.
+
+### Wompi como pasarela adicional (migración 027)
+
+- **Módulo propio:** «Pagos en línea (Wompi)» aparece en la consola del Superadmin junto a «Pagos en línea (Bold)»
+  y se habilita o deshabilita por conjunto. Ambos requieren «Cartera y cobros» y comparten el permiso
+  **Configuración / Métodos de pago**, disponible si al menos una pasarela está habilitada.
+- **Configuración:** en **Métodos de pago** se registran el ambiente (pruebas o producción), la llave pública y,
+  cifrados con `APP_KEY`, la llave privada y los secretos de eventos y de integridad (Wompi › Desarrolladores ›
+  Programación). Al guardar se verifica la llave pública con Wompi. Registra en Wompi la **URL de eventos**
+  que muestra la pantalla (`/pagos/wompi/eventos`, HTTPS público), una por ambiente.
+- **Cobro:** el residente elige Bold o Wompi en **Pagos**; los enlaces temporales y el QR (`/pagar?t=…`) ofrecen
+  las pasarelas disponibles. Cada intento usa una referencia única `CPW-…` y el Web Checkout firmado
+  (`signature:integrity`). El pago se registra en cartera solo cuando llega un evento `transaction.updated` con
+  checksum válido y la consulta a `/v1/transactions/{id}` con la llave privada confirma `APPROVED`, la referencia,
+  el valor y la moneda; el retorno del navegador también consulta a Wompi, nunca confía en la URL.
+- Los pagos de Wompi no se anulan desde cartera (como los de Bold) y generan aviso y comprobante como los demás.
+
+```powershell
+Get-Content .\database\migrations\027_create_wompi_payments.sql | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+```
+
+### Zonas comunes (migración 028)
+
+- **Módulo:** «Zonas comunes», que el Superadmin habilita por conjunto (requiere el portal de residentes). En el
+  panel lo usa el permiso **Zonas comunes / Espacios y reservas**: Total para el rol de sistema; los roles
+  personalizados empiezan sin acceso.
+- **Espacios** (`/admin/zonas-comunes/espacios`): nombre, horario de uso, duración máxima por reserva, anticipación
+  máxima, aforo opcional, descripción y reglamento. Un espacio con reservas no se elimina: se desactiva.
+- **Residente** (`/usuario/zonas-comunes`): ve la agenda de dos semanas de cada espacio (sin nombres de otros
+  residentes), solicita fecha y horas dentro del horario permitido y cancela sus solicitudes o reservas futuras.
+  No puede pedir un horario ya aprobado ni duplicar una solicitud propia que se cruce.
+- **Aprobación** (`/admin/zonas-comunes`, con contador en el menú): cada solicitud muestra si está libre, si
+  compite con otras pendientes o si se cruza con una aprobada; en ese caso no se puede aprobar. Al aprobar, las
+  pendientes que se cruzan se rechazan automáticamente. Las decisiones se toman bajo bloqueo del espacio, así que
+  dos aprobaciones simultáneas no pueden quedar cruzadas.
+- **Avisos:** la administración recibe un correo por cada solicitud y cancelación de una reserva aprobada; el
+  residente recibe aviso en el portal y correo con cada decisión. Los avisos del portal ahora admiten tipos de
+  cualquier módulo (columna `kind` de texto) y los gestiona `App\Modules\Auth\UserNotifier`.
+
+```powershell
+Get-Content .\database\migrations\028_create_common_areas.sql | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+```
+
+### Comunidad / Residentes (migración 029)
+
+- **Sección Comunidad** del panel: **Residentes**, **Reservas de zonas comunes** y **Espacios comunes**.
+- **Residentes** (`/admin/comunidad/residentes`, permiso **Comunidad / Residentes**: Total para el rol de sistema,
+  los demás roles empiezan sin acceso): listado con búsqueda (nombre, documento, correo, teléfono, inmueble) y
+  filtro de activos/inactivos; alta y edición de la ficha (nombre, documento, teléfono, notas internas) y de la
+  cuenta del portal; invitación por correo para crear la contraseña (vence en 72 horas, reenviable); activar o
+  desactivar; eliminar (requiere nivel Total y solo si no tiene cobros, pagos o mensajes: si los tiene, se
+  desactiva). Los inmuebles se vinculan en **Inmuebles / Asignación**, con acceso directo desde cada residente.
+- **Separación de cuentas:** los roles tienen tipo (`admin_roles.kind`): `staff` para el personal, que se gestiona en
+  **Configuración / Equipo de trabajo**, y `resident` para el rol **Residente** de cada conjunto (acceso al portal),
+  que no se puede eliminar ni asignar desde Equipo. Todo conjunto nuevo o reiniciado nace con los roles
+  Administrador y Residente.
+- La recuperación de contraseña y la invitación comparten `App\Modules\Auth\AccessLinkService`.
+
+```powershell
+Get-Content .\database\migrations\029_create_community_residents.sql | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+```
+
+### Portal exclusivo para residentes y Atención a residentes (migración 030)
+
+- **Solo los residentes** (cuentas con el rol de tipo `resident`) entran al portal `/usuario`; el equipo de la
+  administración trabaja solo en el panel. Una cuenta de residente nunca obtiene permisos del panel, aunque se
+  editen en su rol, y el rol Residente ya no aparece en **Roles y permisos**. Al iniciar sesión cada cuenta va a su
+  lugar, sin importar la pantalla de acceso. El personal edita sus datos y contraseña en **Mi cuenta** (`/admin/mi-cuenta`).
+- **Atención a residentes:** desde el portal (**Comunicación › Escribir a la administración**) el residente abre una
+  consulta, petición, queja, reclamo o sugerencia y conversa con el equipo. En el panel (**Comunicación › Atención a
+  residentes**, permiso **Mensajes**, con contador de pendientes) el equipo responde, responde y cierra, cierra o
+  reabre. Cada respuesta llega al residente en su portal (aviso) y por correo; cada mensaje del residente llega por
+  correo a la administración.
+- **Comunicados a residentes:** los avisos que envía la administración (a uno o a todos) ahora solo se dirigen a
+  residentes, porque se leen en el portal.
+
+```powershell
+Get-Content .\database\migrations\030_create_resident_conversations.sql | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+```

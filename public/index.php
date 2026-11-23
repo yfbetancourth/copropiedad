@@ -17,11 +17,5 @@ try {
         Url::routePath($_SERVER['REQUEST_URI'] ?? '/')
     );
 } catch (Throwable $exception) {
-    error_log((string) $exception);
-    http_response_code(500);
-    $isDebug = ($_ENV['APP_ENV'] ?? 'production') !== 'production'
-        && filter_var($_ENV['APP_DEBUG'] ?? false, FILTER_VALIDATE_BOOL);
-    echo $isDebug
-        ? nl2br(htmlspecialchars((string) $exception, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'))
-        : 'Ocurrio un error interno. Consulte el registro de la aplicacion.';
+    WebBootstrap::handleException($exception);
 }

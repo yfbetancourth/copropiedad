@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Billing;
 
+use App\Core\Http;
 use App\Core\Authorization;
 use App\Core\Session;
-use App\Core\Url;
 use App\Core\View;
 use DateTimeImmutable;
 use PDOException;
@@ -14,6 +14,7 @@ use RuntimeException;
 
 final class BillingController
 {
+    private const FLASH = 'billing_flash';
     private const PERMISSION = 'cartera.cobros';
 
     public function index(): void
@@ -25,8 +26,8 @@ final class BillingController
 
         $period = $_GET['periodo'] ?? (new DateTimeImmutable('first day of this month'))->format('Y-m');
         if (!is_string($period) || !BillingService::validPeriod($period)) {
-            $this->flash('error', 'Selecciona un período mensual válido.');
-            $this->redirect('/cartera/cobros');
+            Http::flash(self::FLASH, 'error', 'Selecciona un período mensual válido.');
+            Http::redirect('/cartera/cobros');
         }
 
         try {
@@ -37,13 +38,13 @@ final class BillingController
                 $preview = $service->preview($period, (int) $actor['id']);
             } catch (RuntimeException $exception) {
                 $preview = null;
-                $this->flash('error', $exception->getMessage());
+                Http::flash(self::FLASH, 'error', $exception->getMessage());
             }
         } catch (RuntimeException $exception) {
             $preview = null;
             $statements = [];
             $payments = [];
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
         // Saldo de cada nota con la misma regla de la cartera (incluye el descuento por pronto pago).
         $summary = ['billed' => 0, 'collected' => 0, 'outstanding' => 0, 'recipients' => 0, 'sent' => 0, 'failed' => 0, 'pending_mail' => 0];
@@ -56,7 +57,7 @@ final class BillingController
                 $paid,
                 BillingService::moneyToCents($statement['early_payments_total'] ?? '0')
             );
-            $statement['number'] = sprintf('NC-%s-%06d', str_replace('-', '', (string) $statement['period']), (int) $statement['id']);
+            $statement['number'] = BillingService::statementNumber((string) $statement['period'], (int) $statement['id']);
             $statement['total_cents'] = $totalDue;
             $statement['paid_cents'] = $paid;
             $statement['discount_cents'] = $settlement['discount'];
@@ -123,21 +124,21 @@ final class BillingController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
-        $period = $this->stringInput($_POST['period'] ?? null);
-        $unitId = $this->stringInput($_POST['unit_id'] ?? null);
+        Http::requireCsrf();
+        $period = Http::string($_POST['period'] ?? null);
+        $unitId = Http::string($_POST['unit_id'] ?? null);
         try {
             (new BillingService())->addItem(
                 $unitId,
                 $period,
-                $this->stringInput($_POST['category'] ?? null),
-                trim($this->stringInput($_POST['description'] ?? null)),
-                $this->stringInput($_POST['amount'] ?? null),
+                Http::string($_POST['category'] ?? null),
+                trim(Http::string($_POST['description'] ?? null)),
+                Http::string($_POST['amount'] ?? null),
                 (int) $actor['id']
             );
-            $this->flash('success', 'El concepto quedó registrado para este inmueble y período.');
+            Http::flash(self::FLASH, 'success', 'El concepto quedó registrado para este inmueble y período.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
         $this->redirectToPeriod($period, 'preparar');
     }
@@ -148,9 +149,9 @@ final class BillingController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
-        $period = $this->stringInput($_POST['period'] ?? null);
-        $statementId = $this->integerInput($_POST['statement_id'] ?? null);
+        Http::requireCsrf();
+        $period = Http::string($_POST['period'] ?? null);
+        $statementId = Http::integer($_POST['statement_id'] ?? null);
         try {
             if (!BillingService::validPeriod($period)) {
                 throw new RuntimeException('Selecciona un período mensual válido.');
@@ -160,15 +161,15 @@ final class BillingController
             }
             (new BillingService())->addPayment(
                 $statementId,
-                $this->stringInput($_POST['amount'] ?? null),
-                $this->stringInput($_POST['received_on'] ?? null),
-                trim($this->stringInput($_POST['reference'] ?? null)),
-                trim($this->stringInput($_POST['notes'] ?? null)),
+                Http::string($_POST['amount'] ?? null),
+                Http::string($_POST['received_on'] ?? null),
+                trim(Http::string($_POST['reference'] ?? null)),
+                trim(Http::string($_POST['notes'] ?? null)),
                 (int) $actor['id']
             );
-            $this->flash('success', 'El pago quedó registrado en la nota de cobro.');
+            Http::flash(self::FLASH, 'success', 'El pago quedó registrado en la nota de cobro.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
         $this->redirectToPeriod($period, 'pagos');
     }
@@ -180,21 +181,21 @@ final class BillingController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
-        $period = $this->stringInput($_POST['period'] ?? null);
-        $paymentId = $this->integerInput($_POST['payment_id'] ?? null);
+        Http::requireCsrf();
+        $period = Http::string($_POST['period'] ?? null);
+        $paymentId = Http::integer($_POST['payment_id'] ?? null);
         try {
             if ($paymentId === false || $paymentId === null || $paymentId < 1) {
                 throw new RuntimeException('Selecciona un pago válido.');
             }
             (new BillingService())->voidPayment(
                 $paymentId,
-                trim($this->stringInput($_POST['reason'] ?? null)),
+                trim(Http::string($_POST['reason'] ?? null)),
                 (int) $actor['id']
             );
-            $this->flash('success', 'El pago quedó anulado; el registro se conserva con el motivo indicado.');
+            Http::flash(self::FLASH, 'success', 'El pago quedó anulado; el registro se conserva con el motivo indicado.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
         $this->redirectToPeriod($period, 'pagos');
     }
@@ -204,17 +205,17 @@ final class BillingController
         if ($this->requireAction('write') === null) {
             return;
         }
-        $this->requireCsrf();
-        $period = $this->stringInput($_POST['period'] ?? null);
-        $itemId = $this->integerInput($_POST['item_id'] ?? null);
+        Http::requireCsrf();
+        $period = Http::string($_POST['period'] ?? null);
+        $itemId = Http::integer($_POST['item_id'] ?? null);
         try {
             if (!BillingService::validPeriod($period) || $itemId === false || $itemId === null || $itemId < 1) {
                 throw new RuntimeException('El concepto seleccionado no es válido.');
             }
             (new BillingService())->removeItem($itemId, $period);
-            $this->flash('success', 'Se eliminó el concepto antes de emitir la nota.');
+            Http::flash(self::FLASH, 'success', 'Se eliminó el concepto antes de emitir la nota.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
         $this->redirectToPeriod($period, 'preparar');
     }
@@ -225,11 +226,11 @@ final class BillingController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
-        $period = $this->stringInput($_POST['period'] ?? null);
+        Http::requireCsrf();
+        $period = Http::string($_POST['period'] ?? null);
         try {
             $result = (new BillingService())->issue($period, (int) $actor['id']);
-            $this->flash(
+            Http::flash(self::FLASH, 
                 $result['failed'] > 0 ? 'error' : 'success',
                 sprintf(
                     'Se emitieron %d notas; se enviaron %d correos desde %s, %d fallaron y %d siguen pendientes.',
@@ -242,12 +243,12 @@ final class BillingController
             );
         } catch (PDOException $exception) {
             if ((string) $exception->getCode() === '23000') {
-                $this->flash('error', 'El período ya fue emitido en otra sesión. Recarga la página para revisar los documentos.');
+                Http::flash(self::FLASH, 'error', 'El período ya fue emitido en otra sesión. Recarga la página para revisar los documentos.');
             } else {
                 throw $exception;
             }
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
         $this->redirectToPeriod($period, 'notas');
     }
@@ -258,14 +259,14 @@ final class BillingController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
-        $period = $this->stringInput($_POST['period'] ?? null);
+        Http::requireCsrf();
+        $period = Http::string($_POST['period'] ?? null);
         try {
             if (!BillingService::validPeriod($period)) {
                 throw new RuntimeException('Selecciona un período mensual válido.');
             }
             $result = (new BillingService())->sendPeriod($period, (int) $actor['id']);
-            $this->flash(
+            Http::flash(self::FLASH, 
                 $result['failed'] > 0 ? 'error' : 'success',
                 sprintf(
                     'Envío procesado desde %s: %d correos enviados, %d fallidos y %d pendientes.',
@@ -276,7 +277,7 @@ final class BillingController
                 )
             );
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
         $this->redirectToPeriod($period, 'notas');
     }
@@ -287,7 +288,7 @@ final class BillingController
         if ($actor === null) {
             return;
         }
-        $statementId = $this->integerInput($_GET['id'] ?? null);
+        $statementId = Http::integer($_GET['id'] ?? null);
         if ($statementId === false || $statementId === null || $statementId < 1) {
             http_response_code(404);
             echo 'La nota de cobro no existe.';
@@ -322,59 +323,20 @@ final class BillingController
         return Authorization::requirePermission(self::PERMISSION, $level);
     }
 
-    private function requireCsrf(): void
-    {
-        if (!Session::verifyCsrf($_POST['_token'] ?? null)) {
-            http_response_code(419);
-            echo 'La sesión del formulario venció. Recarga la página e intenta nuevamente.';
-            exit;
-        }
-    }
-
     private function render(string $template, string $title, array $data): void
     {
         Session::start();
         $data['title'] = $title;
         $data['csrfToken'] = Session::csrfToken();
-        $data['flash'] = $_SESSION['billing_flash'] ?? null;
-        unset($_SESSION['billing_flash']);
+        $data['flash'] = Http::pullFlash(self::FLASH);
         View::renderAdmin($template, $data);
-    }
-
-    private function flash(string $type, string $message): void
-    {
-        Session::start();
-        $_SESSION['billing_flash'] = ['type' => $type, 'message' => $message];
     }
 
     /** Vuelve al período y a la pestaña donde se hizo la acción (preparar, notas o pagos). */
     private function redirectToPeriod(string $period, string $tab = ''): never
     {
         $query = BillingService::validPeriod($period) ? '?periodo=' . rawurlencode($period) : '';
-        $this->redirect('/cartera/cobros' . $query . ($tab !== '' ? '#' . $tab : ''));
+        Http::redirect('/cartera/cobros' . $query . ($tab !== '' ? '#' . $tab : ''));
     }
 
-    private function redirect(string $path): never
-    {
-        header('Location: ' . Url::to($path), true, 303);
-        exit;
-    }
-
-    private function integerInput(mixed $value): int|false|null
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-        if (!is_string($value) && !is_int($value)) {
-            return false;
-        }
-        $validated = filter_var($value, FILTER_VALIDATE_INT);
-
-        return is_int($validated) ? $validated : false;
-    }
-
-    private function stringInput(mixed $value): string
-    {
-        return is_string($value) ? $value : '';
-    }
 }

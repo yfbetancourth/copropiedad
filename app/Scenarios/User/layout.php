@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Core\Authorization;
 use App\Core\Session;
 use App\Core\Url;
 
@@ -10,8 +9,6 @@ $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOT
 $user = is_array($user ?? null) ? $user : [];
 $currentPath = Url::routePath($_SERVER['REQUEST_URI'] ?? '/usuario');
 $portalHome = $basePath . '/usuario';
-$canSeeAdminPanel = $user !== [] && Authorization::hasPermission($user, 'panel', 1);
-$adminHome = $basePath . '/admin';
 
 $accountName = is_string($user['username'] ?? null) ? $user['username'] : '';
 $account = [
@@ -23,37 +20,51 @@ $account = [
 
 $unreadMessages = (int) ($notifications['message_count'] ?? 0);
 $unreadBilling = (int) ($notifications['billing_count'] ?? 0);
-$notificationCount = $unreadMessages + $unreadBilling;
+$unreadNotices = (int) ($notifications['notice_count'] ?? 0);
+$notificationCount = $unreadMessages + $unreadBilling + $unreadNotices;
+$noticeIcons = [
+    'payment_received' => 'bi-check-circle text-success',
+    'payment_report_approved' => 'bi-check-circle text-success',
+    'payment_report_rejected' => 'bi-x-circle text-danger',
+    'booking_approved' => 'bi-calendar2-check text-success',
+    'booking_rejected' => 'bi-calendar2-x text-danger',
+    'conversation_reply' => 'bi-chat-dots text-primary',
+];
 
 // Mismo menú por secciones que el panel administrativo, con las opciones del residente.
 // Cada opción aparece solo si el Superadmin habilitó su módulo en este conjunto.
 $billingEnabled = \App\Core\ModuleCatalog::enabled('cartera');
 $messagesEnabled = \App\Core\ModuleCatalog::enabled('mensajes');
+$unreadConversations = $messagesEnabled && isset($user['id'])
+    ? (new \App\Modules\Messaging\ConversationService())->unreadForResident((int) $user['id'])
+    : 0;
 $classifiedsEnabled = \App\Core\ModuleCatalog::enabled('clasificados');
+$commonAreasEnabled = \App\Core\ModuleCatalog::enabled('zonas_comunes');
 $sidebarSections = [
     ['title' => null, 'items' => [
         ['href' => $portalHome, 'icon' => 'bi-house-heart', 'label' => 'Bienvenida', 'active' => $currentPath === '/usuario'],
     ]],
     ['title' => 'Mi inmueble', 'items' => [
         ['href' => $portalHome . '#inmuebles', 'icon' => 'bi-house-door', 'label' => 'Mis inmuebles'],
-        ...($billingEnabled ? [['href' => $portalHome . '#documentos', 'icon' => 'bi-receipt', 'label' => 'Documentos de cobro', 'badge' => $unreadBilling]] : []),
     ]],
     ['title' => 'Pagos', 'items' => $billingEnabled ? [
-        ['href' => $portalHome . '/pagos', 'icon' => 'bi-credit-card', 'label' => 'Pagar mis cuotas', 'active' => str_starts_with($currentPath, '/usuario/pagos')],
+        ['href' => $portalHome . '/pagos', 'icon' => 'bi-credit-card', 'label' => 'Pagar mis cuotas', 'active' => str_starts_with($currentPath, '/usuario/pagos'), 'badge' => $unreadBilling + $unreadNotices],
+        ['href' => $portalHome . '/pagos#reportar', 'icon' => 'bi-upload', 'label' => 'Reportar un pago'],
     ] : []],
     ['title' => 'Comunicación', 'items' => $messagesEnabled ? [
-        ['href' => $portalHome . '/mensajes', 'icon' => 'bi-chat-left-text', 'label' => 'Mis mensajes', 'active' => str_starts_with($currentPath, '/usuario/mensajes'), 'badge' => $unreadMessages],
+        ['href' => $portalHome . '/comunicacion', 'icon' => 'bi-chat-dots', 'label' => 'Escribir a la administración', 'active' => str_starts_with($currentPath, '/usuario/comunicacion'), 'badge' => $unreadConversations],
+        ['href' => $portalHome . '/mensajes', 'icon' => 'bi-megaphone', 'label' => 'Comunicados', 'active' => str_starts_with($currentPath, '/usuario/mensajes'), 'badge' => $unreadMessages],
     ] : []],
-    ['title' => 'Comunidad', 'items' => $classifiedsEnabled ? [
-        ['href' => $portalHome . '#clasificados', 'icon' => 'bi-megaphone', 'label' => 'Mis clasificados'],
-        ['href' => $basePath . '/clasificados', 'icon' => 'bi-shop', 'label' => 'Clasificados públicos', 'newTab' => true],
-    ] : []],
+    ['title' => 'Comunidad', 'items' => [
+        ...($commonAreasEnabled ? [['href' => $portalHome . '/zonas-comunes', 'icon' => 'bi-calendar2-week', 'label' => 'Zonas comunes', 'active' => str_starts_with($currentPath, '/usuario/zonas-comunes')]] : []),
+        ...($classifiedsEnabled ? [
+            ['href' => $portalHome . '#clasificados', 'icon' => 'bi-megaphone', 'label' => 'Mis clasificados'],
+            ['href' => $basePath . '/clasificados', 'icon' => 'bi-shop', 'label' => 'Clasificados públicos', 'newTab' => true],
+        ] : []),
+    ]],
     ['title' => 'Mi cuenta', 'items' => [
         ['href' => $portalHome . '#perfil', 'icon' => 'bi-person-gear', 'label' => 'Datos y contraseña'],
     ]],
-    ['title' => null, 'items' => $canSeeAdminPanel
-        ? [['href' => $adminHome, 'icon' => 'bi-speedometer2', 'label' => 'Panel administrativo']]
-        : []],
 ];
 $sidebarBrandHref = $portalHome;
 $sidebarUser = ['name' => $account['name'], 'role' => $account['role'], 'initial' => $account['initial']];
@@ -61,29 +72,18 @@ $sidebarUser = ['name' => $account['name'], 'role' => $account['role'], 'initial
 $accountGroups = [
     ['title' => 'Ir a', 'items' => array_values(array_filter([
         ['href' => $portalHome, 'icon' => 'bi-house-heart', 'label' => 'Bienvenida', 'active' => $currentPath === '/usuario'],
-        $canSeeAdminPanel ? ['href' => $adminHome, 'icon' => 'bi-speedometer2', 'label' => 'Panel administrativo'] : null,
         ['href' => $basePath . '/', 'icon' => 'bi-globe2', 'label' => 'Ver sitio público', 'newTab' => true],
     ]))],
     ['title' => 'Mi cuenta', 'items' => array_values(array_filter([
         ['href' => $portalHome . '#perfil', 'icon' => 'bi-person-gear', 'label' => 'Editar mis datos y contraseña'],
-        $messagesEnabled ? ['href' => $portalHome . '/mensajes', 'icon' => 'bi-chat-left-text', 'label' => 'Mis mensajes'] : null,
+        $messagesEnabled ? ['href' => $portalHome . '/comunicacion', 'icon' => 'bi-chat-dots', 'label' => 'Escribir a la administración'] : null,
     ]))],
 ];
 $logoutAction = $basePath . '/logout';
 $csrfToken = Session::csrfToken();
 
 ?>
-<!doctype html>
-<html lang="es">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= $escape($pageTitle) ?> | <?= $escape($propertyName) ?></title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.2/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.10.2/dist/css/adminlte.min.css">
-</head>
+<?php require dirname(__DIR__) . '/Shared/panel-head.php'; ?>
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
 <a class="visually-hidden-focusable position-absolute top-0 start-0 z-3 bg-white p-2" href="#main-content">Saltar al contenido principal</a>
 <div class="app-wrapper">
@@ -119,6 +119,19 @@ $csrfToken = Session::csrfToken();
                             </div>
                         <?php else: ?>
                             <div style="max-height: 22rem; overflow-y: auto">
+                                <?php foreach (($notifications['notices'] ?? []) as $notice): ?>
+                                    <form method="post" action="<?= $escape($portalHome) ?>/avisos/abrir">
+                                        <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
+                                        <input type="hidden" name="notice_id" value="<?= (int) $notice['id'] ?>">
+                                        <button class="dropdown-item d-flex gap-2 text-wrap py-2 border-bottom" type="submit">
+                                            <i class="bi <?= $escape($noticeIcons[$notice['kind']] ?? 'bi-info-circle text-primary') ?> mt-1" aria-hidden="true"></i>
+                                            <span>
+                                                <strong class="d-block"><?= $escape((string) $notice['title']) ?></strong>
+                                                <span class="small text-secondary"><?= $escape((string) $notice['body']) ?></span>
+                                            </span>
+                                        </button>
+                                    </form>
+                                <?php endforeach; ?>
                                 <?php foreach (($notifications['messages'] ?? []) as $message): ?>
                                     <a class="dropdown-item d-flex gap-2 text-wrap py-2 border-bottom" href="<?= $escape($portalHome) ?>/mensajes">
                                         <i class="bi bi-envelope text-primary mt-1" aria-hidden="true"></i>
@@ -147,7 +160,7 @@ $csrfToken = Session::csrfToken();
                                 <?php endforeach; ?>
                             </div>
                         <?php endif; ?>
-                        <a class="dropdown-item text-center small fw-semibold py-2" href="<?= $escape($portalHome) ?>/mensajes">Ver todos mis mensajes</a>
+                        <a class="dropdown-item text-center small fw-semibold py-2" href="<?= $escape($portalHome) ?>/mensajes">Ver todos los comunicados</a>
                     </div>
                 </li>
                 <?php require dirname(__DIR__) . '/Shared/account-menu.php'; ?>
@@ -169,8 +182,6 @@ $csrfToken = Session::csrfToken();
         <strong><?= $escape($propertyName) ?></strong>
     </footer>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/browser/overlayscrollbars.browser.es6.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.9/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/admin-lte@4.10.2/dist/js/adminlte.min.js"></script>
+<?php require dirname(__DIR__) . '/Shared/panel-scripts.php'; ?>
 </body>
 </html>

@@ -7,7 +7,7 @@ $welcomeWeekdays = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viern
 $welcomeMonths = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 $welcomeDate = ucfirst($welcomeWeekdays[(int) $welcomeNow->format('w')]) . ', ' . $welcomeNow->format('j') . ' de '
     . $welcomeMonths[(int) $welcomeNow->format('n') - 1] . ' de ' . $welcomeNow->format('Y');
-$welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notifications['billing_count'] ?? 0);
+$welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notifications['billing_count'] ?? 0) + (int) ($notifications['notice_count'] ?? 0);
 ?>
 <section class="content">
     <div class="card border-0 shadow-sm mb-4">
@@ -90,13 +90,17 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                         <div class="table-responsive">
                             <table class="table table-striped align-middle mb-0">
                                 <thead>
-                                <tr><th>Inmueble</th><th>Categoría</th></tr>
+                                <tr><th>Inmueble</th><th>Categoría</th><th>Tu vínculo</th></tr>
                                 </thead>
                                 <tbody>
                                 <?php foreach ($units as $unit): ?>
                                     <tr>
                                         <td><?= htmlspecialchars((string) ($unit['name'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
                                         <td><?= htmlspecialchars((string) ($unit['category'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
+                                        <td>
+                                            <?= htmlspecialchars((string) ($unit['relation_label'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
+                                            <span class="d-block small text-secondary">Desde <?= htmlspecialchars((string) ($unit['started_on'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                                 </tbody>
@@ -105,129 +109,44 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                     <?php endif; ?>
                 </div>
             </div>
-            <?php if (\App\Core\ModuleCatalog::enabled('cartera')): ?>
+            <?php if (is_array($billingSummary)): ?>
             <div class="card card-success card-outline mt-3" id="documentos">
                 <div class="card-header">
                     <h2 class="card-title">Mis documentos de cobro</h2>
-                    <span class="badge text-bg-primary"><?= count($billingDocuments) ?></span>
+                    <span class="badge text-bg-primary"><?= (int) $billingSummary['count'] ?></span>
                 </div>
-                <div class="card-body">
-                    <?php if ($billingDocuments === []): ?>
+                <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <?php if ($billingSummary['count'] === 0): ?>
                         <p class="text-secondary mb-0">No tienes notas de cobro emitidas.</p>
+                    <?php elseif ($billingSummary['pending'] === 0): ?>
+                        <p class="mb-0"><i class="bi bi-check-circle-fill text-success me-1" aria-hidden="true"></i>Estás al día: no tienes saldos pendientes.</p>
                     <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="table table-striped align-middle mb-0">
-                                <thead>
-                                <tr><th>Nota</th><th>Inmueble</th><th>Período</th><th>Saldo</th><th>Estado</th><th>Acción</th></tr>
-                                </thead>
-                                <tbody>
-                                <?php foreach ($billingDocuments as $document): ?>
-                                    <?php
-                                    $balance = (int) $document['balance'];
-                                    $supersededPeriod = is_array($document["superseded_by"] ?? null) ? (string) $document["superseded_by"]["period"] : null;
-                                    $payable = $balance > 0 && $supersededPeriod === null;
-                                    $paymentStatus = $document['terminal_payment_status'] ?? $document['online_payment_status'] ?? null;
-                                    ?>
-                                    <tr>
-                                        <td><?= htmlspecialchars((string) $document['number'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
-                                        <td><?= htmlspecialchars((string) $document['unit_name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
-                                        <td><?= htmlspecialchars((string) $document['period'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
-                                        <td><?= $supersededPeriod !== null ? '<span class="text-secondary">Incluido en ' . htmlspecialchars($supersededPeriod, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</span>' : htmlspecialchars($currency($balance / 100), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></td>
-                                        <td>
-                                            <?php if ($supersededPeriod !== null): ?><span class="badge text-bg-secondary">Saldo trasladado a <?= htmlspecialchars($supersededPeriod, ENT_QUOTES | ENT_SUBSTITUTE, "UTF-8") ?></span>
-                                    <?php elseif ($balance <= 0): ?>
-                                                <span class="badge text-bg-success">Pagada</span>
-                                            <?php elseif ($paymentStatus === 'approved'): ?>
-                                                <span class="badge text-bg-success">Pago aprobado</span>
-                                            <?php elseif ($paymentStatus === 'pending'): ?>
-                                                <span class="badge text-bg-warning">Pago en proceso</span>
-                                            <?php elseif ($paymentStatus === 'rejected'): ?>
-                                                <span class="badge text-bg-danger">Pago rechazado</span>
-                                            <?php else: ?>
-                                                <span class="badge text-bg-secondary">Pendiente</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
-                                            <?php if ($payable && $onlinePaymentsReady): ?>
-                                                <form method="post" action="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/pagar">
-                                                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
-                                                    <input type="hidden" name="statement_id" value="<?= (int) $document['id'] ?>">
-                                                    <button class="btn btn-success btn-sm" type="submit">
-                                                        <?= $document['checkout_url'] !== null ? 'Continuar pago en línea' : 'Pago en línea' ?>
-                                                    </button>
-                                                </form>
-                                            <?php endif; ?>
-                                            <?php if ($payable && $terminalPaymentsReady): ?>
-                                                <form class="mt-1" method="post" action="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/pagar-datafono" aria-label="Pagar nota en datáfono Bold">
-                                                    <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
-                                                    <input type="hidden" name="statement_id" value="<?= (int) $document['id'] ?>">
-                                                    <button class="btn btn-outline-success btn-sm" type="submit">Datáfono Bold · <?= htmlspecialchars($currency($balance / 100), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></button>
-                                                </form>
-                                            <?php endif; ?>
-                                            <?php if ($supersededPeriod !== null): ?>
-                                        <span class="text-secondary small">Paga la nota más reciente</span>
-                                    <?php elseif ($payable && !$onlinePaymentsReady && !$terminalPaymentsReady): ?>
-                                                <span class="text-secondary small">Pago en línea no disponible</span>
-                                            <?php elseif ($balance <= 0): ?>
-                                                <span class="text-secondary small">Sin saldo pendiente</span>
-                                            <?php endif; ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                                </tbody>
-                            </table>
+                        <div>
+                            <p class="text-secondary small mb-1"><?= (int) $billingSummary['pending'] ?> nota(s) con saldo pendiente</p>
+                            <p class="h4 mb-0"><?= htmlspecialchars(\App\Modules\Billing\BillingService::money((int) $billingSummary['balance_cents']), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></p>
                         </div>
                     <?php endif; ?>
+                    <a class="btn btn-outline-success" href="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/pagos">
+                        <i class="bi bi-receipt me-1" aria-hidden="true"></i>Ver notas, pagos y comprobantes
+                    </a>
                 </div>
             </div>
             <?php endif; ?>
         </div>
         <div class="col-xl-4">
-            <div class="card" id="perfil">
-                <div class="card-header"><h2 class="card-title">Personalizar mi cuenta</h2></div>
-                <form method="post" action="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/perfil">
-                    <div class="card-body">
-                        <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
-                        <div class="mb-3">
-                            <label for="profile-username" class="form-label">Nombre de usuario</label>
-                            <input id="profile-username" name="username" class="form-control" minlength="3" maxlength="64" autocomplete="username" required value="<?= htmlspecialchars($user['username'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
-                        </div>
-                        <div class="mb-3">
-                            <label for="profile-email" class="form-label">Correo electrónico</label>
-                            <input id="profile-email" name="email" type="email" class="form-control" maxlength="254" autocomplete="email" required value="<?= htmlspecialchars($user['email'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
-                        </div>
-                        <hr>
-                        <p class="small text-secondary">Confirma tu contraseña actual para guardar los cambios. La nueva contraseña es opcional.</p>
-                        <div class="mb-3">
-                            <label for="current-password" class="form-label">Contraseña actual</label>
-                            <input id="current-password" name="current_password" type="password" class="form-control" autocomplete="current-password" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="new-password" class="form-label">Nueva contraseña</label>
-                            <input id="new-password" name="new_password" type="password" class="form-control" minlength="12" autocomplete="new-password">
-                            <small class="text-secondary">Déjala vacía si no deseas cambiarla. Mínimo 12 caracteres.</small>
-                        </div>
-                        <div class="mb-0">
-                            <label for="password-confirmation" class="form-label">Confirmar nueva contraseña</label>
-                            <input id="password-confirmation" name="password_confirmation" type="password" class="form-control" minlength="12" autocomplete="new-password">
-                        </div>
-                    </div>
-                    <div class="card-footer">
-                        <button class="btn btn-primary" type="submit">Guardar datos de mi cuenta</button>
-                    </div>
-                </form>
-            </div>
+            <?php $accountFormAction = '/usuario/perfil'; require dirname(__DIR__, 3) . '/Shared/account-form.php'; ?>
         </div>
     </div>
 
     <?php if (\App\Core\ModuleCatalog::enabled('clasificados')): ?>
+    <?php $classifiedOperationLabels = ['sale' => 'En venta', 'rent' => 'En arriendo', 'purchase' => 'Busca comprar']; ?>
     <div class="card card-info card-outline mt-3" id="clasificados">
         <div class="card-header">
             <h2 class="card-title">Mis clasificados de inmuebles</h2>
             <span class="badge text-bg-primary"><?= count($classifieds) ?></span>
         </div>
         <div class="card-body">
-            <p class="text-secondary">Publica un inmueble en venta o una búsqueda de compra. Las publicaciones activas son visibles en la página pública.</p>
+            <p class="text-secondary">Publica un inmueble en venta o en arriendo, o una búsqueda de compra. Las publicaciones activas son visibles en la página pública.</p>
             <form method="post" enctype="multipart/form-data" action="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/clasificados/guardar">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
                 <div class="row g-3">
@@ -235,6 +154,7 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                         <label for="classified-operation" class="form-label">Publicación</label>
                         <select id="classified-operation" name="operation" class="form-select" required>
                             <option value="sale">Ofrezco en venta</option>
+                            <option value="rent">Ofrezco en arriendo</option>
                             <option value="purchase">Busco comprar</option>
                         </select>
                     </div>
@@ -257,7 +177,7 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                         <div class="form-text">No publiques una dirección exacta si no deseas hacerla pública.</div>
                     </div>
                     <div class="col-md-6">
-                        <label for="classified-price" class="form-label">Precio o presupuesto (COP, opcional)</label>
+                        <label for="classified-price" class="form-label">Precio, canon mensual o presupuesto (COP, opcional)</label>
                         <input id="classified-price" name="price" type="number" class="form-control" min="0.01" max="999999999999.99" step="0.01">
                     </div>
                     <div class="col-12">
@@ -299,12 +219,12 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
         <?php if ($classifieds !== []): ?>
             <div class="list-group list-group-flush">
                 <?php foreach ($classifieds as $classified): ?>
-                    <article class="list-group-item p-3">
+                    <article class="list-group-item p-3" id="clasificado-<?= (int) $classified['id'] ?>">
                         <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
                             <div>
                                 <h3 class="h5 mb-1"><?= htmlspecialchars($classified['title'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></h3>
                                 <p class="small text-secondary mb-2">
-                                    <?= $classified['operation'] === 'sale' ? 'En venta' : 'Busca comprar' ?>
+                                    <?= $classifiedOperationLabels[$classified['operation']] ?? 'Clasificado' ?>
                                     · <?= htmlspecialchars($classified['location'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
                                     · <?= $classified['status'] === 'published' ? 'Publicado' : 'Cerrado' ?>
                                     · <?= count($classified['images']) ?> imagen(es)
@@ -331,8 +251,86 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                                     <input type="hidden" name="listing_id" value="<?= (int) $classified['id'] ?>">
                                     <button class="btn btn-outline-danger btn-sm" type="submit">Eliminar</button>
                                 </form>
+                                <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse"
+                                        data-bs-target="#edit-classified-<?= (int) $classified['id'] ?>" aria-expanded="false"
+                                        aria-controls="edit-classified-<?= (int) $classified['id'] ?>"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Editar</button>
                             </div>
                         </div>
+                        <?php $cid = (int) $classified['id']; $ce = static fn (mixed $v): string => htmlspecialchars((string) $v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); ?>
+                        <form class="collapse border rounded p-3 mt-3 bg-body-tertiary" id="edit-classified-<?= $cid ?>" method="post" enctype="multipart/form-data"
+                              action="<?= $ce($basePath) ?>/usuario/clasificados/actualizar">
+                            <input type="hidden" name="_token" value="<?= $ce($csrfToken) ?>">
+                            <input type="hidden" name="listing_id" value="<?= $cid ?>">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="edit-operation-<?= $cid ?>" class="form-label">Publicación</label>
+                                    <select id="edit-operation-<?= $cid ?>" name="operation" class="form-select" required>
+                                        <?php foreach (['sale' => 'Ofrezco en venta', 'rent' => 'Ofrezco en arriendo', 'purchase' => 'Busco comprar'] as $value => $label): ?>
+                                            <option value="<?= $value ?>"<?= $classified['operation'] === $value ? ' selected' : '' ?>><?= $label ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="edit-title-<?= $cid ?>" class="form-label">Título</label>
+                                    <input id="edit-title-<?= $cid ?>" name="title" class="form-control" minlength="3" maxlength="160" required value="<?= $ce($classified['title']) ?>">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="edit-type-<?= $cid ?>" class="form-label">Tipo de inmueble</label>
+                                    <select id="edit-type-<?= $cid ?>" name="property_type" class="form-select" required>
+                                        <?php foreach (['apartment' => 'Apartamento', 'house' => 'Casa', 'commercial' => 'Local u oficina', 'other' => 'Otro'] as $value => $label): ?>
+                                            <option value="<?= $value ?>"<?= $classified['property_type'] === $value ? ' selected' : '' ?>><?= $label ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="edit-location-<?= $cid ?>" class="form-label">Barrio o sector</label>
+                                    <input id="edit-location-<?= $cid ?>" name="location" class="form-control" maxlength="120" required value="<?= $ce($classified['location']) ?>">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="edit-price-<?= $cid ?>" class="form-label">Precio, canon mensual o presupuesto (COP, opcional)</label>
+                                    <input id="edit-price-<?= $cid ?>" name="price" type="number" class="form-control" min="0.01" max="999999999999.99" step="0.01" value="<?= $ce($classified['price'] ?? '') ?>">
+                                </div>
+                                <div class="col-12">
+                                    <label for="edit-description-<?= $cid ?>" class="form-label">Descripción</label>
+                                    <textarea id="edit-description-<?= $cid ?>" name="description" class="form-control" rows="4" maxlength="3000" required><?= $ce($classified['description']) ?></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <span class="form-label d-block">Imágenes actuales (marca las que quieres quitar)</span>
+                                    <div class="d-flex flex-wrap gap-3">
+                                        <?php foreach ($classified['images'] as $image): ?>
+                                            <label class="text-center small">
+                                                <img src="<?= $ce($basePath) ?>/clasificados/imagen?id=<?= (int) $image['id'] ?>" alt="" loading="lazy" class="rounded object-fit-cover d-block mb-1" style="width: 7rem; height: 5rem">
+                                                <input type="checkbox" class="form-check-input me-1" name="remove_images[]" value="<?= (int) $image['id'] ?>">Quitar
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <label for="edit-images-<?= $cid ?>" class="form-label">Agregar imágenes (opcional)</label>
+                                    <input id="edit-images-<?= $cid ?>" name="images[]" type="file" class="form-control" accept="image/jpeg,image/png,image/webp" multiple>
+                                    <div class="form-text">Máximo 5 imágenes en total y al menos una; JPEG, PNG o WebP de hasta 4 MB.</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="edit-contact-name-<?= $cid ?>" class="form-label">Nombre de contacto</label>
+                                    <input id="edit-contact-name-<?= $cid ?>" name="contact_name" class="form-control" maxlength="100" value="<?= $ce($classified['contact_name'] ?? '') ?>">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="edit-contact-email-<?= $cid ?>" class="form-label">Correo de contacto</label>
+                                    <input id="edit-contact-email-<?= $cid ?>" name="contact_email" type="email" class="form-control" maxlength="254" value="<?= $ce($classified['contact_email'] ?? '') ?>">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="edit-contact-phone-<?= $cid ?>" class="form-label">Teléfono de contacto</label>
+                                    <input id="edit-contact-phone-<?= $cid ?>" name="contact_phone" type="tel" class="form-control" maxlength="30" value="<?= $ce($classified['contact_phone'] ?? '') ?>">
+                                </div>
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        <input id="edit-consent-<?= $cid ?>" name="contact_authorized" value="1" type="checkbox" class="form-check-input"<?= !empty($classified['contact_authorized']) ? ' checked' : '' ?>>
+                                        <label for="edit-consent-<?= $cid ?>" class="form-check-label">Autorizo publicar en la página pública los datos de contacto ingresados arriba.</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary btn-sm mt-3" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>Guardar cambios</button>
+                        </form>
                     </article>
                 <?php endforeach; ?>
             </div>

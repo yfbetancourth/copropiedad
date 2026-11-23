@@ -6,7 +6,6 @@ namespace App\Modules\Auth;
 
 use App\Core\Database;
 use App\Core\Tenant;
-use PDO;
 use RuntimeException;
 use Throwable;
 
@@ -104,7 +103,8 @@ final class AuthService
         return !is_string($createdAt) || strtotime($createdAt . ' UTC') <= time() - 60;
     }
 
-    public function createResetToken(int $userId, string $tokenHash): void
+    /** Token de un solo uso para crear o cambiar la contraseña; invalida los anteriores de la cuenta. */
+    public function createResetToken(int $userId, string $tokenHash, int $validHours = 1): void
     {
         $pdo = Database::connection();
         $pdo->beginTransaction();
@@ -117,8 +117,8 @@ final class AuthService
             )->execute([$userId]);
             $pdo->prepare(
                 'INSERT INTO admin_password_reset_tokens (user_id, token_hash, expires_at)
-                 VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 1 HOUR))'
-            )->execute([$userId, $tokenHash]);
+                 VALUES (?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? HOUR))'
+            )->execute([$userId, $tokenHash, max(1, min(168, $validHours))]);
             $pdo->commit();
         } catch (Throwable $exception) {
             if ($pdo->inTransaction()) {
@@ -181,11 +181,6 @@ final class AuthService
         }
     }
 
-    public function isCurrentSession(int $userId, int $authVersion): bool
-    {
-        return $this->currentUser($userId, $authVersion) !== null;
-    }
-
     public function updateOwnCredentials(
         int $userId,
         string $currentPassword,
@@ -244,7 +239,7 @@ final class AuthService
         [$scopeSql, $scopeParams] = self::loginScope('users');
         $statement = Database::connection()->prepare(
             'SELECT users.id, users.tenant_id, users.username, users.email, roles.id AS role_id, roles.name AS role_name,
-                    roles.is_system, users.auth_version
+                    roles.is_system, roles.kind AS role_kind, users.auth_version
              FROM admin_users AS users
              JOIN admin_roles AS roles ON roles.id = users.role_id
              WHERE users.id = ? AND users.auth_version = ? AND users.is_active = 1 AND ' . $scopeSql . '

@@ -8,8 +8,8 @@ final class Url
 {
     public static function basePath(): string
     {
-        $appUrl = $_ENV['APP_URL'] ?? '';
-        $configuredPath = is_string($appUrl) && $appUrl !== ''
+        $appUrl = Env::get('APP_URL');
+        $configuredPath = $appUrl !== ''
             ? parse_url($appUrl, PHP_URL_PATH)
             : null;
 

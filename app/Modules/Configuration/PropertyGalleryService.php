@@ -120,6 +120,12 @@ final class PropertyGalleryService
     /** Cada conjunto tiene su propia carpeta de galería. */
     private function directory(): string
     {
-        return dirname(__DIR__, 3) . '/public/uploads/property-gallery/' . Tenant::id();
+        return self::directoryFor(Tenant::id());
+    }
+
+    /** Carpeta pública de la galería de un conjunto (también la usa el reinicio del Superadmin). */
+    public static function directoryFor(int $tenantId): string
+    {
+        return dirname(__DIR__, 3) . '/public/uploads/property-gallery/' . $tenantId;
     }
 }

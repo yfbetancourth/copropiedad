@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Platform;
 
+use App\Core\Http;
 use App\Core\Authorization;
 use App\Core\ModuleCatalog;
 use App\Core\Session;
 use App\Core\Tenant;
-use App\Core\Url;
 use App\Core\View;
 use RuntimeException;
 
@@ -18,6 +18,7 @@ use RuntimeException;
  */
 final class PlatformController
 {
+    private const FLASH = 'platform_flash';
     public function __construct(private readonly TenantService $tenants = new TenantService())
     {
     }
@@ -47,7 +48,7 @@ final class PlatformController
     public function store(): void
     {
         $this->requireSuperadmin();
-        $this->requireCsrf();
+        Http::requireCsrf();
         $name = $this->text('name');
         $slug = strtolower($this->text('slug'));
         $modules = $this->selectedModules();
@@ -72,12 +73,12 @@ final class PlatformController
             $this->failWithInput($exception->getMessage(), '/clientes/nuevo');
         }
 
-        $this->flash('success', sprintf(
+        Http::flash(self::FLASH, 'success', sprintf(
             'Conjunto «%s» creado. Su administrador ya puede entrar en %s',
             $name,
             Tenant::absoluteUrl('/login', $slug)
         ));
-        $this->redirect('/clientes/editar?id=' . $tenantId);
+        Http::redirect('/clientes/editar?id=' . $tenantId);
     }
 
     public function edit(): void
@@ -89,6 +90,7 @@ final class PlatformController
 
         $this->render('edit', $tenant['name'], [
             'tenant' => $tenant,
+            'resetSummary' => (new TenantResetService())->summary($tenant['id']),
             'modules' => ModuleCatalog::MODULES,
             'baseDomain' => Tenant::baseDomain(),
         ]);
@@ -97,58 +99,58 @@ final class PlatformController
     public function update(): void
     {
         $this->requireSuperadmin();
-        $this->requireCsrf();
+        Http::requireCsrf();
         $tenant = $this->tenantFromInput($_POST['tenant_id'] ?? null);
         $name = $this->text('name');
         $slug = strtolower($this->text('slug'));
 
         if (mb_strlen($name, 'UTF-8') < 3 || mb_strlen($name, 'UTF-8') > 160) {
-            $this->flash('error', 'El nombre del conjunto debe tener entre 3 y 160 caracteres.');
-            $this->redirect('/clientes/editar?id=' . $tenant['id']);
+            Http::flash(self::FLASH, 'error', 'El nombre del conjunto debe tener entre 3 y 160 caracteres.');
+            Http::redirect('/clientes/editar?id=' . $tenant['id']);
         }
 
         try {
             $this->tenants->update($tenant['id'], $name, $slug);
-            $this->flash('success', $slug !== $tenant['slug']
+            Http::flash(self::FLASH, 'success', $slug !== $tenant['slug']
                 ? 'Datos guardados. El conjunto ahora se abre en ' . Tenant::absoluteUrl('/', $slug) . '; la dirección anterior deja de funcionar.'
                 : 'Datos del conjunto guardados.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
-        $this->redirect('/clientes/editar?id=' . $tenant['id']);
+        Http::redirect('/clientes/editar?id=' . $tenant['id']);
     }
 
     public function saveModules(): void
     {
         $this->requireSuperadmin();
-        $this->requireCsrf();
+        Http::requireCsrf();
         $tenant = $this->tenantFromInput($_POST['tenant_id'] ?? null);
         $this->tenants->setModules($tenant['id'], $this->selectedModules());
-        $this->flash('success', 'Módulos del conjunto actualizados. Los cambios aplican de inmediato.');
-        $this->redirect('/clientes/editar?id=' . $tenant['id'] . '#modulos');
+        Http::flash(self::FLASH, 'success', 'Módulos del conjunto actualizados. Los cambios aplican de inmediato.');
+        Http::redirect('/clientes/editar?id=' . $tenant['id'] . '#modulos');
     }
 
     public function setStatus(): void
     {
         $this->requireSuperadmin();
-        $this->requireCsrf();
+        Http::requireCsrf();
         $tenant = $this->tenantFromInput($_POST['tenant_id'] ?? null);
         $status = $this->text('status');
         try {
             $this->tenants->setStatus($tenant['id'], $status);
-            $this->flash('success', $status === 'suspended'
+            Http::flash(self::FLASH, 'success', $status === 'suspended'
                 ? 'Conjunto suspendido: su sitio público y sus cuentas quedan sin acceso hasta que lo reactives.'
                 : 'Conjunto reactivado.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
-        $this->redirect('/clientes/editar?id=' . $tenant['id']);
+        Http::redirect('/clientes/editar?id=' . $tenant['id']);
     }
 
     public function addAdmin(): void
     {
         $this->requireSuperadmin();
-        $this->requireCsrf();
+        Http::requireCsrf();
         $tenant = $this->tenantFromInput($_POST['tenant_id'] ?? null);
         try {
             $this->tenants->addAdmin(
@@ -157,17 +159,17 @@ final class PlatformController
                 $this->text('admin_email'),
                 is_string($_POST['admin_password'] ?? null) ? $_POST['admin_password'] : ''
             );
-            $this->flash('success', 'Administrador asignado al conjunto.');
+            Http::flash(self::FLASH, 'success', 'Administrador asignado al conjunto.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
-        $this->redirect('/clientes/editar?id=' . $tenant['id'] . '#administradores');
+        Http::redirect('/clientes/editar?id=' . $tenant['id'] . '#administradores');
     }
 
     public function setAdminStatus(): void
     {
         $this->requireSuperadmin();
-        $this->requireCsrf();
+        Http::requireCsrf();
         $tenant = $this->tenantFromInput($_POST['tenant_id'] ?? null);
         $userId = filter_var($_POST['user_id'] ?? null, FILTER_VALIDATE_INT);
         try {
@@ -176,17 +178,17 @@ final class PlatformController
             }
             $active = ($_POST['active'] ?? '') === '1';
             $this->tenants->setAdminActive($tenant['id'], $userId, $active);
-            $this->flash('success', $active ? 'Administrador activado.' : 'Administrador desactivado; su sesión se cerró.');
+            Http::flash(self::FLASH, 'success', $active ? 'Administrador activado.' : 'Administrador desactivado; su sesión se cerró.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
-        $this->redirect('/clientes/editar?id=' . $tenant['id'] . '#administradores');
+        Http::redirect('/clientes/editar?id=' . $tenant['id'] . '#administradores');
     }
 
     public function resetAdminPassword(): void
     {
         $this->requireSuperadmin();
-        $this->requireCsrf();
+        Http::requireCsrf();
         $tenant = $this->tenantFromInput($_POST['tenant_id'] ?? null);
         $userId = filter_var($_POST['user_id'] ?? null, FILTER_VALIDATE_INT);
         try {
@@ -198,18 +200,72 @@ final class PlatformController
                 $userId,
                 is_string($_POST['admin_password'] ?? null) ? $_POST['admin_password'] : ''
             );
-            $this->flash('success', 'Contraseña del administrador actualizada; sus sesiones abiertas se cerraron.');
+            Http::flash(self::FLASH, 'success', 'Contraseña del administrador actualizada; sus sesiones abiertas se cerraron.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
-        $this->redirect('/clientes/editar?id=' . $tenant['id'] . '#administradores');
+        Http::redirect('/clientes/editar?id=' . $tenant['id'] . '#administradores');
+    }
+
+    /**
+     * Reinicia el conjunto desde cero. Exige escribir el subdominio del conjunto y la contraseña del Superadmin.
+     */
+    public function reset(): void
+    {
+        $superadmin = $this->requireSuperadmin();
+        Http::requireCsrf();
+        $tenant = $this->tenantFromInput($_POST['tenant_id'] ?? null);
+        $back = '/clientes/editar?id=' . $tenant['id'] . '#reiniciar';
+
+        if (strtolower($this->text('confirm_slug')) !== (string) $tenant['slug']) {
+            Http::flash(self::FLASH, 'error', 'Para reiniciar escribe exactamente el subdominio del conjunto: ' . $tenant['slug'] . '.');
+            Http::redirect($back);
+        }
+        $password = is_string($_POST['superadmin_password'] ?? null) ? $_POST['superadmin_password'] : '';
+        if (!$this->tenants->superadminPasswordMatches((int) $superadmin['id'], $password)) {
+            Http::flash(self::FLASH, 'error', 'La contraseña del Superadmin no es correcta. No se borró nada.');
+            Http::redirect($back);
+        }
+
+        $requested = is_array($_POST['categories'] ?? null)
+            ? array_values(array_filter($_POST['categories'], 'is_string'))
+            : [];
+        try {
+            $categories = TenantResetService::validateSelection($requested);
+        } catch (RuntimeException $exception) {
+            Http::flash(self::FLASH, 'error', $exception->getMessage() . ' No se borró nada.');
+            Http::redirect($back);
+        }
+
+        try {
+            $files = (new TenantResetService())->reset($tenant['id'], (string) $tenant['name'], $categories);
+        } catch (\Throwable $exception) {
+            error_log('Falló el reinicio del conjunto ' . $tenant['id'] . ': ' . $exception->getMessage());
+            Http::flash(self::FLASH, 'error', 'No se pudo reiniciar el conjunto; no se borró nada. Revisa el registro de errores.');
+            Http::redirect($back);
+        }
+        error_log(sprintf(
+            'Superadmin %d reinició el conjunto %d (%s): %s; %d archivo(s) eliminados.',
+            (int) $superadmin['id'],
+            $tenant['id'],
+            $tenant['slug'],
+            implode(', ', $categories),
+            $files
+        ));
+        $labels = array_map(static fn (string $key): string => TenantResetService::CATEGORIES[$key]['label'], $categories);
+        $all = count($categories) === count(TenantResetService::CATEGORIES);
+        Http::flash(self::FLASH, 'success', $all
+            ? sprintf('El conjunto «%s» quedó en blanco: sin cuentas, caracterización, cartera ni archivos. Asigna su nuevo administrador.', $tenant['name'])
+            : sprintf('Se reinició en «%s»: %s.', $tenant['name'], implode(', ', $labels))
+                . (in_array('accounts', $categories, true) ? ' Asigna su nuevo administrador.' : ''));
+        Http::redirect('/clientes/editar?id=' . $tenant['id'] . (in_array('accounts', $categories, true) ? '#administradores' : '#reiniciar'));
     }
 
     private function requireSuperadmin(): array
     {
         $user = Authorization::currentUser();
         if ($user === null) {
-            $this->redirect('/login');
+            Http::redirect('/login');
         }
         if (!Authorization::isSuperadmin($user)) {
             http_response_code(403);
@@ -226,8 +282,8 @@ final class PlatformController
         $tenantId = filter_var($value, FILTER_VALIDATE_INT);
         $tenant = is_int($tenantId) && $tenantId > 0 ? $this->tenants->find($tenantId) : null;
         if ($tenant === null) {
-            $this->flash('error', 'El conjunto seleccionado no existe.');
-            $this->redirect('/clientes');
+            Http::flash(self::FLASH, 'error', 'El conjunto seleccionado no existe.');
+            Http::redirect('/clientes');
         }
 
         return $tenant;
@@ -263,8 +319,8 @@ final class PlatformController
             'admin_email' => $this->text('admin_email'),
             'modules' => $this->selectedModules(),
         ];
-        $this->flash('error', $message);
-        $this->redirect($path);
+        Http::flash(self::FLASH, 'error', $message);
+        Http::redirect($path);
     }
 
     /** @return array<string, mixed>|null */
@@ -277,35 +333,14 @@ final class PlatformController
         return is_array($old) ? $old : null;
     }
 
-    private function requireCsrf(): void
-    {
-        if (!Session::verifyCsrf($_POST['_token'] ?? null)) {
-            http_response_code(419);
-            echo 'La sesión del formulario venció. Recarga la página e intenta nuevamente.';
-            exit;
-        }
-    }
-
-    private function flash(string $type, string $message): void
-    {
-        Session::start();
-        $_SESSION['platform_flash'] = ['type' => $type, 'message' => $message];
-    }
-
     /** @param array<string, mixed> $data */
     private function render(string $template, string $title, array $data = []): void
     {
         Session::start();
         $data['title'] = $title;
         $data['csrfToken'] = Session::csrfToken();
-        $data['flash'] = $_SESSION['platform_flash'] ?? null;
-        unset($_SESSION['platform_flash']);
+        $data['flash'] = Http::pullFlash(self::FLASH);
         View::renderAdmin('Platform/' . $template, $data);
     }
 
-    private function redirect(string $path): never
-    {
-        header('Location: ' . Url::to($path), true, 303);
-        exit;
-    }
 }

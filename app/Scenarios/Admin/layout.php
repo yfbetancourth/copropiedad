@@ -10,7 +10,6 @@ $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOT
 $authUser = Authorization::currentUser();
 $currentPath = Url::routePath($_SERVER['REQUEST_URI'] ?? '/');
 $adminHome = Url::adminHome();
-$userPortalHome = Url::publicBasePath() . '/usuario';
 $can = static fn (?string $module): bool => $authUser !== null && $module !== null && Authorization::hasPermission($authUser, $module, 1);
 
 $accountName = is_string($authUser['username'] ?? null) ? $authUser['username'] : '';
@@ -41,23 +40,31 @@ $menu = [
         ['cartera.cobros', '/cartera/cobros', 'bi-receipt', 'Cartera / Cobros', ['/cartera/cobros*']],
         ['cartera.cobros', '/cartera/reportes', 'bi-graph-up', 'Reportes de cartera', ['/cartera/reportes*']],
         ['cartera.cobros', '/cartera/buscar', 'bi-search', 'Buscar en cartera', ['/cartera/buscar']],
+        ['cartera.cobros', '/cartera/pagos-reportados', 'bi-inbox', 'Pagos reportados', ['/cartera/pagos-reportados*']],
     ]],
     ['Pagos', [
         ['configuracion.pagos', '/configuracion/metodos-pago', 'bi-credit-card', 'Métodos de pago', ['/configuracion/metodos-pago']],
     ]],
+    ['Comunidad', [
+        ['comunidad.residentes', '/comunidad/residentes', 'bi-people', 'Residentes', ['/comunidad/residentes*']],
+        ['zonas.comunes', '/zonas-comunes', 'bi-calendar2-check', 'Reservas de zonas comunes', ['/zonas-comunes']],
+        ['zonas.comunes', '/zonas-comunes/espacios', 'bi-building', 'Espacios comunes', ['/zonas-comunes/espacios']],
+    ]],
     ['Comunicación', [
-        ['mensajes', '/mensajes', 'bi-chat-left-text', 'Mensajes', ['/mensajes']],
+        ['mensajes', '/comunicacion/atencion', 'bi-chat-dots', 'Atención a residentes', ['/comunicacion/atencion*']],
+        ['mensajes', '/mensajes', 'bi-megaphone', 'Comunicados a residentes', ['/mensajes']],
         ['configuracion.correo', '/configuracion/correo', 'bi-envelope-at', 'Correo', ['/configuracion/correo']],
     ]],
     ['Conformación', [
         ['configuracion.caracterizacion', '/configuracion/caracterizacion', 'bi-buildings', 'Caracterización', ['/configuracion/caracterizacion']],
         [$canSeeComposition ? 'configuracion.conformacion' : null, '/configuracion/conformacion', 'bi-diagram-3', 'Conformación de la copropiedad', ['/configuracion/conformacion']],
-        ['inmuebles.asignaciones', '/inmuebles/asignaciones', 'bi-person-vcard', 'Asignación de inmuebles', ['/inmuebles/*']],
+        ['inmuebles.asignaciones', '/inmuebles/asignaciones', 'bi-person-vcard', 'Asignación de inmuebles', ['/inmuebles/asignaciones*']],
+        ['inmuebles.asignaciones', '/inmuebles/historial', 'bi-clock-history', 'Trazabilidad de inmuebles', ['/inmuebles/historial']],
     ]],
     ['Administración', [
         ['configuracion.parametrizacion', '/configuracion/parametrizacion', 'bi-building-gear', 'Parametrización', ['/configuracion/parametrizacion']],
         ['configuracion.financiera', '/configuracion/financiera', 'bi-sliders', 'Configuración financiera', ['/configuracion/financiera']],
-        ['configuracion.equipo', '/configuracion/equipo', 'bi-people', 'Equipo', ['/configuracion/equipo']],
+        ['configuracion.equipo', '/configuracion/equipo', 'bi-person-badge', 'Equipo de trabajo', ['/configuracion/equipo']],
         ['configuracion.roles', '/configuracion/roles', 'bi-shield-lock', 'Roles y permisos', ['/configuracion/roles']],
     ]],
     ['Personalización', [
@@ -82,6 +89,17 @@ $isActivePath = static function (array $patterns) use ($currentPath): bool {
 
     return false;
 };
+// Contador de pagos reportados por los residentes que esperan revisión.
+$menuBadges = [];
+if (!$isPlatform && $can('cartera.cobros')) {
+    $menuBadges['/cartera/pagos-reportados'] = (new \App\Modules\Billing\PaymentReportService())->pendingCount();
+}
+if (!$isPlatform && $can('mensajes')) {
+    $menuBadges['/comunicacion/atencion'] = (new \App\Modules\Messaging\ConversationService())->pendingForStaff();
+}
+if (!$isPlatform && $can('zonas.comunes')) {
+    $menuBadges['/zonas-comunes'] = (new \App\Modules\CommonAreas\CommonAreaService())->pendingCount();
+}
 $sidebarSections = [];
 foreach ($menu as [$menuTitle, $menuEntries]) {
     $menuItems = [];
@@ -92,25 +110,22 @@ foreach ($menu as [$menuTitle, $menuEntries]) {
                 'icon' => $menuIcon,
                 'label' => $menuLabel,
                 'active' => $isActivePath($menuPatterns),
+                'badge' => $menuBadges[$menuPath] ?? 0,
             ];
         }
     }
     $sidebarSections[] = ['title' => $menuTitle, 'items' => $menuItems];
 }
-$sidebarSections[] = ['title' => null, 'items' => $can('usuario.portal')
-    ? [['href' => $userPortalHome, 'icon' => 'bi-house-door', 'label' => 'Portal de residente']]
-    : []];
-$sidebarBrandHref = $can('panel') ? $adminHome : $userPortalHome;
+$sidebarBrandHref = $adminHome;
 $sidebarUser = ['name' => $account['name'], 'role' => $account['role'], 'initial' => $account['initial']];
 
 $accountGroups = [
     ['title' => 'Ir a', 'items' => array_values(array_filter([
         $can('panel') ? ['href' => $adminHome, 'icon' => 'bi-house-heart', 'label' => 'Bienvenida', 'active' => $currentPath === '/admin'] : null,
-        $can('usuario.portal') ? ['href' => $userPortalHome, 'icon' => 'bi-house-door', 'label' => 'Portal de residente'] : null,
         $isPlatform ? null : ['href' => Url::publicBasePath() . '/', 'icon' => 'bi-globe2', 'label' => 'Ver sitio público', 'newTab' => true],
     ]))],
     ['title' => 'Mi cuenta', 'items' => array_values(array_filter([
-        $can('usuario.portal') ? ['href' => $userPortalHome . '#perfil', 'icon' => 'bi-person-gear', 'label' => 'Editar mis datos y contraseña'] : null,
+        $can('panel') ? ['href' => $basePath . '/mi-cuenta', 'icon' => 'bi-person-gear', 'label' => 'Editar mis datos y contraseña', 'active' => $currentPath === '/mi-cuenta'] : null,
         $authUser !== null && Authorization::hasPermission($authUser, 'cartera.cobros', 2)
             ? ['href' => $basePath . '/configuracion/mi-correo', 'icon' => 'bi-envelope-check', 'label' => 'Mi correo de envío', 'active' => $currentPath === '/configuracion/mi-correo']
             : null,
@@ -120,17 +135,7 @@ $logoutAction = $basePath . '/logout';
 $csrfToken = Session::csrfToken();
 
 ?>
-<!doctype html>
-<html lang="es">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= $escape($pageTitle) ?> | <?= $escape($propertyName) ?></title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.2/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.10.2/dist/css/adminlte.min.css">
-</head>
+<?php require dirname(__DIR__) . '/Shared/panel-head.php'; ?>
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
 <a class="visually-hidden-focusable position-absolute top-0 start-0 z-3 bg-white p-2" href="#main-content">Saltar al contenido principal</a>
 <div class="app-wrapper">
@@ -171,8 +176,6 @@ $csrfToken = Session::csrfToken();
         <strong><?= $escape($propertyName) ?></strong>
     </footer>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/browser/overlayscrollbars.browser.es6.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.9/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/admin-lte@4.10.2/dist/js/adminlte.min.js"></script>
+<?php require dirname(__DIR__) . '/Shared/panel-scripts.php'; ?>
 </body>
 </html>

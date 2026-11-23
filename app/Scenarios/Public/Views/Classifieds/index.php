@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-$operationLabels = ['sale' => 'En venta', 'purchase' => 'Busca comprar'];
+$operationLabels = ['sale' => 'En venta', 'rent' => 'En arriendo', 'purchase' => 'Busca comprar'];
 $propertyTypeLabels = [
     'house' => 'Casa',
     'apartment' => 'Apartamento',
@@ -74,7 +74,7 @@ $operationCounts = array_count_values(array_map(static fn (array $listing): stri
                         <p class="catalog-kicker"><?= $escape($propertyType) ?> <span aria-hidden="true">·</span> <?= $escape($listing['location']) ?></p>
                         <h2><?= $escape($listing['title']) ?></h2>
                         <?php if ($amount !== null): ?>
-                            <p class="catalog-price"><?php if ($listing['operation'] === 'purchase'): ?><small>Presupuesto</small> <?php endif; ?><?= $escape($amount) ?> <small>COP</small></p>
+                            <p class="catalog-price"><?php if ($listing['operation'] === 'purchase'): ?><small>Presupuesto</small> <?php endif; ?><?= $escape($amount) ?> <small>COP<?= $listing['operation'] === 'rent' ? ' / mes' : '' ?></small></p>
                         <?php endif; ?>
                         <p class="catalog-description"><?= nl2br($escape($listing['description'])) ?></p>
                         <?php if ($listing['contact_name'] !== null || $listing['contact_email'] !== null || $listing['contact_phone'] !== null): ?>

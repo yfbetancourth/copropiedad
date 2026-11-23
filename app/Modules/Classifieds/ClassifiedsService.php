@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Classifieds;
 
 use App\Core\Database;
+use App\Core\Storage;
 use App\Core\Tenant;
 use RuntimeException;
 use Throwable;
@@ -18,11 +19,6 @@ final class ClassifiedsService
     public function publicListings(int $limit = 50): array
     {
         return $this->listings('c.status = ?', ['published'], max(1, min(50, $limit)));
-    }
-
-    public function listingsForUser(int $userId): array
-    {
-        return $this->listings('c.user_id = ?', [$userId]);
     }
 
     public function createListing(int $userId, array $data, array $files): void
@@ -63,43 +59,141 @@ final class ClassifiedsService
                 'contact_authorized_at' => $listing['contact_authorized'] ? 1 : 0,
             ]);
             $listingId = (int) $pdo->lastInsertId();
-
-            $imageStatement = $pdo->prepare(
-                'INSERT INTO property_classified_images
-                    (listing_id, storage_name, mime_type, byte_size, width, height)
-                 VALUES (?, ?, ?, ?, ?, ?)'
-            );
-            foreach ($uploads as $upload) {
-                $storageName = bin2hex(random_bytes(16)) . '.' . $upload['extension'];
-                $destination = $this->storageDirectory() . DIRECTORY_SEPARATOR . $storageName;
-                if (!move_uploaded_file($upload['temporary_name'], $destination)) {
-                    throw new RuntimeException('No se pudo guardar una de las imágenes. Intenta nuevamente.');
-                }
-
-                $storedPaths[] = $destination;
-                $imageStatement->execute([
-                    $listingId,
-                    $storageName,
-                    $upload['mime_type'],
-                    $upload['byte_size'],
-                    $upload['width'],
-                    $upload['height'],
-                ]);
-            }
+            $this->storeImages($listingId, $uploads, $storedPaths);
 
             $pdo->commit();
         } catch (Throwable $exception) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            foreach ($storedPaths as $path) {
-                if (is_file($path) && !unlink($path)) {
-                    error_log('No se pudo limpiar una imagen después de fallar la publicación.');
-                }
-            }
+            $this->discardFiles($storedPaths);
 
             throw $exception;
         }
+    }
+
+    /**
+     * Edita un clasificado propio: datos, contacto e imágenes (quitar algunas y agregar nuevas, entre 1 y 5 en total).
+     *
+     * @param list<int> $removeImageIds
+     */
+    public function updateListing(int $listingId, int $userId, array $data, array $files, array $removeImageIds): bool
+    {
+        $listing = $this->validateListing($data);
+        $uploads = $this->validateUploads($files);
+
+        $pdo = Database::connection();
+        $storedPaths = [];
+        $removedNames = [];
+        $pdo->beginTransaction();
+        try {
+            $lookup = $pdo->prepare(
+                'SELECT id, contact_authorized FROM property_classifieds
+                 WHERE id = ? AND tenant_id = ? AND user_id = ? FOR UPDATE'
+            );
+            $lookup->execute([$listingId, Tenant::id(), $userId]);
+            $current = $lookup->fetch();
+            if (!is_array($current)) {
+                $pdo->rollBack();
+
+                return false;
+            }
+
+            $imagesQuery = $pdo->prepare('SELECT id, storage_name FROM property_classified_images WHERE listing_id = ?');
+            $imagesQuery->execute([$listingId]);
+            $images = $imagesQuery->fetchAll();
+            $removeIds = array_values(array_intersect(
+                array_map(static fn (array $image): int => (int) $image['id'], $images),
+                array_map('intval', $removeImageIds)
+            ));
+            $remaining = count($images) - count($removeIds) + count($uploads);
+            if ($remaining < 1) {
+                throw new RuntimeException('El clasificado debe conservar al menos una imagen.');
+            }
+            if ($remaining > self::MAX_IMAGES) {
+                throw new RuntimeException('Un clasificado admite máximo cinco imágenes. Quita alguna antes de agregar más.');
+            }
+
+            $update = $pdo->prepare(
+                'UPDATE property_classifieds
+                 SET operation = :operation, title = :title, property_type = :property_type, location = :location,
+                     description = :description, price = :price,
+                     contact_name = :contact_name, contact_email = :contact_email, contact_phone = :contact_phone,
+                     contact_authorized = :contact_authorized,
+                     contact_authorized_at = IF(:authorized_now = 0, NULL, COALESCE(contact_authorized_at, UTC_TIMESTAMP()))
+                 WHERE id = :id AND tenant_id = :tenant_id AND user_id = :user_id'
+            );
+            $update->execute([
+                'operation' => $listing['operation'],
+                'title' => $listing['title'],
+                'property_type' => $listing['property_type'],
+                'location' => $listing['location'],
+                'description' => $listing['description'],
+                'price' => $listing['price'],
+                'contact_name' => $listing['contact_name'],
+                'contact_email' => $listing['contact_email'],
+                'contact_phone' => $listing['contact_phone'],
+                'contact_authorized' => $listing['contact_authorized'] ? 1 : 0,
+                'authorized_now' => $listing['contact_authorized'] ? 1 : 0,
+                'id' => $listingId,
+                'tenant_id' => Tenant::id(),
+                'user_id' => $userId,
+            ]);
+
+            if ($removeIds !== []) {
+                foreach ($images as $image) {
+                    if (in_array((int) $image['id'], $removeIds, true)) {
+                        $removedNames[] = (string) $image['storage_name'];
+                    }
+                }
+                $placeholders = implode(', ', array_fill(0, count($removeIds), '?'));
+                $pdo->prepare("DELETE FROM property_classified_images WHERE listing_id = ? AND id IN ({$placeholders})")
+                    ->execute([$listingId, ...$removeIds]);
+            }
+
+            $this->storeImages($listingId, $uploads, $storedPaths);
+
+            $pdo->commit();
+        } catch (Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $this->discardFiles($storedPaths);
+
+            throw $exception;
+        }
+
+        $this->discardFiles(array_map($this->pathForStorageName(...), $removedNames));
+
+        return true;
+    }
+
+    /** Clasificados de su autor, con los datos de contacto guardados aunque no estén autorizados (para editar). */
+    public function listingsForOwner(int $userId): array
+    {
+        $listings = $this->listings('c.user_id = ?', [$userId]);
+        if ($listings === []) {
+            return [];
+        }
+        $query = Database::connection()->prepare(
+            'SELECT id, contact_name, contact_email, contact_phone, contact_authorized
+             FROM property_classifieds WHERE tenant_id = ? AND user_id = ?'
+        );
+        $query->execute([Tenant::id(), $userId]);
+        $contacts = [];
+        foreach ($query->fetchAll() as $row) {
+            $contacts[(int) $row['id']] = $row;
+        }
+        foreach ($listings as &$listing) {
+            $contact = $contacts[(int) $listing['id']] ?? [];
+            $listing['contact_name'] = $contact['contact_name'] ?? null;
+            $listing['contact_email'] = $contact['contact_email'] ?? null;
+            $listing['contact_phone'] = $contact['contact_phone'] ?? null;
+            $listing['contact_authorized'] = (bool) ($contact['contact_authorized'] ?? false);
+        }
+        unset($listing);
+
+        return $listings;
     }
 
     public function setStatus(int $listingId, int $userId, string $status): bool
@@ -147,15 +241,8 @@ final class ClassifiedsService
             return false;
         }
 
-        foreach ($images as $image) {
-            if (!is_string($image['storage_name'] ?? null)) {
-                continue;
-            }
-            $path = $this->pathForStorageName($image['storage_name']);
-            if (is_file($path) && !unlink($path)) {
-                error_log('No se pudo eliminar una imagen asociada a un clasificado eliminado.');
-            }
-        }
+        $storageNames = array_filter(array_column($images, 'storage_name'), 'is_string');
+        $this->discardFiles(array_map($this->pathForStorageName(...), $storageNames));
 
         return true;
     }
@@ -232,8 +319,8 @@ final class ClassifiedsService
         $description = trim(is_string($data['description'] ?? null) ? $data['description'] : '');
         $priceInput = trim(is_string($data['price'] ?? null) ? $data['price'] : '');
 
-        if (!in_array($operation, ['sale', 'purchase'], true)) {
-            throw new RuntimeException('Selecciona si ofreces el inmueble en venta o buscas comprar.');
+        if (!in_array($operation, ['sale', 'rent', 'purchase'], true)) {
+            throw new RuntimeException('Selecciona si ofreces el inmueble en venta, en arriendo o buscas comprar.');
         }
         if ($this->textLength($title) < 3 || $this->textLength($title) > 160) {
             throw new RuntimeException('El título debe tener entre 3 y 160 caracteres.');
@@ -292,6 +379,37 @@ final class ClassifiedsService
             'contact_email' => $contactEmail === '' ? null : $contactEmail,
             'contact_phone' => $contactPhone === '' ? null : $contactPhone,
         ];
+    }
+
+    /**
+     * Mueve las imágenes validadas al almacenamiento privado y las registra en el clasificado.
+     * Cada archivo guardado se agrega a $storedPaths para limpiarlo si la transacción falla.
+     */
+    private function storeImages(int $listingId, array $uploads, array &$storedPaths): void
+    {
+        $insert = Database::connection()->prepare(
+            'INSERT INTO property_classified_images (listing_id, storage_name, mime_type, byte_size, width, height)
+             VALUES (?, ?, ?, ?, ?, ?)'
+        );
+        foreach ($uploads as $upload) {
+            $storageName = bin2hex(random_bytes(16)) . '.' . $upload['extension'];
+            $destination = Storage::directory('classifieds') . DIRECTORY_SEPARATOR . $storageName;
+            if (!move_uploaded_file($upload['temporary_name'], $destination)) {
+                throw new RuntimeException('No se pudo guardar una de las imágenes. Intenta nuevamente.');
+            }
+            $storedPaths[] = $destination;
+            $insert->execute([$listingId, $storageName, $upload['mime_type'], $upload['byte_size'], $upload['width'], $upload['height']]);
+        }
+    }
+
+    /** @param list<string> $paths */
+    private function discardFiles(array $paths): void
+    {
+        foreach ($paths as $path) {
+            if (is_file($path) && !unlink($path)) {
+                error_log('No se pudo eliminar una imagen de clasificados.');
+            }
+        }
     }
 
     private function validateUploads(array $files): array
@@ -359,24 +477,13 @@ final class ClassifiedsService
         return $uploads;
     }
 
-    private function storageDirectory(): string
-    {
-        $directory = dirname(__DIR__, 3) . DIRECTORY_SEPARATOR . 'storage'
-            . DIRECTORY_SEPARATOR . 'classifieds';
-        if (!is_dir($directory) && !mkdir($directory, 0750, true) && !is_dir($directory)) {
-            throw new RuntimeException('No se pudo preparar el almacenamiento de imágenes.');
-        }
-
-        return $directory;
-    }
-
     private function pathForStorageName(string $storageName): string
     {
         if (!preg_match('/^[a-f0-9]{32}\.(?:jpg|png|webp)$/D', $storageName)) {
             throw new RuntimeException('El nombre interno de una imagen no es válido.');
         }
 
-        return $this->storageDirectory() . DIRECTORY_SEPARATOR . $storageName;
+        return Storage::directory('classifieds') . DIRECTORY_SEPARATOR . $storageName;
     }
 
     private function textLength(string $value): int

@@ -87,7 +87,7 @@ final class BillingSearchService
             $settlement = BillingService::settle($total, BillingService::moneyToCents($row['early_discount']), $paid, BillingService::moneyToCents($row['early_payments']));
             $result['statements'][] = [
                 'id' => (int) $row['id'],
-                'number' => sprintf('NC-%s-%06d', str_replace('-', '', (string) $row['period']), (int) $row['id']),
+                'number' => BillingService::statementNumber((string) $row['period'], (int) $row['id']),
                 'unit_id' => (string) $row['unit_id'],
                 'unit_name' => (string) $row['unit_name'],
                 'period' => (string) $row['period'],
@@ -129,7 +129,7 @@ final class BillingSearchService
                 'voided' => $row['voided_at'] !== null,
                 'void_reason' => (string) ($row['void_reason'] ?? ''),
                 'statement_id' => (int) $row['statement_id'],
-                'statement_number' => sprintf('NC-%s-%06d', str_replace('-', '', (string) $row['period']), (int) $row['statement_id']),
+                'statement_number' => BillingService::statementNumber((string) $row['period'], (int) $row['statement_id']),
                 'period' => (string) $row['period'],
                 'unit_name' => (string) $row['unit_name'],
                 'created_by' => (string) ($row['created_by_name'] ?? ''),

@@ -20,3 +20,16 @@ $reports = new \App\Modules\Billing\ReportController();
 $router->get('/cartera/reportes', [$reports, 'index']);
 $router->get('/cartera/reportes/exportar', [$reports, 'export']);
 $router->get('/cartera/buscar', [$reports, 'search']);
+
+$paymentReports = new \App\Modules\Billing\PaymentReportController();
+$router->get('/cartera/pagos-reportados', [$paymentReports, 'index']);
+$router->get('/cartera/pagos-reportados/soporte', [$paymentReports, 'proof']);
+$router->post('/cartera/pagos-reportados/aprobar', [$paymentReports, 'approve']);
+$router->post('/cartera/pagos-reportados/rechazar', [$paymentReports, 'reject']);
+$router->get('/cartera/cobros/comprobante', [$paymentReports, 'receipt']);
+
+$paymentLinks = new \App\Modules\Billing\PaymentLinkController();
+$router->get('/cartera/cobros/enlaces', [$paymentLinks, 'index']);
+$router->post('/cartera/cobros/enlaces/crear', [$paymentLinks, 'create']);
+$router->post('/cartera/cobros/enlaces/enviar', [$paymentLinks, 'send']);
+$router->post('/cartera/cobros/enlaces/revocar', [$paymentLinks, 'revoke']);

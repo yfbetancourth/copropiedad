@@ -97,7 +97,7 @@ final class ReportController
             foreach ($payments as $payment) {
                 $rows[] = [
                     $payment['received_on'], $payment['unit_name'],
-                    sprintf('NC-%s-%06d', str_replace('-', '', (string) $payment['period']), (int) $payment['statement_id']),
+                    BillingService::statementNumber((string) $payment['period'], (int) $payment['statement_id']),
                     $payment['period'], self::amount(BillingService::moneyToCents($payment['amount'])),
                     $payment['reference'], $payment['notes'], $payment['created_by_name'] ?? '',
                     $payment['voided_at'] === null ? 'Vigente' : 'Anulado', $payment['void_reason'] ?? '',

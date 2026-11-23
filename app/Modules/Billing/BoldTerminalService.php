@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Billing;
 
+use App\Core\SecretBox;
 use App\Core\Database;
+use App\Core\ModuleCatalog;
 use App\Core\Tenant;
 use DateTimeImmutable;
 use RuntimeException;
@@ -41,6 +43,12 @@ final class BoldTerminalService
             'payment_method' => (string) $row['api_integrations_payment_method'],
             'webhook_secret_configured' => (string) $row['api_integrations_webhook_secret_ciphertext'] !== '',
         ];
+    }
+
+    /** Datáfono disponible: módulo habilitado, terminal configurado y URL HTTPS para el webhook. */
+    public function isReady(): bool
+    {
+        return ModuleCatalog::enabled('pagos_en_linea') && $this->settings()['configured'] && $this->webhookUrl() !== '';
     }
 
     public function paymentMethods(): array
@@ -132,8 +140,8 @@ final class BoldTerminalService
                 api_integrations_payment_method = VALUES(api_integrations_payment_method),
                 api_integrations_environment = VALUES(api_integrations_environment)'
         )->execute([
-            Tenant::id(), $environment, $this->credential('api_key_ciphertext'), '', $this->encrypt($apiKey),
-            $webhookSecret === '' ? '' : $this->encrypt($webhookSecret), $terminalModel, $terminalSerial,
+            Tenant::id(), $environment, $this->credential('api_key_ciphertext'), '', SecretBox::encrypt($apiKey, BoldPaymentService::SECRET_CONTEXT),
+            $webhookSecret === '' ? '' : SecretBox::encrypt($webhookSecret, BoldPaymentService::SECRET_CONTEXT), $terminalModel, $terminalSerial,
             (string) ($terminal['name'] ?? ''), $method, $environment,
         ]);
     }
@@ -160,19 +168,13 @@ final class BoldTerminalService
             $pdo->rollBack();
             throw new RuntimeException('La nota ya no está disponible.');
         }
-        $billingStatement = (new BillingService())->statement($statementId);
-        if ($billingStatement['superseded_by'] !== null) {
+        try {
+            $billingStatement = (new BillingService())->payableStatement($statementId);
+        } catch (RuntimeException $exception) {
             $pdo->rollBack();
-            throw new RuntimeException(sprintf(
-                'El saldo de esta nota ya se incluyó en la nota del período %s. Paga la nota más reciente.',
-                $billingStatement['superseded_by']['period']
-            ));
+            throw $exception;
         }
         $amountCents = (int) $billingStatement['balance'];
-        if ($amountCents <= 0) {
-            $pdo->rollBack();
-            throw new RuntimeException('Esta nota no tiene saldo pendiente.');
-        }
         $pending = $pdo->prepare("SELECT id FROM billing_bold_terminal_payments WHERE tenant_id=? AND statement_id=? AND user_id=? AND status='pending' LIMIT 1");
         $pending->execute([Tenant::id(), $statementId, $userId]);
         if ($pending->fetchColumn() !== false) {
@@ -290,9 +292,11 @@ final class BoldTerminalService
             }
             $pdo->prepare('INSERT INTO billing_payments (tenant_id,statement_id,amount,received_on,reference,notes,created_by) VALUES (?,?,?,?,?,?,?)')
                 ->execute([Tenant::id(), $payment['statement_id'], $payment['expected_amount'], (new DateTimeImmutable('today'))->format('Y-m-d'), $transactionId, 'Pago en datáfono Bold API Integrations aprobado', $payment['user_id']]);
+            $paymentId = (int) $pdo->lastInsertId();
             $pdo->prepare("UPDATE billing_bold_terminal_payments SET status='approved',transaction_id=? WHERE id=? AND tenant_id=?")
                 ->execute([$transactionId, $payment['id'], Tenant::id()]);
             $pdo->commit();
+            PaymentNotificationService::defer('payment', ['payment_id' => $paymentId, 'origin' => 'terminal']);
         } catch (\Throwable $exception) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             throw $exception;
@@ -323,26 +327,6 @@ final class BoldTerminalService
         $allowed=['api_key_ciphertext','api_integrations_key_ciphertext','api_integrations_webhook_secret_ciphertext'];
         if (!in_array($column,$allowed,true)) throw new RuntimeException('Credencial no válida.');
         $q=Database::connection()->prepare('SELECT '.$column.' FROM bold_payment_settings WHERE tenant_id=?'); $q->execute([Tenant::id()]); $v=$q->fetchColumn();
-        return is_string($v)&&$v!==''?$this->decrypt($v):'';
-    }
-    private function encrypt(string $plain): string
-    {
-        $nonce=random_bytes(12); $tag=''; $cipher=openssl_encrypt($plain,'aes-256-gcm',$this->encryptionKey(),OPENSSL_RAW_DATA,$nonce,$tag,'copropiedad-bold-payment-settings-v1');
-        if (!is_string($cipher)) throw new RuntimeException('No se pudo proteger la credencial Bold.');
-        return 'v1.'.base64_encode($nonce).'.'.base64_encode($tag).'.'.base64_encode($cipher);
-    }
-    private function decrypt(string $payload): string
-    {
-        $parts=explode('.',$payload); if (count($parts)!==4||$parts[0]!=='v1') throw new RuntimeException('Credencial Bold guardada no válida.');
-        $plain=openssl_decrypt(base64_decode($parts[3],true)?:'','aes-256-gcm',$this->encryptionKey(),OPENSSL_RAW_DATA,base64_decode($parts[1],true)?:'',base64_decode($parts[2],true)?:'','copropiedad-bold-payment-settings-v1');
-        if (!is_string($plain)) throw new RuntimeException('No se pudo descifrar la credencial Bold. Verifica APP_KEY.');
-        return $plain;
-    }
-    private function encryptionKey(): string
-    {
-        $key=$_ENV['APP_KEY']??$_SERVER['APP_KEY']??getenv('APP_KEY');
-        if (!is_string($key)||!str_starts_with($key,'base64:')) throw new RuntimeException('Configura APP_KEY para proteger las credenciales Bold.');
-        $decoded=base64_decode(substr($key,7),true); if (!is_string($decoded)||strlen($decoded)!==32) throw new RuntimeException('APP_KEY debe codificar 32 bytes.');
-        return $decoded;
+        return is_string($v)&&$v!==''?SecretBox::decrypt($v, BoldPaymentService::SECRET_CONTEXT):'';
     }
 }

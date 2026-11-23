@@ -63,7 +63,7 @@ $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/inter@5.0.18/index.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/fraunces@5.0.21/wght.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/fraunces@5.0.21/wght-italic.css">
-    <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/portada/css/public.css?v=2">
+    <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/portada/css/public.css?v=3">
     <?php if ($isHomePage): ?>
         <link rel="preload" as="image" href="<?= $escape($basePath . ($galleryImages[0]['url'] ?? '/assets/portada/images/community-placeholder.svg')) ?>" fetchpriority="high">
         <script type="application/ld+json"><?= json_encode($structuredSite, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>

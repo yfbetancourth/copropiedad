@@ -25,12 +25,14 @@ $router->post('/configuracion/mi-correo/eliminar', [$configuration, 'deleteMyMai
 $router->get('/configuracion/metodos-pago', [$configuration, 'paymentMethods']);
 $router->post('/configuracion/metodos-pago/guardar', [$configuration, 'savePaymentMethods']);
 $router->post('/configuracion/metodos-pago/bold-terminal/guardar', [$configuration, 'saveBoldTerminalSettings']);
+$router->post('/configuracion/metodos-pago/wompi/guardar', [$configuration, 'saveWompiSettings']);
 $router->get('/configuracion/caracterizacion', [$configuration, 'characterization']);
 $router->post('/configuracion/caracterizacion/guardar', [$configuration, 'saveCharacterization']);
 $router->get('/configuracion/conformacion', [$configuration, 'composition']);
 $router->post('/configuracion/conformacion/paso', [$configuration, 'saveCompositionStep']);
 $router->post('/configuracion/conformacion/generar', [$configuration, 'generateComposition']);
 $router->post('/configuracion/conformacion/finalizar', [$configuration, 'finishComposition']);
+$router->post('/configuracion/conformacion/reiniciar', [$configuration, 'resetComposition']);
 $router->get('/configuracion/equipo', [$configuration, 'team']);
 $router->post('/configuracion/equipo/guardar', [$configuration, 'saveUser']);
 $router->post('/configuracion/equipo/estado', [$configuration, 'setUserStatus']);

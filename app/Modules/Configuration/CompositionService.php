@@ -6,6 +6,7 @@ namespace App\Modules\Configuration;
 
 use App\Core\Database;
 use App\Core\Tenant;
+use App\Modules\PropertyAssignment\RelationshipHistory;
 use JsonException;
 use RuntimeException;
 
@@ -66,6 +67,7 @@ final class CompositionService
                     completed = 0'
             )->execute([Tenant::id(), $housingType, $encoded]);
             $pdo->prepare('DELETE FROM property_unit_assignments WHERE tenant_id = ?')->execute([Tenant::id()]);
+            RelationshipHistory::closeAll($pdo, 'reinicio_conformacion', self::actorId());
             $pdo->commit();
         } catch (\Throwable $exception) {
             if ($pdo->inTransaction()) {
@@ -122,6 +124,7 @@ final class CompositionService
             );
             foreach (array_diff_key($previousIds, $ids) as $removedId => $_) {
                 $removeAssignment->execute([Tenant::id(), $removedId]);
+                RelationshipHistory::close($pdo, (string) $removedId, null, date('Y-m-d'), 'inmueble_eliminado', self::actorId());
             }
             $pdo->commit();
         } catch (\Throwable $exception) {
@@ -169,11 +172,25 @@ final class CompositionService
         return $composition;
     }
 
+    /**
+     * Borra la estructura y sus vínculos vigentes. Quien llama abre la transacción.
+     */
     public function clear(): void
     {
         $pdo = Database::connection();
         $pdo->prepare('DELETE FROM property_unit_assignments WHERE tenant_id = ?')->execute([Tenant::id()]);
+        RelationshipHistory::closeAll($pdo, 'reinicio_conformacion', self::actorId());
         $pdo->prepare('DELETE FROM copropiedad_composition WHERE tenant_id = ?')->execute([Tenant::id()]);
+    }
+
+    /**
+     * Usuario que hace el cambio, para dejarlo en la trazabilidad de vínculos.
+     */
+    private static function actorId(): ?int
+    {
+        $id = $_SESSION['admin_user_id'] ?? null;
+
+        return is_int($id) && $id > 0 ? $id : null;
     }
 
     /**

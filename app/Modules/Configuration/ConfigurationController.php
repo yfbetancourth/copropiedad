@@ -4,20 +4,23 @@ declare(strict_types=1);
 
 namespace App\Modules\Configuration;
 
+use App\Core\Http;
 use App\Core\Authorization;
 use App\Core\Database;
+use App\Core\ModuleCatalog;
 use App\Core\Session;
-use App\Core\Url;
 use App\Core\View;
 use App\Modules\Auth\SmtpMailer;
 use App\Modules\Billing\BoldPaymentService;
 use App\Modules\Billing\BoldTerminalService;
+use App\Modules\Billing\WompiPaymentService;
 use PDOException;
 use RuntimeException;
 use Throwable;
 
 final class ConfigurationController
 {
+    private const FLASH = 'configuration_flash';
     /** Categorías sugeridas al editar la estructura; se puede escribir otra. */
     public const UNIT_CATEGORIES = ['Apartamento', 'Casa', 'Inmueble comercial', 'Parqueadero', 'Bodega', 'Depósito', 'Oficina'];
 
@@ -35,16 +38,16 @@ final class ConfigurationController
         }
 
         $user = null;
-        $userId = $this->integerInput($_GET['editar'] ?? null);
+        $userId = Http::integer($_GET['editar'] ?? null);
         if ($userId !== false && $userId !== null) {
             $user = $this->team->find((int) $userId);
             if ($user === null) {
-                $this->flash('error', 'El usuario seleccionado no existe.');
-                $this->redirect('/configuracion/equipo');
+                Http::flash(self::FLASH, 'error', 'El usuario seleccionado no existe.');
+                Http::redirect('/configuracion/equipo');
             }
             if ((bool) $user['is_system']) {
-                $this->flash('error', 'La cuenta del administrador principal está protegida; la gestiona el Superadmin.');
-                $this->redirect('/configuracion/equipo');
+                Http::flash(self::FLASH, 'error', 'La cuenta del administrador principal está protegida; la gestiona el Superadmin.');
+                Http::redirect('/configuracion/equipo');
             }
         }
 
@@ -62,46 +65,46 @@ final class ConfigurationController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
-        $userId = $this->integerInput($_POST['user_id'] ?? null);
-        $username = trim($this->stringInput($_POST['username'] ?? null));
-        $email = trim($this->stringInput($_POST['email'] ?? null));
-        $password = $this->stringInput($_POST['password'] ?? null);
-        $roleId = $this->integerInput($_POST['role_id'] ?? null);
+        $userId = Http::integer($_POST['user_id'] ?? null);
+        $username = trim(Http::string($_POST['username'] ?? null));
+        $email = trim(Http::string($_POST['email'] ?? null));
+        $password = Http::string($_POST['password'] ?? null);
+        $roleId = Http::integer($_POST['role_id'] ?? null);
 
         if (strlen($username) < 3 || strlen($username) > 64
             || !preg_match('/^[\p{L}\p{N}_.@-]+$/uD', $username)
             || !filter_var($email, FILTER_VALIDATE_EMAIL)
             || $roleId === false || $roleId === null
         ) {
-            $this->flash('error', 'Verifica el nombre de usuario, correo y rol seleccionado.');
-            $this->redirect('/configuracion/equipo');
+            Http::flash(self::FLASH, 'error', 'Verifica el nombre de usuario, correo y rol seleccionado.');
+            Http::redirect('/configuracion/equipo');
         }
 
         if ($userId === false || ($userId !== null && $userId < 1)) {
-            $this->flash('error', 'El usuario seleccionado no es valido.');
-            $this->redirect('/configuracion/equipo');
+            Http::flash(self::FLASH, 'error', 'El usuario seleccionado no es valido.');
+            Http::redirect('/configuracion/equipo');
         }
 
         $editing = $userId !== null;
         if ((!$editing && strlen($password) < 12)
             || ($password !== '' && strlen($password) < 12)
         ) {
-            $this->flash('error', 'La contrasena debe tener al menos 12 caracteres.');
-            $this->redirect('/configuracion/equipo');
+            Http::flash(self::FLASH, 'error', 'La contrasena debe tener al menos 12 caracteres.');
+            Http::redirect('/configuracion/equipo');
         }
 
         $role = $this->roles->find((int) $roleId);
         if ($role === null || (bool) $role['is_system']) {
-            $this->flash('error', 'Selecciona un rol personalizado valido.');
-            $this->redirect('/configuracion/equipo');
+            Http::flash(self::FLASH, 'error', 'Selecciona un rol personalizado valido.');
+            Http::redirect('/configuracion/equipo');
         }
         if (!$actor['is_system']) {
             foreach ($role['permissions'] as $moduleKey => $level) {
                 if (!Authorization::canGrant($level, $actor['permissions'][$moduleKey] ?? 'none')) {
-                    $this->flash('error', 'No puedes asignar permisos que superen tu propio nivel de acceso.');
-                    $this->redirect('/configuracion/equipo');
+                    Http::flash(self::FLASH, 'error', 'No puedes asignar permisos que superen tu propio nivel de acceso.');
+                    Http::redirect('/configuracion/equipo');
                 }
             }
         }
@@ -114,18 +117,18 @@ final class ConfigurationController
                 $this->team->create($username, $email, $password, (int) $roleId);
                 $message = 'Usuario creado correctamente.';
             }
-            $this->flash('success', $message);
+            Http::flash(self::FLASH, 'success', $message);
         } catch (PDOException $exception) {
             if ((string) $exception->getCode() === '23000') {
-                $this->flash('error', 'El nombre de usuario o el correo ya esta registrado.');
+                Http::flash(self::FLASH, 'error', 'El nombre de usuario o el correo ya esta registrado.');
             } else {
                 throw $exception;
             }
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
 
-        $this->redirect('/configuracion/equipo');
+        Http::redirect('/configuracion/equipo');
     }
 
     public function setUserStatus(): void
@@ -134,25 +137,25 @@ final class ConfigurationController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
-        $userId = $this->integerInput($_POST['user_id'] ?? null);
+        $userId = Http::integer($_POST['user_id'] ?? null);
         $activeInput = $_POST['active'] ?? null;
         $active = $activeInput === '1';
         if ($userId === false || $userId === null || $userId < 1
             || !in_array($activeInput, ['0', '1'], true)
         ) {
-            $this->flash('error', 'El usuario seleccionado no es valido.');
-            $this->redirect('/configuracion/equipo');
+            Http::flash(self::FLASH, 'error', 'El usuario seleccionado no es valido.');
+            Http::redirect('/configuracion/equipo');
         }
 
         try {
             $this->team->setActive((int) $userId, $active, $actor['id']);
-            $this->flash('success', $active ? 'Usuario activado.' : 'Usuario desactivado.');
+            Http::flash(self::FLASH, 'success', $active ? 'Usuario activado.' : 'Usuario desactivado.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
-        $this->redirect('/configuracion/equipo');
+        Http::redirect('/configuracion/equipo');
     }
 
     public function roles(): void
@@ -163,12 +166,12 @@ final class ConfigurationController
         }
 
         $role = null;
-        $roleId = $this->integerInput($_GET['editar'] ?? null);
+        $roleId = Http::integer($_GET['editar'] ?? null);
         if ($roleId !== false && $roleId !== null) {
             $role = $this->roles->find((int) $roleId);
             if ($role === null) {
-                $this->flash('error', 'El rol seleccionado no existe.');
-                $this->redirect('/configuracion/roles');
+                Http::flash(self::FLASH, 'error', 'El rol seleccionado no existe.');
+                Http::redirect('/configuracion/roles');
             }
         }
 
@@ -192,19 +195,19 @@ final class ConfigurationController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
-        $roleId = $this->integerInput($_POST['role_id'] ?? null);
-        $name = trim($this->stringInput($_POST['name'] ?? null));
-        $description = trim($this->stringInput($_POST['description'] ?? null));
+        $roleId = Http::integer($_POST['role_id'] ?? null);
+        $name = trim(Http::string($_POST['name'] ?? null));
+        $description = trim(Http::string($_POST['description'] ?? null));
         $submitted = is_array($_POST['permissions'] ?? null) ? $_POST['permissions'] : [];
 
         if (strlen($name) < 2 || strlen($name) > 64
             || !preg_match('/^[\p{L}\p{N} _.-]+$/uD', $name)
             || strlen($description) > 255
         ) {
-            $this->flash('error', 'Verifica el nombre y la descripcion del rol.');
-            $this->redirect('/configuracion/roles');
+            Http::flash(self::FLASH, 'error', 'Verifica el nombre y la descripcion del rol.');
+            Http::redirect('/configuracion/roles');
         }
 
         $permissions = [];
@@ -219,41 +222,41 @@ final class ConfigurationController
             }
             $level = $submitted[$moduleKey] ?? 'none';
             if (!is_string($level) || !array_key_exists($level, RoleService::LEVELS)) {
-                $this->flash('error', 'Uno de los niveles de permiso no es valido.');
-                $this->redirect('/configuracion/roles');
+                Http::flash(self::FLASH, 'error', 'Uno de los niveles de permiso no es valido.');
+                Http::redirect('/configuracion/roles');
             }
             if (!$actor['is_system'] && !Authorization::canGrant($level, $actor['permissions'][$moduleKey] ?? 'none')) {
-                $this->flash('error', 'No puedes conceder permisos que superen tu propio nivel de acceso.');
-                $this->redirect('/configuracion/roles');
+                Http::flash(self::FLASH, 'error', 'No puedes conceder permisos que superen tu propio nivel de acceso.');
+                Http::redirect('/configuracion/roles');
             }
             $permissions[$moduleKey] = $level;
         }
 
         if ($roleId === false || ($roleId !== null && $roleId < 1)) {
-            $this->flash('error', 'El rol seleccionado no es valido.');
-            $this->redirect('/configuracion/roles');
+            Http::flash(self::FLASH, 'error', 'El rol seleccionado no es valido.');
+            Http::redirect('/configuracion/roles');
         }
 
         $editing = $roleId !== null;
         if ($editing) {
             $existing = $this->roles->find((int) $roleId);
             if ($existing === null || (bool) $existing['is_system']) {
-                $this->flash('error', 'El rol del sistema no se puede modificar.');
-                $this->redirect('/configuracion/roles');
+                Http::flash(self::FLASH, 'error', 'El rol del sistema no se puede modificar.');
+                Http::redirect('/configuracion/roles');
             }
         }
 
         try {
             $this->roles->save($editing ? (int) $roleId : null, $name, $description, $permissions);
-            $this->flash('success', 'Rol y permisos guardados correctamente.');
+            Http::flash(self::FLASH, 'success', 'Rol y permisos guardados correctamente.');
         } catch (PDOException $exception) {
             if ((string) $exception->getCode() === '23000') {
-                $this->flash('error', 'Ya existe un rol con ese nombre.');
+                Http::flash(self::FLASH, 'error', 'Ya existe un rol con ese nombre.');
             } else {
                 throw $exception;
             }
         }
-        $this->redirect('/configuracion/roles');
+        Http::redirect('/configuracion/roles');
     }
 
     public function deleteRole(): void
@@ -262,28 +265,28 @@ final class ConfigurationController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
-        $roleId = $this->integerInput($_POST['role_id'] ?? null);
+        $roleId = Http::integer($_POST['role_id'] ?? null);
         if ($roleId === false || $roleId === null || $roleId < 1) {
-            $this->flash('error', 'El rol seleccionado no es valido.');
-            $this->redirect('/configuracion/roles');
+            Http::flash(self::FLASH, 'error', 'El rol seleccionado no es valido.');
+            Http::redirect('/configuracion/roles');
         }
 
         try {
             if (!$this->roles->delete((int) $roleId)) {
-                $this->flash('error', 'El rol no existe o es un rol protegido del sistema.');
+                Http::flash(self::FLASH, 'error', 'El rol no existe o es un rol protegido del sistema.');
             } else {
-                $this->flash('success', 'Rol eliminado.');
+                Http::flash(self::FLASH, 'success', 'Rol eliminado.');
             }
         } catch (PDOException $exception) {
             if ((string) $exception->getCode() === '23000') {
-                $this->flash('error', 'No se puede eliminar un rol que tiene usuarios asignados.');
+                Http::flash(self::FLASH, 'error', 'No se puede eliminar un rol que tiene usuarios asignados.');
             } else {
                 throw $exception;
             }
         }
-        $this->redirect('/configuracion/roles');
+        Http::redirect('/configuracion/roles');
     }
 
     public function parametrization(): void
@@ -305,17 +308,17 @@ final class ConfigurationController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
-        $name = trim($this->stringInput($_POST['property_name'] ?? null));
-        $address = trim($this->stringInput($_POST['address'] ?? null));
-        $taxId = trim($this->stringInput($_POST['tax_id'] ?? null));
-        $accountHolder = trim($this->stringInput($_POST['account_holder'] ?? null));
-        $bankName = trim($this->stringInput($_POST['bank_name'] ?? null));
-        $accountType = $this->stringInput($_POST['account_type'] ?? null);
-        $accountNumber = trim($this->stringInput($_POST['account_number'] ?? null));
-        $earlyPaymentDay = $this->integerInput($_POST['early_payment_day'] ?? null);
-        $paymentDueDay = $this->integerInput($_POST['payment_due_day'] ?? null);
+        $name = trim(Http::string($_POST['property_name'] ?? null));
+        $address = trim(Http::string($_POST['address'] ?? null));
+        $taxId = trim(Http::string($_POST['tax_id'] ?? null));
+        $accountHolder = trim(Http::string($_POST['account_holder'] ?? null));
+        $bankName = trim(Http::string($_POST['bank_name'] ?? null));
+        $accountType = Http::string($_POST['account_type'] ?? null);
+        $accountNumber = trim(Http::string($_POST['account_number'] ?? null));
+        $earlyPaymentDay = Http::integer($_POST['early_payment_day'] ?? null);
+        $paymentDueDay = Http::integer($_POST['payment_due_day'] ?? null);
 
         if ($name === '' || strlen($name) > 160 || strlen($address) > 255
             || strlen($taxId) > 32 || strlen($accountHolder) > 160
@@ -331,8 +334,8 @@ final class ConfigurationController
             || (($earlyPaymentDay === null) !== ($paymentDueDay === null))
             || ($earlyPaymentDay !== null && $paymentDueDay !== null && $earlyPaymentDay > $paymentDueDay)
         ) {
-            $this->flash('error', 'Verifica los datos de la copropiedad, completa juntos los datos bancarios y revisa los dias de pronto pago y vencimiento (1 a 28).');
-            $this->redirect('/configuracion/parametrizacion');
+            Http::flash(self::FLASH, 'error', 'Verifica los datos de la copropiedad, completa juntos los datos bancarios y revisa los dias de pronto pago y vencimiento (1 a 28).');
+            Http::redirect('/configuracion/parametrizacion');
         }
 
         (new SettingsService())->saveParametrization(
@@ -346,8 +349,8 @@ final class ConfigurationController
             $earlyPaymentDay,
             $paymentDueDay
         );
-        $this->flash('success', 'Los datos de parametrizacion se guardaron correctamente.');
-        $this->redirect('/configuracion/parametrizacion');
+        Http::flash(self::FLASH, 'success', 'Los datos de parametrizacion se guardaron correctamente.');
+        Http::redirect('/configuracion/parametrizacion');
     }
 
     public function propertyGallery(): void
@@ -368,16 +371,16 @@ final class ConfigurationController
         if ($this->requireAction('configuracion.parametrizacion', 'write') === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
         try {
             $count = (new PropertyGalleryService())->upload($_FILES['images'] ?? []);
-            $this->flash('success', sprintf('Se agregaron %d %s a la galería pública.', $count, $count === 1 ? 'imagen' : 'imágenes'));
+            Http::flash(self::FLASH, 'success', sprintf('Se agregaron %d %s a la galería pública.', $count, $count === 1 ? 'imagen' : 'imágenes'));
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
 
-        $this->redirect('/configuracion/galeria-publica');
+        Http::redirect('/configuracion/galeria-publica');
     }
 
     public function deletePropertyGalleryImage(): void
@@ -385,16 +388,16 @@ final class ConfigurationController
         if ($this->requireAction('configuracion.parametrizacion', 'write') === null) {
             return;
         }
-        $this->requireCsrf();
-        $name = $this->stringInput($_POST['image'] ?? null);
+        Http::requireCsrf();
+        $name = Http::string($_POST['image'] ?? null);
 
         if ((new PropertyGalleryService())->delete($name)) {
-            $this->flash('success', 'La imagen se retiró de la galería pública.');
+            Http::flash(self::FLASH, 'success', 'La imagen se retiró de la galería pública.');
         } else {
-            $this->flash('error', 'No se encontró la imagen seleccionada.');
+            Http::flash(self::FLASH, 'error', 'No se encontró la imagen seleccionada.');
         }
 
-        $this->redirect('/configuracion/galeria-publica');
+        Http::redirect('/configuracion/galeria-publica');
     }
 
     public function financial(): void
@@ -416,21 +419,21 @@ final class ConfigurationController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
         $administrationFee = $this->moneyInput($_POST['administration_fee'] ?? null);
-        $effectiveDate = $this->stringInput($_POST['effective_date'] ?? null);
+        $effectiveDate = Http::string($_POST['effective_date'] ?? null);
         $discount = $this->moneyInput($_POST['early_payment_discount'] ?? null);
-        $lateFeeType = $this->stringInput($_POST['late_fee_type'] ?? null);
+        $lateFeeType = Http::string($_POST['late_fee_type'] ?? null);
         $lateFeeValue = $this->moneyInput($_POST['late_fee_value'] ?? null);
-        $lateFeeDays = $this->integerInput($_POST['late_fee_days'] ?? null);
+        $lateFeeDays = Http::integer($_POST['late_fee_days'] ?? null);
         $fineAmount = $this->moneyInput($_POST['fine_amount'] ?? null);
         $extraordinaryFeeInput = $_POST['extraordinary_fee'] ?? null;
         $extraordinaryFee = $extraordinaryFeeInput === null || $extraordinaryFeeInput === ''
             ? null
             : $this->moneyInput($extraordinaryFeeInput);
-        $extraordinaryFeeStartDate = trim($this->stringInput($_POST['extraordinary_fee_start_date'] ?? null));
-        $extraordinaryFeeEndDate = trim($this->stringInput($_POST['extraordinary_fee_end_date'] ?? null));
+        $extraordinaryFeeStartDate = trim(Http::string($_POST['extraordinary_fee_start_date'] ?? null));
+        $extraordinaryFeeEndDate = trim(Http::string($_POST['extraordinary_fee_end_date'] ?? null));
         $validDate = \DateTimeImmutable::createFromFormat('!Y-m-d', $effectiveDate);
         $dateErrors = \DateTimeImmutable::getLastErrors();
         $extraordinaryStartDate = $extraordinaryFeeStartDate === ''
@@ -470,8 +473,8 @@ final class ConfigurationController
                 || $extraordinaryFeeStartDate > $extraordinaryFeeEndDate
             ))
         ) {
-            $this->flash('error', 'Revisa los valores financieros, las fechas de vigencia y el porcentaje de mora entre 0 y 100.');
-            $this->redirect('/configuracion/financiera');
+            Http::flash(self::FLASH, 'error', 'Revisa los valores financieros, las fechas de vigencia y el porcentaje de mora entre 0 y 100.');
+            Http::redirect('/configuracion/financiera');
         }
 
         (new SettingsService())->saveFinancial(
@@ -486,8 +489,8 @@ final class ConfigurationController
             $extraordinaryFeeConfigured ? $extraordinaryFeeStartDate : null,
             $extraordinaryFeeConfigured ? $extraordinaryFeeEndDate : null
         );
-        $this->flash('success', 'Los parametros financieros se guardaron correctamente.');
-        $this->redirect('/configuracion/financiera');
+        Http::flash(self::FLASH, 'success', 'Los parametros financieros se guardaron correctamente.');
+        Http::redirect('/configuracion/financiera');
     }
 
     public function mail(): void
@@ -508,27 +511,10 @@ final class ConfigurationController
         if ($this->requireAction('configuracion.correo', 'write') === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
-        $host = trim($this->stringInput($_POST['host'] ?? null));
-        $port = $this->integerInput($_POST['port'] ?? null);
-        $username = trim($this->stringInput($_POST['username'] ?? null));
-        $password = $this->stringInput($_POST['password'] ?? null);
-        $encryption = $this->stringInput($_POST['encryption'] ?? null);
-        $fromAddress = trim($this->stringInput($_POST['from_address'] ?? null));
-        $fromName = trim($this->stringInput($_POST['from_name'] ?? null));
-
-        if (preg_match('/^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/D', $host) !== 1
-            || $port === false || $port === null || $port < 1 || $port > 65535
-            || $username === '' || strlen($username) > 254 || strlen($password) > 512
-            || preg_match('/[\x00-\x1F\x7F]/', $username) === 1
-            || !in_array($encryption, ['tls', 'ssl'], true)
-            || !filter_var($fromAddress, FILTER_VALIDATE_EMAIL)
-            || strlen($fromName) > 160 || preg_match('/[\x00-\x1F\x7F]/', $fromName) === 1
-        ) {
-            $this->flash('error', 'Revisa el servidor, puerto, cifrado, usuario y datos del remitente.');
-            $this->redirect('/configuracion/correo');
-        }
+        ['host' => $host, 'port' => $port, 'username' => $username, 'password' => $password,
+         'encryption' => $encryption, 'from_address' => $fromAddress, 'from_name' => $fromName] = $this->smtpInput('/configuracion/correo');
 
         try {
             (new MailSettingsService())->save(
@@ -540,12 +526,12 @@ final class ConfigurationController
                 $fromAddress,
                 $fromName
             );
-            $this->flash('success', 'La configuración de correo se guardó de forma segura.');
+            Http::flash(self::FLASH, 'success', 'La configuración de correo se guardó de forma segura.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
 
-        $this->redirect('/configuracion/correo');
+        Http::redirect('/configuracion/correo');
     }
 
     public function testMail(): void
@@ -554,7 +540,7 @@ final class ConfigurationController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
         try {
             $settings = (new MailSettingsService())->credentials();
@@ -567,15 +553,48 @@ final class ConfigurationController
                 '<p>Hola ' . $username . ',</p><p>La configuración de correo funciona correctamente.</p>',
                 'La configuracion de correo funciona correctamente.'
             );
-            $this->flash('success', 'Se envió el correo de prueba a ' . $actor['email'] . '.');
+            Http::flash(self::FLASH, 'success', 'Se envió el correo de prueba a ' . $actor['email'] . '.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         } catch (\PHPMailer\PHPMailer\Exception $exception) {
             error_log('Fallo la prueba SMTP: ' . $exception->getMessage());
-            $this->flash('error', 'No se pudo enviar el correo. Verifica los datos del proveedor y su conexión SMTP.');
+            Http::flash(self::FLASH, 'error', 'No se pudo enviar el correo. Verifica los datos del proveedor y su conexión SMTP.');
         }
 
-        $this->redirect('/configuracion/correo');
+        Http::redirect('/configuracion/correo');
+    }
+
+    /**
+     * Datos SMTP del formulario (cuenta general o correo personal). Si no son válidos, vuelve a $returnPath
+     * con el aviso.
+     *
+     * @return array{host: string, port: int, username: string, password: string, encryption: string, from_address: string, from_name: string}
+     */
+    private function smtpInput(string $returnPath): array
+    {
+        $input = [
+            'host' => trim(Http::string($_POST['host'] ?? null)),
+            'port' => Http::integer($_POST['port'] ?? null),
+            'username' => trim(Http::string($_POST['username'] ?? null)),
+            'password' => Http::string($_POST['password'] ?? null),
+            'encryption' => Http::string($_POST['encryption'] ?? null),
+            'from_address' => trim(Http::string($_POST['from_address'] ?? null)),
+            'from_name' => trim(Http::string($_POST['from_name'] ?? null)),
+        ];
+        $port = $input['port'];
+        if (preg_match('/^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/D', $input['host']) !== 1
+            || !is_int($port) || $port < 1 || $port > 65535
+            || $input['username'] === '' || strlen($input['username']) > 254 || strlen($input['password']) > 512
+            || preg_match('/[\x00-\x1F\x7F]/', $input['username']) === 1
+            || !in_array($input['encryption'], ['tls', 'ssl'], true)
+            || !filter_var($input['from_address'], FILTER_VALIDATE_EMAIL)
+            || strlen($input['from_name']) > 160 || preg_match('/[\x00-\x1F\x7F]/', $input['from_name']) === 1
+        ) {
+            Http::flash(self::FLASH, 'error', 'Revisa el servidor, puerto, cifrado, usuario y datos del remitente.');
+            Http::redirect($returnPath);
+        }
+
+        return $input;
     }
 
     /* ---------- Correo personal de envío (p. ej. correo certificado) de cada administrador ---------- */
@@ -602,39 +621,22 @@ final class ConfigurationController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
-        $host = trim($this->stringInput($_POST['host'] ?? null));
-        $port = $this->integerInput($_POST['port'] ?? null);
-        $username = trim($this->stringInput($_POST['username'] ?? null));
-        $password = $this->stringInput($_POST['password'] ?? null);
-        $encryption = $this->stringInput($_POST['encryption'] ?? null);
-        $fromAddress = trim($this->stringInput($_POST['from_address'] ?? null));
-        $fromName = trim($this->stringInput($_POST['from_name'] ?? null));
-
-        if (preg_match('/^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$/D', $host) !== 1
-            || $port === false || $port === null || $port < 1 || $port > 65535
-            || $username === '' || strlen($username) > 254 || strlen($password) > 512
-            || preg_match('/[\x00-\x1F\x7F]/', $username) === 1
-            || !in_array($encryption, ['tls', 'ssl'], true)
-            || !filter_var($fromAddress, FILTER_VALIDATE_EMAIL)
-            || strlen($fromName) > 160 || preg_match('/[\x00-\x1F\x7F]/', $fromName) === 1
-        ) {
-            $this->flash('error', 'Revisa el servidor, puerto, cifrado, usuario y el correo remitente.');
-            $this->redirect('/configuracion/mi-correo');
-        }
+        ['host' => $host, 'port' => $port, 'username' => $username, 'password' => $password,
+         'encryption' => $encryption, 'from_address' => $fromAddress, 'from_name' => $fromName] = $this->smtpInput('/configuracion/mi-correo');
 
         try {
             $service = new PersonalMailService();
             $service->save((int) $actor['id'], $host, $port, $username, $password, $encryption, $fromAddress, $fromName);
             $active = $service->current((int) $actor['id'])['active'] ?? false;
-            $this->flash('success', $active
+            Http::flash(self::FLASH, 'success', $active
                 ? 'Se guardaron los cambios; tu correo personal sigue activo.'
                 : 'Datos guardados. Ahora envía el correo de prueba: si llega, tu cuenta quedará activa para tus envíos.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
-        $this->redirect('/configuracion/mi-correo');
+        Http::redirect('/configuracion/mi-correo');
     }
 
     public function testMyMail(): void
@@ -643,7 +645,7 @@ final class ConfigurationController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
         $service = new PersonalMailService();
         try {
@@ -663,14 +665,14 @@ final class ConfigurationController
                 'Tu cuenta ' . $settings['from_address'] . ' quedo lista para enviar las notificaciones de cobro que tu emitas.'
             );
             $service->markVerified((int) $actor['id']);
-            $this->flash('success', 'La prueba se envió a ' . $actor['email'] . ' y tu correo personal quedó ACTIVO: las notas que emitas o reenvíes saldrán desde ' . $settings['from_address'] . '.');
+            Http::flash(self::FLASH, 'success', 'La prueba se envió a ' . $actor['email'] . ' y tu correo personal quedó ACTIVO: las notas que emitas o reenvíes saldrán desde ' . $settings['from_address'] . '.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         } catch (\PHPMailer\PHPMailer\Exception $exception) {
             error_log('Fallo la prueba SMTP personal: ' . $exception->getMessage());
-            $this->flash('error', 'El proveedor rechazó el envío. Revisa servidor, puerto, cifrado, usuario y contraseña (algunos proveedores exigen una contraseña de aplicación). Tu cuenta sigue inactiva.');
+            Http::flash(self::FLASH, 'error', 'El proveedor rechazó el envío. Revisa servidor, puerto, cifrado, usuario y contraseña (algunos proveedores exigen una contraseña de aplicación). Tu cuenta sigue inactiva.');
         }
-        $this->redirect('/configuracion/mi-correo');
+        Http::redirect('/configuracion/mi-correo');
     }
 
     public function setMyMailStatus(): void
@@ -679,17 +681,17 @@ final class ConfigurationController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
         $active = ($_POST['active'] ?? '') === '1';
         try {
             (new PersonalMailService())->setActive((int) $actor['id'], $active);
-            $this->flash('success', $active
+            Http::flash(self::FLASH, 'success', $active
                 ? 'Tu correo personal está activo para tus envíos.'
                 : 'Tu correo personal quedó en pausa: tus envíos saldrán por la cuenta general de la copropiedad.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
-        $this->redirect('/configuracion/mi-correo');
+        Http::redirect('/configuracion/mi-correo');
     }
 
     public function deleteMyMail(): void
@@ -698,10 +700,10 @@ final class ConfigurationController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
         (new PersonalMailService())->delete((int) $actor['id']);
-        $this->flash('success', 'Se eliminó tu correo personal de envío y su contraseña. Tus envíos saldrán por la cuenta general.');
-        $this->redirect('/configuracion/mi-correo');
+        Http::flash(self::FLASH, 'success', 'Se eliminó tu correo personal de envío y su contraseña. Tus envíos saldrán por la cuenta general.');
+        Http::redirect('/configuracion/mi-correo');
     }
 
     public function paymentMethods(): void
@@ -711,11 +713,12 @@ final class ConfigurationController
             return;
         }
 
+        $boldEnabled = ModuleCatalog::enabled('pagos_en_linea');
         $service = new BoldPaymentService();
         $settings = $service->settings();
         $availableMethods = [];
         $providerError = null;
-        if ($settings['api_key_configured']) {
+        if ($boldEnabled && $settings['api_key_configured']) {
             try {
                 $availableMethods = $service->availableMethods();
             } catch (RuntimeException $exception) {
@@ -727,7 +730,7 @@ final class ConfigurationController
         $availableTerminals = [];
         $availableTerminalMethods = [];
         $terminalProviderError = null;
-        if ($terminalSettings['api_key_configured']) {
+        if ($boldEnabled && $terminalSettings['api_key_configured']) {
             try {
                 $availableTerminals = $terminalService->terminals();
                 $availableTerminalMethods = $terminalService->paymentMethods();
@@ -745,6 +748,11 @@ final class ConfigurationController
             'availableTerminals' => $availableTerminals,
             'availableTerminalMethods' => $availableTerminalMethods,
             'terminalProviderError' => $terminalProviderError,
+            'boldEnabled' => $boldEnabled,
+            'webhookUrl' => $service->webhookUrl(),
+            'wompiEnabled' => ModuleCatalog::enabled(WompiPaymentService::MODULE),
+            'wompiSettings' => (new WompiPaymentService())->settings(),
+            'wompiEventsUrl' => (new WompiPaymentService())->webhookUrl(),
         ]);
     }
 
@@ -753,7 +761,7 @@ final class ConfigurationController
         if (Authorization::requirePermission('configuracion.pagos', 'write') === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
         $methods = $_POST['payment_methods'] ?? [];
         try {
@@ -761,19 +769,41 @@ final class ConfigurationController
                 throw new RuntimeException('Selecciona métodos de pago válidos.');
             }
             $unavailableMethods = (new BoldPaymentService())->saveSettings(
-                $this->stringInput($_POST['environment'] ?? null),
-                $this->stringInput($_POST['api_key'] ?? null),
+                Http::string($_POST['environment'] ?? null),
+                Http::string($_POST['api_key'] ?? null),
                 $methods
             );
             $message = 'La configuración de Bold se guardó y la conexión fue verificada.';
             if ($unavailableMethods !== []) {
                 $message .= ' Métodos no habilitados en Bold: ' . implode(', ', $unavailableMethods) . '.';
             }
-            $this->flash('success', $message);
+            Http::flash(self::FLASH, 'success', $message);
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
-        $this->redirect('/configuracion/metodos-pago');
+        Http::redirect('/configuracion/metodos-pago');
+    }
+
+    public function saveWompiSettings(): void
+    {
+        if (Authorization::requirePermission('configuracion.pagos', 'write') === null) {
+            return;
+        }
+        Http::requireCsrf();
+        ModuleCatalog::requireEnabled(WompiPaymentService::MODULE);
+        try {
+            (new WompiPaymentService())->saveSettings(
+                Http::string($_POST['wompi_environment'] ?? null),
+                Http::string($_POST['wompi_public_key'] ?? null),
+                Http::string($_POST['wompi_private_key'] ?? null),
+                Http::string($_POST['wompi_events_secret'] ?? null),
+                Http::string($_POST['wompi_integrity_secret'] ?? null)
+            );
+            Http::flash(self::FLASH, 'success', 'Wompi quedó configurado y reconoció la llave pública del comercio.');
+        } catch (RuntimeException $exception) {
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
+        }
+        Http::redirect('/configuracion/metodos-pago#wompi');
     }
 
     public function saveBoldTerminalSettings(): void
@@ -781,22 +811,22 @@ final class ConfigurationController
         if (Authorization::requirePermission('configuracion.pagos', 'write') === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
         try {
-            $terminalParts = explode('|', $this->stringInput($_POST['terminal'] ?? null), 2);
+            $terminalParts = explode('|', Http::string($_POST['terminal'] ?? null), 2);
             (new BoldTerminalService())->saveSettings(
-                $this->stringInput($_POST['terminal_environment'] ?? null),
-                $this->stringInput($_POST['terminal_api_key'] ?? null),
-                $this->stringInput($_POST['terminal_webhook_secret'] ?? null),
+                Http::string($_POST['terminal_environment'] ?? null),
+                Http::string($_POST['terminal_api_key'] ?? null),
+                Http::string($_POST['terminal_webhook_secret'] ?? null),
                 $terminalParts[0] ?? '',
                 $terminalParts[1] ?? '',
-                $this->stringInput($_POST['terminal_payment_method'] ?? null)
+                Http::string($_POST['terminal_payment_method'] ?? null)
             );
-            $this->flash('success', 'API Integrations quedó configurada y Bold validó el método y el datáfono.');
+            Http::flash(self::FLASH, 'success', 'API Integrations quedó configurada y Bold validó el método y el datáfono.');
         } catch (RuntimeException $exception) {
-            $this->flash('error', $exception->getMessage());
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
-        $this->redirect('/configuracion/metodos-pago');
+        Http::redirect('/configuracion/metodos-pago');
     }
 
     public function characterization(): void
@@ -833,12 +863,12 @@ final class ConfigurationController
         if ($actor === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
-        $housingType = $this->stringInput($_POST['housing_type'] ?? null);
+        $housingType = Http::string($_POST['housing_type'] ?? null);
         if (!in_array($housingType, ['casa', 'torres_apartamento', 'mixto'], true)) {
-            $this->flash('error', 'Selecciona una caracterizacion valida.');
-            $this->redirect('/configuracion/caracterizacion');
+            Http::flash(self::FLASH, 'error', 'Selecciona una caracterizacion valida.');
+            Http::redirect('/configuracion/caracterizacion');
         }
 
         $settings = (new SettingsService())->current();
@@ -849,18 +879,18 @@ final class ConfigurationController
             : 'piso_numero';
         $hasTowers = in_array($housingType, ['torres_apartamento', 'mixto'], true);
         $towerNomenclature = $hasTowers
-            ? $this->stringInput($_POST['tower_nomenclature'] ?? null)
+            ? Http::string($_POST['tower_nomenclature'] ?? null)
             : $previousNomenclature;
         if (!UnitNomenclature::isTowerFormat($towerNomenclature)) {
-            $this->flash('error', 'Selecciona un tipo de nomenclatura valido para las torres.');
-            $this->redirect('/configuracion/caracterizacion');
+            Http::flash(self::FLASH, 'error', 'Selecciona un tipo de nomenclatura valido para las torres.');
+            Http::redirect('/configuracion/caracterizacion');
         }
         $apartmentNomenclature = $hasTowers
-            ? $this->stringInput($_POST['apartment_nomenclature'] ?? null)
+            ? Http::string($_POST['apartment_nomenclature'] ?? null)
             : $previousApartmentNomenclature;
         if (!UnitNomenclature::isApartmentFormat($apartmentNomenclature)) {
-            $this->flash('error', 'Selecciona un tipo de nomenclatura valido para los apartamentos.');
-            $this->redirect('/configuracion/caracterizacion');
+            Http::flash(self::FLASH, 'error', 'Selecciona un tipo de nomenclatura valido para los apartamentos.');
+            Http::redirect('/configuracion/caracterizacion');
         }
 
         $compositionService = new CompositionService();
@@ -873,25 +903,25 @@ final class ConfigurationController
         $resetsStructure = ($housingType !== $previousType || $nomenclatureChanged) && $hasComposition;
 
         if ($resetsStructure && !Authorization::isSuperadmin($actor)) {
-            $this->flash(
+            Http::flash(self::FLASH, 
                 'error',
                 'Solo el perfil Superadmin puede reiniciar el proceso de conformación. La caracterización no se cambió.'
             );
-            $this->redirect('/configuracion/caracterizacion');
+            Http::redirect('/configuracion/caracterizacion');
         }
         if ($resetsStructure && $compositionService->unitIdsWithBillingHistory() !== []) {
-            $this->flash(
+            Http::flash(self::FLASH, 
                 'error',
                 'No se puede cambiar la caracterización: ya hay notas de cobro emitidas para los inmuebles actuales y su historial de cartera quedaría desconectado. Corrige nombres o coeficientes desde Conformación de la copropiedad.'
             );
-            $this->redirect('/configuracion/caracterizacion');
+            Http::redirect('/configuracion/caracterizacion');
         }
         if ($resetsStructure && !$confirmedChange) {
-            $this->flash(
+            Http::flash(self::FLASH, 
                 'error',
                 'Para cambiar la caracterización escribe REINICIAR en la confirmación. Se eliminarán la estructura de inmuebles y sus asignaciones.'
             );
-            $this->redirect('/configuracion/caracterizacion');
+            Http::redirect('/configuracion/caracterizacion');
         }
 
         $pdo = Database::connection();
@@ -910,11 +940,11 @@ final class ConfigurationController
         }
         if ($resetsStructure || $previousType === '') {
             // El siguiente paso natural es definir la estructura con la nueva caracterización.
-            $this->flash('success', 'Caracterización guardada. Ahora define cuántos inmuebles conforman la copropiedad.');
-            $this->redirect('/configuracion/conformacion');
+            Http::flash(self::FLASH, 'success', 'Caracterización guardada. Ahora define cuántos inmuebles conforman la copropiedad.');
+            Http::redirect('/configuracion/conformacion');
         }
-        $this->flash('success', 'La caracterización se guardó correctamente.');
-        $this->redirect('/configuracion/caracterizacion');
+        Http::flash(self::FLASH, 'success', 'La caracterización se guardó correctamente.');
+        Http::redirect('/configuracion/caracterizacion');
     }
 
     /** Las acciones que borran la estructura exigen escribir REINICIAR, no solo pulsar «Aceptar». */
@@ -933,8 +963,8 @@ final class ConfigurationController
         $settings = (new SettingsService())->current();
         $housingType = $settings['housing_type'] ?? '';
         if (!in_array($housingType, ['casa', 'torres_apartamento', 'mixto'], true)) {
-            $this->flash('error', 'Primero define la caracterizacion de la copropiedad.');
-            $this->redirect('/configuracion/caracterizacion');
+            Http::flash(self::FLASH, 'error', 'Primero define la caracterizacion de la copropiedad.');
+            Http::redirect('/configuracion/caracterizacion');
         }
 
         $towerNomenclature = $settings['tower_nomenclature'] ?? 'numeric';
@@ -955,7 +985,7 @@ final class ConfigurationController
         $steps = $this->compositionSteps($housingType);
         $firstUnanswered = $this->firstUnansweredCompositionStep($steps, $answers);
         $allAnswered = $firstUnanswered === count($steps);
-        $requestedStep = $this->integerInput($_GET['paso'] ?? null);
+        $requestedStep = Http::integer($_GET['paso'] ?? null);
         $stepIndex = $requestedStep === false || $requestedStep === null
             ? $firstUnanswered
             : min(max($requestedStep, 0), $firstUnanswered);
@@ -980,7 +1010,7 @@ final class ConfigurationController
                 if (!is_array($unit)) {
                     continue;
                 }
-                $category = trim($this->stringInput($unit['category'] ?? null));
+                $category = trim(Http::string($unit['category'] ?? null));
                 $category = $category !== '' ? $category : 'Sin categoria';
                 $unitCountsByCategory[$category] = ($unitCountsByCategory[$category] ?? 0) + 1;
             }
@@ -1032,18 +1062,18 @@ final class ConfigurationController
         if ($this->requireAction('configuracion.conformacion', 'write') === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
         $housingType = $this->configuredHousingType();
         $steps = $this->compositionSteps($housingType);
-        $field = $this->stringInput($_POST['field'] ?? null);
-        $value = $this->integerInput($_POST['value'] ?? null);
+        $field = Http::string($_POST['field'] ?? null);
+        $value = Http::integer($_POST['value'] ?? null);
         $fieldIndex = array_search($field, array_column($steps, 'key'), true);
         $minimum = $fieldIndex === false ? 1 : $steps[$fieldIndex]['min'];
 
         if ($fieldIndex === false || $value === false || $value === null || $value < $minimum || $value > 5000) {
-            $this->flash('error', sprintf('Ingresa una cantidad como numero entero, entre %d y 5.000.', $minimum));
-            $this->redirect('/configuracion/conformacion');
+            Http::flash(self::FLASH, 'error', sprintf('Ingresa una cantidad como numero entero, entre %d y 5.000.', $minimum));
+            Http::redirect('/configuracion/conformacion');
         }
 
         $composition = (new CompositionService())->current();
@@ -1053,8 +1083,8 @@ final class ConfigurationController
         $answers[$field] = $value;
         $error = $this->compositionAnswersError($housingType, $answers, false);
         if ($error !== null) {
-            $this->flash('error', $error);
-            $this->redirect('/configuracion/conformacion?paso=' . $fieldIndex);
+            Http::flash(self::FLASH, 'error', $error);
+            Http::redirect('/configuracion/conformacion?paso=' . $fieldIndex);
         }
 
         $changed = !is_array($composition) || $composition['housing_type'] !== $housingType
@@ -1064,24 +1094,71 @@ final class ConfigurationController
         if ($changed && $structureExists) {
             // Cambiar una cantidad regenera todos los inmuebles: se pierden coeficientes, ediciones y asignaciones.
             if (!Authorization::isSuperadmin(Authorization::currentUser())) {
-                $this->flash('error', 'Solo el perfil Superadmin puede reiniciar el proceso de conformación. La cantidad no se cambió.');
-                $this->redirect('/configuracion/conformacion');
+                Http::flash(self::FLASH, 'error', 'Solo el perfil Superadmin puede reiniciar el proceso de conformación. La cantidad no se cambió.');
+                Http::redirect('/configuracion/conformacion');
             }
             if ((new CompositionService())->unitIdsWithBillingHistory() !== []) {
-                $this->flash('error', 'No se puede regenerar la estructura: ya hay notas de cobro emitidas para estos inmuebles. Agrega o corrige inmuebles directamente en la lista.');
-                $this->redirect('/configuracion/conformacion');
+                Http::flash(self::FLASH, 'error', 'No se puede regenerar la estructura: ya hay notas de cobro emitidas para estos inmuebles. Agrega o corrige inmuebles directamente en la lista.');
+                Http::redirect('/configuracion/conformacion');
             }
             if (!$this->confirmedReset($_POST['confirm_text'] ?? null)) {
-                $this->flash('error', 'La cantidad no se cambió. Para regenerar la estructura escribe REINICIAR en la confirmación.');
-                $this->redirect('/configuracion/conformacion?paso=' . $fieldIndex);
+                Http::flash(self::FLASH, 'error', 'La cantidad no se cambió. Para regenerar la estructura escribe REINICIAR en la confirmación.');
+                Http::redirect('/configuracion/conformacion?paso=' . $fieldIndex);
             }
         }
         if ($changed) {
             (new CompositionService())->saveAnswers($housingType, $answers);
         } elseif ($structureExists) {
-            $this->flash('success', 'La cantidad no cambió; la estructura de inmuebles se conserva.');
+            Http::flash(self::FLASH, 'success', 'La cantidad no cambió; la estructura de inmuebles se conserva.');
         }
-        $this->redirect('/configuracion/conformacion');
+        Http::redirect('/configuracion/conformacion');
+    }
+
+    /**
+     * Borra la estructura (respuestas del asistente, inmuebles, coeficientes y vínculos vigentes)
+     * para volver a conformar desde la primera pregunta. La caracterización se conserva.
+     */
+    public function resetComposition(): void
+    {
+        $actor = $this->requireAction('configuracion.conformacion', 'write');
+        if ($actor === null) {
+            return;
+        }
+        Http::requireCsrf();
+
+        $compositionService = new CompositionService();
+        if (!Authorization::isSuperadmin($actor)) {
+            Http::flash(self::FLASH, 'error', 'Solo el perfil Superadmin puede reiniciar la conformación. No se borró nada.');
+            Http::redirect('/configuracion/conformacion');
+        }
+        if ($compositionService->current() === null) {
+            Http::flash(self::FLASH, 'error', 'No hay una conformación guardada para reiniciar.');
+            Http::redirect('/configuracion/conformacion');
+        }
+        if ($compositionService->unitIdsWithBillingHistory() !== []) {
+            Http::flash(self::FLASH, 'error', 'No se puede reiniciar: ya hay notas de cobro emitidas para estos inmuebles y su cartera quedaría desconectada. Corrige o agrega inmuebles directamente en la lista.');
+            Http::redirect('/configuracion/conformacion');
+        }
+        if (!$this->confirmedReset($_POST['confirm_text'] ?? null)) {
+            Http::flash(self::FLASH, 'error', 'No se reinició. Para confirmar escribe REINICIAR.');
+            Http::redirect('/configuracion/conformacion');
+        }
+
+        $pdo = Database::connection();
+        $pdo->beginTransaction();
+        try {
+            $compositionService->clear();
+            $pdo->commit();
+        } catch (Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $exception;
+        }
+        Session::start();
+        unset($_SESSION['composition_draft']);
+        Http::flash(self::FLASH, 'success', 'Conformación reiniciada. Responde de nuevo las cantidades para generar los inmuebles; el historial de vínculos anteriores se conserva en Trazabilidad.');
+        Http::redirect('/configuracion/conformacion');
     }
 
     public function generateComposition(): void
@@ -1089,7 +1166,7 @@ final class ConfigurationController
         if ($this->requireAction('configuracion.conformacion', 'write') === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
         $housingType = $this->configuredHousingType();
         $settings = (new SettingsService())->current();
@@ -1101,8 +1178,8 @@ final class ConfigurationController
             : [];
         $error = $this->compositionAnswersError($housingType, $answers, true);
         if ($error !== null) {
-            $this->flash('error', $error);
-            $this->redirect('/configuracion/conformacion');
+            Http::flash(self::FLASH, 'error', $error);
+            Http::redirect('/configuracion/conformacion');
         }
 
         $units = [];
@@ -1145,7 +1222,7 @@ final class ConfigurationController
         }
 
         (new CompositionService())->saveUnits($units, false);
-        $this->redirect('/configuracion/conformacion');
+        Http::redirect('/configuracion/conformacion');
     }
 
     public function finishComposition(): void
@@ -1153,7 +1230,7 @@ final class ConfigurationController
         if ($this->requireAction('configuracion.conformacion', 'write') === null) {
             return;
         }
-        $this->requireCsrf();
+        Http::requireCsrf();
 
         $housingType = $this->configuredHousingType();
         $compositionService = new CompositionService();
@@ -1161,29 +1238,29 @@ final class ConfigurationController
         if (!is_array($composition) || $composition['housing_type'] !== $housingType
             || $composition['units'] === null
         ) {
-            $this->flash('error', 'Genera la estructura antes de guardarla.');
-            $this->redirect('/configuracion/conformacion');
+            Http::flash(self::FLASH, 'error', 'Genera la estructura antes de guardarla.');
+            Http::redirect('/configuracion/conformacion');
         }
         $composition = $compositionService->ensureUnitIds();
         if (!is_array($composition) || !is_array($composition['units'])) {
-            $this->flash('error', 'No se pudo cargar la estructura actual. Recarga la pagina e intenta nuevamente.');
-            $this->redirect('/configuracion/conformacion');
+            Http::flash(self::FLASH, 'error', 'No se pudo cargar la estructura actual. Recarga la pagina e intenta nuevamente.');
+            Http::redirect('/configuracion/conformacion');
         }
 
         $submittedJson = $_POST['units_json'] ?? null;
         if (!is_string($submittedJson)) {
-            $this->flash('error', 'No se recibio la lista de inmuebles. Recarga la pagina e intenta nuevamente.');
-            $this->redirect('/configuracion/conformacion');
+            Http::flash(self::FLASH, 'error', 'No se recibio la lista de inmuebles. Recarga la pagina e intenta nuevamente.');
+            Http::redirect('/configuracion/conformacion');
         }
         try {
             $submitted = json_decode($submittedJson, true, 512, JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
-            $this->flash('error', 'La lista de inmuebles tiene un formato invalido. Revisa los datos e intenta nuevamente.');
-            $this->redirect('/configuracion/conformacion');
+            Http::flash(self::FLASH, 'error', 'La lista de inmuebles tiene un formato invalido. Revisa los datos e intenta nuevamente.');
+            Http::redirect('/configuracion/conformacion');
         }
         if (!is_array($submitted) || !array_is_list($submitted) || count($submitted) < 1 || count($submitted) > 5000) {
-            $this->flash('error', 'La estructura debe tener entre 1 y 5.000 inmuebles.');
-            $this->redirect('/configuracion/conformacion');
+            Http::flash(self::FLASH, 'error', 'La estructura debe tener entre 1 y 5.000 inmuebles.');
+            Http::redirect('/configuracion/conformacion');
         }
 
         $existingIds = [];
@@ -1206,8 +1283,8 @@ final class ConfigurationController
                 $errors[] = $row . ': el inmueble no tiene un formato válido.';
                 continue;
             }
-            $name = preg_replace('/\s+/u', ' ', trim($this->stringInput($unit['name'] ?? null))) ?? '';
-            $category = $this->normalizedCategory($this->stringInput($unit['category'] ?? null));
+            $name = preg_replace('/\s+/u', ' ', trim(Http::string($unit['name'] ?? null))) ?? '';
+            $category = $this->normalizedCategory(Http::string($unit['category'] ?? null));
             if ($name === '' || mb_strlen($name) > 160) {
                 $errors[] = $row . ': escribe el nombre del inmueble (máximo 160 caracteres).';
             }
@@ -1230,10 +1307,10 @@ final class ConfigurationController
                 [$whole, $fraction] = explode('.', $coefficient);
                 $totalTenThousandths += (int) $whole * 10000 + (int) $fraction;
             }
-            $id = $this->stringInput($unit['id'] ?? null);
+            $id = Http::string($unit['id'] ?? null);
             if ($id !== '' && (!isset($existingIds[$id]) || isset($submittedIds[$id]))) {
-                $this->flash('error', 'La lista contiene un identificador de inmueble inválido. Recarga la página e intenta nuevamente.');
-                $this->redirect('/configuracion/conformacion');
+                Http::flash(self::FLASH, 'error', 'La lista contiene un identificador de inmueble inválido. Recarga la página e intenta nuevamente.');
+                Http::redirect('/configuracion/conformacion');
             }
             if ($id !== '') {
                 $submittedIds[$id] = true;
@@ -1261,14 +1338,14 @@ final class ConfigurationController
             $_SESSION['composition_draft'] = $submittedJson;
             $shown = array_slice($errors, 0, 6);
             $extra = count($errors) - count($shown);
-            $this->flash('error', 'No se guardó la estructura. Tus cambios siguen en pantalla; corrige: ' . implode(' · ', $shown)
+            Http::flash(self::FLASH, 'error', 'No se guardó la estructura. Tus cambios siguen en pantalla; corrige: ' . implode(' · ', $shown)
                 . ($extra > 0 ? ' · y ' . $extra . ' error(es) más.' : ''));
-            $this->redirect('/configuracion/conformacion');
+            Http::redirect('/configuracion/conformacion');
         }
 
         $compositionService->saveUnits($units, true);
-        $this->flash('success', 'La estructura de ' . count($units) . ' inmuebles se guardó correctamente. Siguiente paso: asigna los inmuebles a sus usuarios.');
-        $this->redirect('/configuracion/conformacion');
+        Http::flash(self::FLASH, 'success', 'La estructura de ' . count($units) . ' inmuebles se guardó correctamente. Siguiente paso: asigna los inmuebles a sus usuarios.');
+        Http::redirect('/configuracion/conformacion');
     }
 
     /** Unifica mayúsculas y espacios de las categorías conocidas para evitar «apartamento» vs «Apartamento». */
@@ -1348,8 +1425,8 @@ final class ConfigurationController
     {
         $housingType = (new SettingsService())->current()['housing_type'] ?? '';
         if (!in_array($housingType, ['casa', 'torres_apartamento', 'mixto'], true)) {
-            $this->flash('error', 'Primero define la caracterizacion de la copropiedad.');
-            $this->redirect('/configuracion/caracterizacion');
+            Http::flash(self::FLASH, 'error', 'Primero define la caracterizacion de la copropiedad.');
+            Http::redirect('/configuracion/caracterizacion');
         }
 
         return $housingType;
@@ -1427,35 +1504,6 @@ final class ConfigurationController
         return Authorization::requirePermission($moduleKey, $level);
     }
 
-    private function requireCsrf(): void
-    {
-        if (!Session::verifyCsrf($_POST['_token'] ?? null)) {
-            http_response_code(419);
-            echo 'La sesion del formulario vencio. Recarga la pagina e intenta nuevamente.';
-            exit;
-        }
-    }
-
-    private function integerInput(mixed $value): int|false|null
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if (!is_string($value) && !is_int($value)) {
-            return false;
-        }
-
-        $validated = filter_var($value, FILTER_VALIDATE_INT);
-
-        return is_int($validated) ? $validated : false;
-    }
-
-    private function stringInput(mixed $value): string
-    {
-        return is_string($value) ? $value : '';
-    }
-
     private function coefficientInput(mixed $value): string|false
     {
         if (!is_string($value) && !is_int($value)) {
@@ -1507,12 +1555,6 @@ final class ConfigurationController
             || ($comparison === 0 && str_pad($fraction, 2, '0') > $limitFraction);
     }
 
-    private function flash(string $type, string $message): void
-    {
-        Session::start();
-        $_SESSION['configuration_flash'] = ['type' => $type, 'message' => $message];
-    }
-
     /**
      * @param array<string, mixed> $data
      */
@@ -1521,14 +1563,8 @@ final class ConfigurationController
         Session::start();
         $data['title'] = $title;
         $data['csrfToken'] = Session::csrfToken();
-        $data['flash'] = $_SESSION['configuration_flash'] ?? null;
-        unset($_SESSION['configuration_flash']);
+        $data['flash'] = Http::pullFlash(self::FLASH);
         View::renderAdmin('Configuration/' . $template, $data);
     }
 
-    private function redirect(string $path): never
-    {
-        header('Location: ' . Url::to($path), true, 303);
-        exit;
-    }
 }

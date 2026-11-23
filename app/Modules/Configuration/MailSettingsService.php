@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Configuration;
 
+use App\Core\Env;
 use App\Core\Database;
 use App\Core\Tenant;
 use App\Core\SecretBox;
@@ -31,13 +32,13 @@ final class MailSettingsService
         }
 
         return [
-            'host' => self::environmentSetting('MAIL_HOST'),
-            'port' => self::environmentSetting('MAIL_PORT') ?: '587',
-            'username' => self::environmentSetting('MAIL_USERNAME'),
-            'encryption' => strtolower(self::environmentSetting('MAIL_ENCRYPTION')),
-            'from_address' => self::environmentSetting('MAIL_FROM_ADDRESS'),
-            'from_name' => self::environmentSetting('MAIL_FROM_NAME'),
-            'password_configured' => self::environmentSetting('MAIL_PASSWORD') !== '',
+            'host' => Env::get('MAIL_HOST'),
+            'port' => Env::get('MAIL_PORT') ?: '587',
+            'username' => Env::get('MAIL_USERNAME'),
+            'encryption' => strtolower(Env::get('MAIL_ENCRYPTION')),
+            'from_address' => Env::get('MAIL_FROM_ADDRESS'),
+            'from_name' => Env::get('MAIL_FROM_NAME'),
+            'password_configured' => Env::get('MAIL_PASSWORD') !== '',
         ];
     }
 
@@ -60,16 +61,16 @@ final class MailSettingsService
             ];
         }
 
-        $port = filter_var(self::environmentSetting('MAIL_PORT'), FILTER_VALIDATE_INT);
+        $port = filter_var(Env::get('MAIL_PORT'), FILTER_VALIDATE_INT);
 
         return [
-            'host' => self::environmentSetting('MAIL_HOST'),
+            'host' => Env::get('MAIL_HOST'),
             'port' => is_int($port) ? $port : 0,
-            'username' => self::environmentSetting('MAIL_USERNAME'),
-            'password' => self::environmentSetting('MAIL_PASSWORD'),
-            'encryption' => strtolower(self::environmentSetting('MAIL_ENCRYPTION')),
-            'from_address' => self::environmentSetting('MAIL_FROM_ADDRESS'),
-            'from_name' => self::environmentSetting('MAIL_FROM_NAME'),
+            'username' => Env::get('MAIL_USERNAME'),
+            'password' => Env::get('MAIL_PASSWORD'),
+            'encryption' => strtolower(Env::get('MAIL_ENCRYPTION')),
+            'from_address' => Env::get('MAIL_FROM_ADDRESS'),
+            'from_name' => Env::get('MAIL_FROM_NAME'),
         ];
     }
 
@@ -141,10 +142,4 @@ final class MailSettingsService
         return SecretBox::decrypt($payload, self::SECRET_CONTEXT);
     }
 
-    private static function environmentSetting(string $name): string
-    {
-        $value = $_ENV[$name] ?? $_SERVER[$name] ?? getenv($name);
-
-        return is_string($value) ? trim($value) : '';
-    }
 }

@@ -28,7 +28,7 @@ $router->get('/robots.txt', static function (): void {
     $appUrl = rtrim(Tenant::absoluteUrl('/'), '/');
     header('Content-Type: text/plain; charset=utf-8');
     header('Cache-Control: public, max-age=3600');
-    echo "User-agent: *\nAllow: /\nDisallow: /admin\n";
+    echo "User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /pagar\n";
     if ($appUrl !== '') {
         echo 'Sitemap: ' . $appUrl . '/sitemap.xml' . "\n";
     }

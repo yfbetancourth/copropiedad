@@ -12,7 +12,7 @@ $address = trim((string) ($settings['address'] ?? ''));
 $mapsUrl = $address !== ''
     ? 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($address)
     : '';
-$operationLabels = ['sale' => 'En venta', 'purchase' => 'Busca comprar'];
+$operationLabels = ['sale' => 'En venta', 'rent' => 'En arriendo', 'purchase' => 'Busca comprar'];
 $propertyTypeLabels = [
     'house' => 'Casa',
     'apartment' => 'Apartamento',
@@ -136,7 +136,7 @@ $propertyTypeLabels = [
                         <span class="listing-type"><?= $escape($operation) ?></span>
                     </a>
                     <div class="listing-copy"><p class="listing-kicker"><?= $escape($kind) ?> <span>·</span> <?= $escape($listing['location']) ?></p><h3><a href="<?= $escape($basePath) ?>/clasificados"><?= $escape($listing['title']) ?></a></h3>
-                        <?php if ($price !== null): ?><strong><?= $escape($listing['operation'] === 'purchase' ? 'Presupuesto ' : '') ?><?= $escape($price) ?> <small>COP</small></strong><?php endif; ?>
+                        <?php if ($price !== null): ?><strong><?= $escape($listing['operation'] === 'purchase' ? 'Presupuesto ' : '') ?><?= $escape($price) ?> <small>COP<?= $listing['operation'] === 'rent' ? ' / mes' : '' ?></small></strong><?php endif; ?>
                     </div>
                 </article>
             <?php endforeach; ?>

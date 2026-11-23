@@ -9,14 +9,6 @@ use RuntimeException;
 final class View
 {
     /**
-     * @param array<string, mixed> $data
-     */
-    public static function render(string $template, array $data = []): void
-    {
-        self::renderWithLayout($template, $data, null, 'Admin/layout.php');
-    }
-
-    /**
      * Pantallas de acceso (login y recuperación): plantillas en app/Modules, con layout propio a pantalla completa.
      *
      * @param array<string, mixed> $data
@@ -88,8 +80,6 @@ final class View
 
     public static function platformName(): string
     {
-        $name = $_ENV['APP_NAME'] ?? $_SERVER['APP_NAME'] ?? getenv('APP_NAME');
-
-        return is_string($name) && trim($name) !== '' ? trim($name) : 'Copropiedad';
+        return Env::get('APP_NAME') ?: 'Copropiedad';
     }
 }

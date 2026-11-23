@@ -364,6 +364,9 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                                 </td>
                                 <td class="text-end text-nowrap">
                                     <a class="btn btn-outline-secondary btn-sm" href="<?= $escape($basePath) ?>/cartera/cobros/nota?id=<?= (int) $statement['id'] ?>" target="_blank" rel="noopener" title="Ver o imprimir la nota"><i class="bi bi-printer" aria-hidden="true"></i><span class="visually-hidden">Ver nota</span></a>
+                                    <?php if ($isOpen && $balance > 0): ?>
+                                        <a class="btn btn-outline-primary btn-sm" href="<?= $escape($basePath) ?>/cartera/cobros/enlaces?id=<?= (int) $statement['id'] ?>" title="Enlace de pago temporal y QR"><i class="bi bi-qr-code me-1" aria-hidden="true"></i>Enlace / QR</a>
+                                    <?php endif; ?>
                                     <?php if ($canWrite && $isOpen && $balance > 0): ?>
                                         <button class="btn btn-outline-success btn-sm" type="button" data-pay-statement="<?= (int) $statement['id'] ?>"><i class="bi bi-cash-coin me-1" aria-hidden="true"></i>Registrar pago</button>
                                     <?php endif; ?>
@@ -441,7 +444,8 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                         <?php foreach ($payments as $payment): ?>
                             <?php $isVoided = $payment['voided_at'] !== null; $amount = BillingService::moneyToCents($payment['amount']); ?>
                             <tr<?= $isVoided ? ' class="text-secondary"' : '' ?> data-search="<?= $escape(mb_strtolower($payment['unit_name'] . ' ' . $payment['reference'] . ' ' . $payment['notes'] . ' ' . $short($amount) . ' ' . $payment['received_on'], 'UTF-8')) ?>">
-                                <td class="text-nowrap"><?= $escape($payment['received_on']) ?></td>
+                                <td class="text-nowrap"><?= $escape($payment['received_on']) ?>
+                                    <a class="d-block small" target="_blank" rel="noopener" href="<?= $escape($basePath) ?>/cartera/cobros/comprobante?id=<?= (int) $payment['id'] ?>"><?= $escape(BillingService::receiptNumber((int) $payment['id'])) ?></a></td>
                                 <td><?= $escape($payment['unit_name']) ?></td>
                                 <td class="text-end"><?= $isVoided ? '<s>' . $short($amount) . '</s>' : $short($amount) ?></td>
                                 <td class="small"><?= $escape($payment['reference']) ?><?= $payment['notes'] !== '' ? '<span class="d-block text-secondary">' . $escape($payment['notes']) . '</span>' : '' ?></td>

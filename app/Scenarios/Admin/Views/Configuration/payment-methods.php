@@ -25,13 +25,18 @@ $terminalMethodsToShow = $availableTerminalMethods !== []
 <section class="content">
     <div class="mb-3">
         <h1 class="h3 mb-1">Metodos de pago</h1>
-        <p class="text-secondary mb-0">Configura Bold para recibir pagos en línea desde las notas de cobro del portal de usuario.</p>
+        <p class="text-secondary mb-0">Configura las pasarelas que el Superadmin habilitó para este conjunto. Los residentes pagan sus notas de cobro con cualquiera de ellas desde el portal o con un enlace de pago.</p>
     </div>
 
     <?php if (is_array($flash)): ?>
         <div class="alert alert-<?= $flash['type'] === 'success' ? 'success' : 'danger' ?>" role="<?= $flash['type'] === 'success' ? 'status' : 'alert' ?>"><?= $escape($flash['message']) ?></div>
     <?php endif; ?>
 
+    <?php if (!$boldEnabled && !$wompiEnabled): ?>
+        <div class="alert alert-light border" role="status">El Superadmin no ha habilitado ninguna pasarela de pago en línea (Bold o Wompi) para este conjunto.</div>
+    <?php endif; ?>
+
+    <?php if ($boldEnabled): ?>
     <?php if (is_string($providerError)): ?>
         <div class="alert alert-warning" role="alert"><?= $escape($providerError) ?></div>
     <?php endif; ?>
@@ -163,4 +168,75 @@ $terminalMethodsToShow = $availableTerminalMethods !== []
             <?php if ($canWrite): ?><div class="card-footer"><button class="btn btn-primary" type="submit">Guardar y validar API Datáfono</button></div><?php endif; ?>
         </form>
     </div>
+    <?php endif; ?>
+
+    <?php if ($wompiEnabled): ?>
+    <?php
+    $wompiPlaceholder = static fn (bool $configured, string $prefix): string => $configured
+        ? 'Guardada; deja vacío para conservarla'
+        : 'Empieza por ' . $prefix;
+    $wompiSandbox = $wompiSettings['environment'] !== 'production';
+    ?>
+    <div class="row g-3 mt-1" id="wompi">
+        <div class="col-xl-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h2 class="card-title mb-0">Wompi · Web Checkout</h2>
+                    <span class="badge text-bg-<?= $wompiSettings['configured'] ? 'success' : 'warning' ?>"><?= $wompiSettings['configured'] ? 'Llaves configuradas' : 'Configuración incompleta' ?></span>
+                </div>
+                <form method="post" action="<?= $escape($basePath) ?>/configuracion/metodos-pago/wompi/guardar" autocomplete="off">
+                    <div class="card-body">
+                        <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
+                        <p class="small text-secondary">Copia las llaves de <strong>Desarrolladores › Programación</strong> en el panel de comercios de Wompi. Cada ambiente (pruebas y producción) tiene sus propias llaves. Los medios de pago (tarjeta, PSE, Nequi, Botón Bancolombia…) se habilitan en tu cuenta de Wompi.</p>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="wompi-environment" class="form-label">Ambiente</label>
+                                <select id="wompi-environment" name="wompi_environment" class="form-select" <?= $canWrite ? '' : 'disabled' ?>>
+                                    <option value="sandbox" <?= $wompiSandbox ? 'selected' : '' ?>>Pruebas (sandbox)</option>
+                                    <option value="production" <?= !$wompiSandbox ? 'selected' : '' ?>>Producción</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8">
+                                <label for="wompi-public-key" class="form-label">Llave pública</label>
+                                <input id="wompi-public-key" name="wompi_public_key" class="form-control" maxlength="120" required spellcheck="false" <?= $canWrite ? '' : 'readonly' ?>
+                                       value="<?= $escape($wompiSettings['public_key']) ?>" placeholder="pub_test_… o pub_prod_…">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="wompi-private-key" class="form-label">Llave privada</label>
+                                <input id="wompi-private-key" name="wompi_private_key" type="password" class="form-control" maxlength="200" autocomplete="new-password" <?= $canWrite ? '' : 'readonly' ?>
+                                       placeholder="<?= $escape($wompiPlaceholder($wompiSettings['private_key_configured'], 'prv_test_ / prv_prod_')) ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="wompi-events-secret" class="form-label">Secreto de eventos</label>
+                                <input id="wompi-events-secret" name="wompi_events_secret" type="password" class="form-control" maxlength="200" autocomplete="new-password" <?= $canWrite ? '' : 'readonly' ?>
+                                       placeholder="<?= $escape($wompiPlaceholder($wompiSettings['events_secret_configured'], 'test_events_ / prod_events_')) ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="wompi-integrity-secret" class="form-label">Secreto de integridad</label>
+                                <input id="wompi-integrity-secret" name="wompi_integrity_secret" type="password" class="form-control" maxlength="200" autocomplete="new-password" <?= $canWrite ? '' : 'readonly' ?>
+                                       placeholder="<?= $escape($wompiPlaceholder($wompiSettings['integrity_secret_configured'], 'test_integrity_ / prod_integrity_')) ?>">
+                            </div>
+                        </div>
+                        <small class="text-secondary d-block mt-2">La llave privada y los secretos se guardan cifrados y nunca vuelven a mostrarse. Si cambias de ambiente debes ingresarlos de nuevo.</small>
+                        <div class="alert alert-info mt-3 mb-0">Los pagos solo se registran en cartera cuando Wompi confirma la transacción como aprobada: la aplicación valida la firma del evento y vuelve a consultar la transacción con la llave privada, verificando referencia, valor y moneda.</div>
+                    </div>
+                    <?php if ($canWrite): ?>
+                        <div class="card-footer"><button class="btn btn-primary" type="submit">Guardar y verificar llave pública</button></div>
+                    <?php endif; ?>
+                </form>
+            </div>
+        </div>
+        <div class="col-xl-4">
+            <div class="card card-info card-outline">
+                <div class="card-header"><h2 class="card-title">URL de eventos de Wompi</h2></div>
+                <div class="card-body">
+                    <p>En el panel de Wompi, en <strong>Desarrolladores › Programación › URL de eventos</strong>, registra esta URL para cada ambiente que uses:</p>
+                    <code class="user-select-all"><?= $escape($wompiEventsUrl !== '' ? $wompiEventsUrl : 'Configura APP_URL con un dominio público HTTPS.') ?></code>
+                    <hr>
+                    <p class="small text-secondary mb-0">Sin una URL HTTPS pública Wompi no puede avisar los pagos, por eso el botón de Wompi no se muestra a los residentes hasta tenerla.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 </section>

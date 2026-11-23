@@ -12,7 +12,7 @@ $canManage = \App\Core\Authorization::hasPermission($actor, 'configuracion.equip
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
             <h1 class="h3 mb-1">Configuracion</h1>
-            <p class="text-secondary mb-0">Equipo · administra las cuentas de la aplicacion.</p>
+            <p class="text-secondary mb-0">Equipo de trabajo · cuentas del personal con acceso al panel (administración, portería, contabilidad…). Los residentes se gestionan en <a href="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/comunidad/residentes">Comunidad / Residentes</a>.</p>
         </div>
     </div>
 

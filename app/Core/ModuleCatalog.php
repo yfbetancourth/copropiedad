@@ -34,12 +34,26 @@ final class ModuleCatalog
             'permissions' => ['configuracion.pagos'],
             'requires' => ['cartera'],
         ],
+        'pagos_wompi' => [
+            'label' => 'Pagos en línea (Wompi)',
+            'description' => 'Checkout de Wompi (tarjeta, PSE, Nequi, Botón Bancolombia) para que los residentes paguen sus cuotas.',
+            'icon' => 'bi-wallet2',
+            'permissions' => ['configuracion.pagos'],
+            'requires' => ['cartera'],
+        ],
         'mensajes' => [
             'label' => 'Mensajes',
-            'description' => 'Mensajes internos de la administración a los residentes.',
+            'description' => 'Comunicados de la administración y atención a residentes: consultas, peticiones, quejas, reclamos y sugerencias desde el portal.',
             'icon' => 'bi-chat-left-text',
             'permissions' => ['mensajes'],
             'requires' => [],
+        ],
+        'zonas_comunes' => [
+            'label' => 'Zonas comunes',
+            'description' => 'Reserva de salón social, BBQ, piscina y demás espacios según la agenda; la administración aprueba cada solicitud.',
+            'icon' => 'bi-calendar2-week',
+            'permissions' => ['zonas.comunes'],
+            'requires' => ['portal'],
         ],
         'clasificados' => [
             'label' => 'Clasificados',
@@ -70,22 +84,45 @@ final class ModuleCatalog
         return true;
     }
 
-    public static function moduleForPermission(string $permissionKey): ?string
+    /** Responde 404 y corta la petición si el Superadmin deshabilitó el módulo en este conjunto. */
+    public static function requireEnabled(string $module): void
     {
+        if (!self::enabled($module)) {
+            http_response_code(404);
+            echo 'Esta opción no está habilitada en tu conjunto.';
+            exit;
+        }
+    }
+
+    /** @return list<string> Módulos que incluyen el permiso (uno puede compartirse, p. ej. métodos de pago). */
+    public static function modulesForPermission(string $permissionKey): array
+    {
+        $modules = [];
         foreach (self::MODULES as $module => $definition) {
             if (in_array($permissionKey, $definition['permissions'], true)) {
-                return $module;
+                $modules[] = $module;
             }
         }
 
-        return null;
+        return $modules;
     }
 
-    /** En la plataforma no hay módulos de conjunto: sus permisos solo aplican dentro de un cliente. */
+    /**
+     * Un permiso del núcleo siempre está disponible; uno de módulo, si al menos uno de sus módulos está habilitado.
+     * En la plataforma no hay módulos de conjunto: sus permisos solo aplican dentro de un cliente.
+     */
     public static function permissionAvailable(string $permissionKey): bool
     {
-        $module = self::moduleForPermission($permissionKey);
+        $modules = self::modulesForPermission($permissionKey);
+        if ($modules === []) {
+            return true;
+        }
+        foreach ($modules as $module) {
+            if (self::enabled($module)) {
+                return true;
+            }
+        }
 
-        return $module === null || self::enabled($module);
+        return false;
     }
 }

@@ -8,6 +8,10 @@ use App\Core\Database;
 use App\Core\Tenant;
 use Throwable;
 
+/**
+ * Roles del equipo de la administración (acceso al panel). El rol «Residente» es fijo: da acceso solo al portal
+ * y no se edita aquí.
+ */
 final class RoleService
 {
     public const MODULES = [
@@ -23,7 +27,8 @@ final class RoleService
         'inmuebles.asignaciones' => 'Inmuebles / Asignacion de usuarios',
         'cartera.cobros' => 'Cartera / Cobros',
         'mensajes' => 'Mensajes internos',
-        'usuario.portal' => 'Usuario / Portal de inmuebles asignados',
+        'comunidad.residentes' => 'Comunidad / Residentes',
+        'zonas.comunes' => 'Zonas comunes / Espacios y reservas',
     ];
 
     public const LEVELS = [
@@ -36,13 +41,13 @@ final class RoleService
     public function all(): array
     {
         $statement = Database::connection()->prepare(
-            'SELECT roles.id, roles.name, roles.description, roles.is_system,
+            "SELECT roles.id, roles.name, roles.description, roles.is_system,
                     COUNT(users.id) AS user_count
              FROM admin_roles AS roles
              LEFT JOIN admin_users AS users ON users.role_id = roles.id
-             WHERE roles.tenant_id = ?
+             WHERE roles.tenant_id = ? AND roles.kind = 'staff'
              GROUP BY roles.id
-             ORDER BY roles.is_system DESC, roles.name'
+             ORDER BY roles.is_system DESC, roles.name"
         );
         $statement->execute([Tenant::id()]);
         $roles = $statement->fetchAll();
@@ -58,7 +63,7 @@ final class RoleService
     public function find(int $roleId): ?array
     {
         $statement = Database::connection()->prepare(
-            'SELECT id, name, description, is_system FROM admin_roles WHERE id = ? AND tenant_id = ? LIMIT 1'
+            "SELECT id, name, description, is_system FROM admin_roles WHERE id = ? AND tenant_id = ? AND kind = 'staff' LIMIT 1"
         );
         $statement->execute([$roleId, Tenant::id()]);
         $role = $statement->fetch();
@@ -132,7 +137,7 @@ final class RoleService
     public function delete(int $roleId): bool
     {
         $statement = Database::connection()->prepare(
-            'DELETE FROM admin_roles WHERE id = ? AND tenant_id = ? AND is_system = 0'
+            "DELETE FROM admin_roles WHERE id = ? AND tenant_id = ? AND is_system = 0 AND kind = 'staff'"
         );
         $statement->execute([$roleId, Tenant::id()]);
 
@@ -142,7 +147,7 @@ final class RoleService
     public function assignableRoles(): array
     {
         $statement = Database::connection()->prepare(
-            'SELECT id, name FROM admin_roles WHERE tenant_id = ? AND is_system = 0 ORDER BY name'
+            "SELECT id, name FROM admin_roles WHERE tenant_id = ? AND is_system = 0 AND kind = 'staff' ORDER BY name"
         );
         $statement->execute([Tenant::id()]);
 

@@ -6,7 +6,9 @@ declare(strict_types=1);
  * Guía de tres pasos compartida por Caracterización, Conformación y Asignación de inmuebles.
  *
  * Espera: $escape, $basePath, $conformation (CompositionService::progress()) y $currentStep (1, 2 o 3).
+ * Opcional: $conformationResetTarget, id del modal que abre «Reiniciar» en el paso 2 (solo en Conformación).
  */
+$conformationResetTarget ??= null;
 $stepCharacterized = $conformation['housing_type'] !== '';
 $stepStructureDone = $conformation['completed'] && $conformation['missing_coefficients'] === 0;
 $stepAssignmentsDone = $conformation['unit_count'] > 0 && $conformation['assigned_units'] === $conformation['unit_count'];
@@ -60,13 +62,18 @@ $stepVisuals = [
                     <span class="rounded-circle d-inline-flex align-items-center justify-content-center fw-semibold flex-shrink-0 <?= $stepBadge ?>" style="width: 2.25rem; height: 2.25rem" aria-hidden="true">
                         <?php if ($stepIcon !== null): ?><i class="bi <?= $stepIcon ?>"></i><?php else: ?><?= $number ?><?php endif; ?>
                     </span>
-                    <span style="min-width: 0">
+                    <span class="flex-grow-1" style="min-width: 0">
                         <span class="d-block fw-semibold"><?= $number ?>. <?= $escape($step['label']) ?></span>
                         <span class="d-block small text-secondary text-truncate"><?= $escape($step['detail']) ?></span>
                         <span class="visually-hidden">
                             <?= ['done' => 'Completo', 'partial' => 'En progreso', 'todo' => 'Pendiente', 'locked' => 'Bloqueado hasta completar el paso anterior'][$step['state']] ?>
                         </span>
                     </span>
+                    <?php if ($number === 2 && $isCurrent && is_string($conformationResetTarget)): ?>
+                        <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" data-bs-toggle="modal" data-bs-target="#<?= $escape($conformationResetTarget) ?>">
+                            <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reiniciar
+                        </button>
+                    <?php endif; ?>
                 </<?= $isLink ? 'a' : 'div' ?>>
             </li>
         <?php endforeach; ?>

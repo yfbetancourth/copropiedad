@@ -18,3 +18,4 @@ $router->post('/clientes/estado', [$platform, 'setStatus']);
 $router->post('/clientes/administrador', [$platform, 'addAdmin']);
 $router->post('/clientes/administrador/estado', [$platform, 'setAdminStatus']);
 $router->post('/clientes/administrador/clave', [$platform, 'resetAdminPassword']);
+$router->post('/clientes/reiniciar', [$platform, 'reset']);

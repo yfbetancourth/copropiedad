@@ -9,6 +9,7 @@ use App\Modules\Auth\AuthService;
 final class Authorization
 {
     private const PERMISSION_LEVELS = ['none' => 0, 'read' => 1, 'write' => 2, 'total' => 3];
+    private const PORTAL_PERMISSION = 'usuario.portal';
     private static bool $userResolved = false;
     private static ?array $requestUser = null;
     private static ?int $requestUserId = null;
@@ -63,6 +64,31 @@ final class Authorization
         return $user;
     }
 
+    /** El portal es exclusivo de los residentes (rol de tipo «resident») y requiere el módulo Portal habilitado. */
+    public static function isResident(?array $user): bool
+    {
+        return $user !== null
+            && ($user['role_kind'] ?? 'staff') === 'resident'
+            && ModuleCatalog::permissionAvailable(self::PORTAL_PERMISSION);
+    }
+
+    /** Residente autenticado, o corta la petición: sin sesión lleva al acceso del portal; el personal recibe 403. */
+    public static function requireResident(): array
+    {
+        $user = self::currentUser();
+        if ($user === null) {
+            header('Location: ' . Url::to('/login?destino=usuario'), true, 303);
+            exit;
+        }
+        if (!self::isResident($user)) {
+            http_response_code(403);
+            echo 'El portal es exclusivo para residentes. El equipo de la administración trabaja desde el panel administrativo.';
+            exit;
+        }
+
+        return $user;
+    }
+
     public static function requirePermission(string $moduleKey, string $minimumLevel): ?array
     {
         $user = self::currentUser();
@@ -90,6 +116,10 @@ final class Authorization
 
         if ((bool) $user['is_system']) {
             return true;
+        }
+        // Una cuenta de residente solo usa el portal: nunca obtiene permisos del panel, aunque se editen en su rol.
+        if (($user['role_kind'] ?? 'staff') === 'resident') {
+            return $moduleKey === self::PORTAL_PERMISSION;
         }
 
         $level = self::PERMISSION_LEVELS[$user['permissions'][$moduleKey] ?? 'none'] ?? 0;

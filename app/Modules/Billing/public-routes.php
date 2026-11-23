@@ -9,3 +9,11 @@ use App\Modules\Billing\PaymentWebhookController;
 $paymentWebhook = new PaymentWebhookController();
 $router->post('/pagos/bold/webhook', [$paymentWebhook, 'receive']);
 $router->get('/pagos/bold/retorno', [$paymentWebhook, 'returnFromBold']);
+$router->post('/pagos/wompi/eventos', [$paymentWebhook, 'receiveWompi']);
+$router->get('/pagos/wompi/retorno', [$paymentWebhook, 'returnFromWompi']);
+
+// Enlaces de pago temporales: no requieren sesión; el token del enlace da acceso a una sola nota.
+$payLink = new \App\Modules\Billing\PayLinkController();
+$router->get('/pagar', [$payLink, 'show']);
+$router->post('/pagar', [$payLink, 'start']);
+$router->get('/pagar/resultado', [$payLink, 'result']);

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Modules\Billing;
 
+use App\Core\SecretBox;
 use App\Core\Database;
+use App\Core\ModuleCatalog;
 use App\Core\Tenant;
 use DateTimeImmutable;
 use RuntimeException;
@@ -12,6 +14,9 @@ use Throwable;
 
 final class BoldPaymentService
 {
+    /** Contexto de cifrado de las llaves de Bold (enlace de pago y datáfono). */
+    public const SECRET_CONTEXT = 'copropiedad-bold-payment-settings-v1';
+
     private const API_URL = 'https://integrations.api.bold.co';
     private const PAYMENT_METHODS = [
         'CREDIT_CARD' => 'Tarjeta de crédito o débito',
@@ -50,6 +55,17 @@ final class BoldPaymentService
     }
 
     /** @return list<array{code: string, label: string}> */
+    /** Pago en línea disponible: módulo habilitado, llave y métodos configurados y URL HTTPS para el webhook. */
+    public function isReady(): bool
+    {
+        if (!ModuleCatalog::enabled('pagos_en_linea')) {
+            return false;
+        }
+        $settings = $this->settings();
+
+        return $settings['api_key_configured'] && $settings['payment_methods'] !== [] && $this->webhookUrl() !== '';
+    }
+
     public function configuredMethods(): array
     {
         $settings = $this->settings();
@@ -130,7 +146,7 @@ final class BoldPaymentService
             throw new RuntimeException('Bold no tiene habilitado ninguno de los métodos seleccionados.');
         }
 
-        $ciphertext = $this->encrypt($apiKey);
+        $ciphertext = SecretBox::encrypt($apiKey, self::SECRET_CONTEXT);
         $methods = implode(',', array_keys($selectedMethods));
         Database::connection()->prepare(
             'INSERT INTO bold_payment_settings (tenant_id, environment, api_key_ciphertext, payment_methods)
@@ -205,17 +221,7 @@ final class BoldPaymentService
             throw new RuntimeException('La nota no existe o no corresponde a tu cuenta.');
         }
 
-        $billingStatement = (new BillingService())->statement($statementId);
-        if ($billingStatement['superseded_by'] !== null) {
-            throw new RuntimeException(sprintf(
-                'El saldo de esta nota ya se incluyó en la nota del período %s. Paga la nota más reciente.',
-                $billingStatement['superseded_by']['period']
-            ));
-        }
-        $amountCents = (int) $billingStatement['balance'];
-        if ($amountCents <= 0) {
-            throw new RuntimeException('Esta nota no tiene saldo pendiente.');
-        }
+        (new BillingService())->payableStatement($statementId);
 
         $settings = $this->settings();
         if (!$settings['api_key_configured'] || $settings['payment_methods'] === []) {
@@ -471,12 +477,14 @@ final class BoldPaymentService
                 'Pago en línea Bold aprobado',
                 (int) $payment['user_id'],
             ]);
+            $paymentId = (int) $pdo->lastInsertId();
             $pdo->prepare(
                 'UPDATE billing_online_payments
                  SET status = "approved", transaction_id = ?, approved_at = CURRENT_TIMESTAMP
                  WHERE id = ? AND tenant_id = ?'
             )->execute([$transactionId, (int) $payment['id'], Tenant::id()]);
             $pdo->commit();
+            PaymentNotificationService::defer('payment', ['payment_id' => $paymentId, 'origin' => 'bold']);
         } catch (Throwable $exception) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -600,78 +608,10 @@ final class BoldPaymentService
             return '';
         }
 
-        return $this->decrypt((string) $row['api_key_ciphertext']);
+        return SecretBox::decrypt((string) $row['api_key_ciphertext'], self::SECRET_CONTEXT);
     }
 
-    private function encrypt(string $plaintext): string
-    {
-        $nonce = random_bytes(12);
-        $tag = '';
-        $ciphertext = openssl_encrypt(
-            $plaintext,
-            'aes-256-gcm',
-            $this->encryptionKey(),
-            OPENSSL_RAW_DATA,
-            $nonce,
-            $tag,
-            'copropiedad-bold-payment-settings-v1'
-        );
-        if (!is_string($ciphertext)) {
-            throw new RuntimeException('No se pudo proteger la llave de Bold.');
-        }
 
-        return implode('.', ['v1', base64_encode($nonce), base64_encode($tag), base64_encode($ciphertext)]);
-    }
 
-    private function decrypt(string $payload): string
-    {
-        $parts = explode('.', $payload);
-        if (count($parts) !== 4 || $parts[0] !== 'v1') {
-            throw new RuntimeException('La llave de Bold guardada tiene un formato no válido.');
-        }
-        $nonce = base64_decode($parts[1], true);
-        $tag = base64_decode($parts[2], true);
-        $ciphertext = base64_decode($parts[3], true);
-        if (!is_string($nonce) || strlen($nonce) !== 12 || !is_string($tag) || strlen($tag) !== 16
-            || !is_string($ciphertext)
-        ) {
-            throw new RuntimeException('No se pudo leer la llave de Bold guardada.');
-        }
 
-        $plaintext = openssl_decrypt(
-            $ciphertext,
-            'aes-256-gcm',
-            $this->encryptionKey(),
-            OPENSSL_RAW_DATA,
-            $nonce,
-            $tag,
-            'copropiedad-bold-payment-settings-v1'
-        );
-        if (!is_string($plaintext)) {
-            throw new RuntimeException('No se pudo descifrar la llave de Bold. Verifica APP_KEY.');
-        }
-
-        return $plaintext;
-    }
-
-    private function encryptionKey(): string
-    {
-        $setting = self::environmentSetting('APP_KEY');
-        if (!str_starts_with($setting, 'base64:')) {
-            throw new RuntimeException('Configura APP_KEY con una clave base64 de 32 bytes para proteger las llaves de Bold.');
-        }
-        $key = base64_decode(substr($setting, 7), true);
-        if (!is_string($key) || strlen($key) !== 32) {
-            throw new RuntimeException('APP_KEY debe contener exactamente 32 bytes codificados en base64.');
-        }
-
-        return $key;
-    }
-
-    private static function environmentSetting(string $name): string
-    {
-        $value = $_ENV[$name] ?? $_SERVER[$name] ?? getenv($name);
-
-        return is_string($value) ? trim($value) : '';
-    }
 }

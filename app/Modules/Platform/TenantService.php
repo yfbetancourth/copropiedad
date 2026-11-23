@@ -18,6 +18,7 @@ use Throwable;
 final class TenantService
 {
     public const ADMIN_ROLE_NAME = 'Administrador';
+    public const RESIDENT_ROLE_NAME = 'Residente';
 
     /** @return list<array<string, mixed>> */
     public function all(): array
@@ -96,10 +97,7 @@ final class TenantService
             $tenantId = (int) $pdo->lastInsertId();
 
             $this->writeModules($tenantId, $modules);
-            $pdo->prepare(
-                'INSERT INTO admin_roles (tenant_id, name, description, is_system) VALUES (?, ?, ?, 1)'
-            )->execute([$tenantId, self::ADMIN_ROLE_NAME, 'Administrador principal del conjunto, asignado por el Superadmin']);
-            $roleId = (int) $pdo->lastInsertId();
+            $roleId = self::seedRoles($tenantId);
 
             $pdo->prepare('INSERT INTO copropiedad_settings (tenant_id, property_name) VALUES (?, ?)')
                 ->execute([$tenantId, $name]);
@@ -118,6 +116,29 @@ final class TenantService
             $this->rollBack();
             throw $exception;
         }
+    }
+
+    /**
+     * Roles con los que nace (o renace, tras un reinicio) un conjunto: «Administrador» (sistema, todos los permisos)
+     * y «Residente» (acceso al portal; sus cuentas se gestionan en Comunidad / Residentes).
+     *
+     * @return int id del rol Administrador
+     */
+    public static function seedRoles(int $tenantId): int
+    {
+        $pdo = Database::connection();
+        $pdo->prepare(
+            'INSERT INTO admin_roles (tenant_id, name, description, is_system) VALUES (?, ?, ?, 1)'
+        )->execute([$tenantId, self::ADMIN_ROLE_NAME, 'Administrador principal del conjunto, asignado por el Superadmin']);
+        $adminRoleId = (int) $pdo->lastInsertId();
+
+        $pdo->prepare(
+            "INSERT INTO admin_roles (tenant_id, name, description, is_system, kind) VALUES (?, ?, ?, 0, 'resident')"
+        )->execute([$tenantId, self::RESIDENT_ROLE_NAME, 'Propietarios, inquilinos y residentes: acceso al portal']);
+        $pdo->prepare("INSERT INTO admin_role_permissions (role_id, module_key, permission_level) VALUES (?, 'usuario.portal', 'read')")
+            ->execute([(int) $pdo->lastInsertId()]);
+
+        return $adminRoleId;
     }
 
     public function update(int $tenantId, string $name, string $slug): void
@@ -196,6 +217,18 @@ final class TenantService
         if ($statement->rowCount() !== 1) {
             throw new RuntimeException('El administrador seleccionado no existe en este conjunto.');
         }
+    }
+
+    /** Confirma la contraseña de la cuenta Superadmin (de la plataforma) antes de una acción irreversible. */
+    public function superadminPasswordMatches(int $userId, string $password): bool
+    {
+        $statement = Database::connection()->prepare(
+            'SELECT password_hash FROM admin_users WHERE id = ? AND tenant_id IS NULL AND is_active = 1'
+        );
+        $statement->execute([$userId]);
+        $hash = $statement->fetchColumn();
+
+        return is_string($hash) && $password !== '' && password_verify($password, $hash);
     }
 
     public static function assertPassword(string $password): void

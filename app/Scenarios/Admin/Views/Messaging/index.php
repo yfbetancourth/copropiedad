@@ -1,8 +1,8 @@
 <section class="content">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-            <h1 class="h3 mb-1">Mensajes</h1>
-            <p class="text-secondary mb-0">Envía avisos internos a un usuario o a todos los usuarios activos.</p>
+            <h1 class="h3 mb-1">Comunicados a residentes</h1>
+            <p class="text-secondary mb-0">Comunicados de la administración a un residente o a todos los residentes activos; los leen en su portal. Las conversaciones que abren los residentes se atienden en Atención a residentes.</p>
         </div>
     </div>
 
@@ -21,10 +21,10 @@
                     <div class="mb-3">
                         <label for="recipient" class="form-label">Destinatario</label>
                         <select id="recipient" name="recipient" class="form-select" required>
-                            <option value="all">Todos los usuarios activos</option>
+                            <option value="all">Todos los residentes activos</option>
                             <?php foreach ($users as $recipient): ?>
                                 <option value="<?= (int) $recipient['id'] ?>">
-                                    <?= htmlspecialchars($recipient['username'] . ' · ' . $recipient['email'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
+                                    <?= htmlspecialchars(($recipient['full_name'] ?: $recipient['username']) . ' · ' . $recipient['email'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
