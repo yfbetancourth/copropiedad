@@ -9,6 +9,7 @@ use App\Core\Tenant;
 use App\Modules\Auth\AccessLinkService;
 use App\Modules\Configuration\CompositionService;
 use App\Modules\Configuration\TeamService;
+use App\Modules\PropertyAssignment\PropertyAssignmentService;
 use App\Modules\PropertyAssignment\RelationshipHistory;
 use PDOException;
 use RuntimeException;
@@ -51,10 +52,12 @@ final class ResidentService
         };
         $query = Database::connection()->prepare(
             "SELECT users.id, users.username, users.email, users.is_active, users.created_at,
-                    profiles.full_name, profiles.document_type, profiles.document_number, profiles.phone
+                    profiles.full_name, profiles.document_type, profiles.document_number, profiles.phone,
+                    profiles.resident_type_id, types.name AS resident_type
              FROM admin_users AS users
              JOIN admin_roles AS roles ON roles.id = users.role_id AND roles.kind = 'resident'
              LEFT JOIN resident_profiles AS profiles ON profiles.user_id = users.id
+             LEFT JOIN resident_types AS types ON types.id = profiles.resident_type_id
              WHERE users.tenant_id = ?{$statusSql}
              ORDER BY COALESCE(profiles.full_name, users.username)"
         );
@@ -68,6 +71,7 @@ final class ResidentService
             $resident['units'] = $units[(int) $resident['id']] ?? [];
             $haystack = mb_strtolower(implode(' ', [
                 $resident['full_name'], $resident['username'], $resident['email'], $resident['document_number'], $resident['phone'],
+                $resident['resident_type'],
                 ...array_column($resident['units'], 'name'),
             ]), 'UTF-8');
             if ($needle === '' || str_contains($haystack, $needle)) {
@@ -88,19 +92,24 @@ final class ResidentService
         $query->execute([$userId, Tenant::id()]);
         $profile = $query->fetch();
 
-        return $account + (is_array($profile) ? $profile : ['full_name' => '', 'document_type' => null, 'document_number' => null, 'phone' => null, 'notes' => ''])
+        return $account + (is_array($profile) ? $profile : ['full_name' => '', 'resident_type_id' => null, 'document_type' => null, 'document_number' => null, 'phone' => null, 'notes' => ''])
             + ['units' => $this->unitsByUser()[$userId] ?? []];
     }
 
     /**
      * Crea ($userId = 0) o actualiza un residente. Sin contraseña al crear, la cuenta nace con una clave aleatoria
-     * y se envía la invitación para que el residente cree la suya.
+     * y se envía la invitación para que el residente cree la suya, salvo que $inviteWithoutPassword sea false
+     * (importación: la invitación se envía después, en lote o desde el listado).
+     *
+     * Si el tipo exige propietario (p. ej. Inquilino), el residente solo se registra vinculado como inquilino a un
+     * inmueble ($input['unit_id']) que ya tiene propietario; si no se cumple, no se guarda nada.
      *
      * @return array{id: int, invited: bool, invitation_error: ?string}
      */
-    public function save(int $userId, array $input): array
+    public function save(int $userId, array $input, bool $inviteWithoutPassword = true): array
     {
-        $data = $this->validate($input, $userId === 0);
+        $data = $this->validate($input, $userId === 0 && $inviteWithoutPassword, $userId > 0 ? $this->currentTypeId($userId) : null);
+        $tenancyUnit = $this->tenancyUnit($userId, $data['resident_type_id'], $input['unit_id'] ?? null);
         $pdo = Database::connection();
         $pdo->beginTransaction();
         try {
@@ -118,17 +127,28 @@ final class ResidentService
             // otro residente y sobrescribiría su ficha en lugar de rechazar el dato.
             $profileExists = $pdo->prepare('SELECT 1 FROM resident_profiles WHERE user_id = ?');
             $profileExists->execute([$userId]);
-            $profile = [$data['full_name'], $data['document_type'], $data['document_number'], $data['phone'], $data['notes']];
+            $profile = [$data['full_name'], $data['resident_type_id'], $data['document_type'], $data['document_number'], $data['phone'], $data['notes']];
             if ($profileExists->fetchColumn() === false) {
                 $pdo->prepare(
-                    'INSERT INTO resident_profiles (full_name, document_type, document_number, phone, notes, user_id, tenant_id)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)'
+                    'INSERT INTO resident_profiles (full_name, resident_type_id, document_type, document_number, phone, notes, user_id, tenant_id)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
                 )->execute([...$profile, $userId, Tenant::id()]);
             } else {
                 $pdo->prepare(
-                    'UPDATE resident_profiles SET full_name = ?, document_type = ?, document_number = ?, phone = ?, notes = ?
+                    'UPDATE resident_profiles SET full_name = ?, resident_type_id = ?, document_type = ?, document_number = ?, phone = ?, notes = ?
                      WHERE user_id = ? AND tenant_id = ?'
                 )->execute([...$profile, $userId, Tenant::id()]);
+            }
+            if ($tenancyUnit !== null) {
+                // Misma transacción: si el inmueble no tiene propietario, tampoco se crea la cuenta.
+                $links = $this->currentLinks($userId);
+                $links[$tenancyUnit] = 'inquilino';
+                (new PropertyAssignmentService())->assign(
+                    $userId,
+                    array_map(static fn (string $unit, string $relation): array => ['unit_id' => $unit, 'relation' => $relation], array_keys($links), $links),
+                    date('Y-m-d'),
+                    is_int($_SESSION['admin_user_id'] ?? null) ? $_SESSION['admin_user_id'] : null
+                );
             }
             $pdo->commit();
         } catch (PDOException $exception) {
@@ -219,6 +239,65 @@ final class ResidentService
         return $units;
     }
 
+    /** true si el residente ya está vinculado como inquilino a algún inmueble. */
+    public function hasTenancy(int $userId): bool
+    {
+        return in_array('inquilino', $this->currentLinks($userId), true);
+    }
+
+    /**
+     * Inmueble que arrienda un residente cuyo tipo exige propietario; null si no hay que vincular nada nuevo.
+     */
+    private function tenancyUnit(int $userId, ?int $typeId, mixed $unitId): ?string
+    {
+        if (!(new ResidentTypeService())->requiresUnitOwner($typeId)) {
+            return null;
+        }
+        $unitId = is_string($unitId) ? trim($unitId) : '';
+        $links = $userId > 0 ? $this->currentLinks($userId) : [];
+        if ($unitId === '') {
+            if (in_array('inquilino', $links, true)) {
+                return null; // ya está vinculado como inquilino
+            }
+            throw new RuntimeException('Este tipo de residente exige elegir el inmueble que arrienda: solo se registra si ese inmueble ya tiene propietario.');
+        }
+        if (preg_match('/^[a-f0-9]{32}$/D', $unitId) !== 1) {
+            throw new RuntimeException('El inmueble seleccionado no es válido.');
+        }
+        if (($links[$unitId] ?? null) === 'inquilino') {
+            return null;
+        }
+        (new CompositionService())->ensureUnitIds(); // fuera de la transacción: puede reescribir la estructura
+
+        return $unitId;
+    }
+
+    /** @return array<string, string> vínculos vigentes del usuario: inmueble => vínculo como lo recibe la asignación */
+    private function currentLinks(int $userId): array
+    {
+        $query = Database::connection()->prepare(
+            'SELECT unit_id, relation_type, resides FROM property_unit_assignments WHERE tenant_id = ? AND user_id = ?'
+        );
+        $query->execute([Tenant::id(), $userId]);
+        $links = [];
+        foreach ($query->fetchAll() as $row) {
+            $links[(string) $row['unit_id']] = $row['relation_type'] === 'propietario' && (bool) $row['resides']
+                ? 'propietario_residente'
+                : (string) $row['relation_type'];
+        }
+
+        return $links;
+    }
+
+    private function currentTypeId(int $userId): ?int
+    {
+        $query = Database::connection()->prepare('SELECT resident_type_id FROM resident_profiles WHERE user_id = ? AND tenant_id = ?');
+        $query->execute([$userId, Tenant::id()]);
+        $typeId = $query->fetchColumn();
+
+        return $typeId === false || $typeId === null ? null : (int) $typeId;
+    }
+
     private function residentRoleId(): int
     {
         $query = Database::connection()->prepare("SELECT id FROM admin_roles WHERE tenant_id = ? AND kind = 'resident' ORDER BY id LIMIT 1");
@@ -231,8 +310,14 @@ final class ResidentService
         return (int) $roleId;
     }
 
-    /** @return array<string, mixed> datos normalizados */
-    private function validate(array $input, bool $creating): array
+    /**
+     * Normaliza y valida los datos de un residente (también la usa la importación para revisar cada fila).
+     * $requireAccess: al crear sin contraseña se fuerza la invitación. $keepTypeId: tipo actual del residente, que se
+     * acepta aunque ya esté inactivo (para poder editar sus otros datos).
+     *
+     * @return array<string, mixed> datos normalizados
+     */
+    public function validate(array $input, bool $requireAccess, ?int $keepTypeId = null): array
     {
         $text = static fn (string $key): string => trim(is_string($input[$key] ?? null) ? $input[$key] : '');
         $data = [
@@ -245,7 +330,16 @@ final class ResidentService
             'notes' => $text('notes'),
             'password' => is_string($input['password'] ?? null) ? $input['password'] : '',
             'send_invitation' => ($input['send_invitation'] ?? '') === '1',
+            'resident_type_id' => null,
         ];
+        $typeId = $input['resident_type_id'] ?? '';
+        if ($typeId !== '' && $typeId !== null) {
+            $typeId = filter_var($typeId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+            if ($typeId === false) {
+                throw new RuntimeException('Elige un tipo de residente válido.');
+            }
+            $data['resident_type_id'] = $typeId === $keepTypeId ? $typeId : (new ResidentTypeService())->requireActive($typeId);
+        }
         if (mb_strlen($data['full_name'], 'UTF-8') < 3 || mb_strlen($data['full_name'], 'UTF-8') > 160) {
             throw new RuntimeException('Escribe el nombre completo del residente (entre 3 y 160 caracteres).');
         }
@@ -273,7 +367,7 @@ final class ResidentService
         if ($data['password'] !== '' && strlen($data['password']) < 12) {
             throw new RuntimeException('La contraseña debe tener al menos 12 caracteres, o déjala vacía para enviar la invitación.');
         }
-        if ($creating && $data['password'] === '') {
+        if ($requireAccess && $data['password'] === '') {
             $data['send_invitation'] = true; // Sin contraseña conocida, la invitación es la única forma de entrar.
         }
         foreach (['document_type', 'document_number', 'phone'] as $optional) {

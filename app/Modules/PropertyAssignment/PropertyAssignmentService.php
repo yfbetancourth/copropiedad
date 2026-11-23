@@ -165,7 +165,11 @@ final class PropertyAssignmentService
         }
 
         $pdo = Database::connection();
-        $pdo->beginTransaction();
+        // Si quien llama ya abrió una transacción (crear residente + vincularlo), todo se confirma o se revierte junto.
+        $ownTransaction = !$pdo->inTransaction();
+        if ($ownTransaction) {
+            $pdo->beginTransaction();
+        }
         try {
             $currentStatement = $pdo->prepare(
                 'SELECT unit_id, relation_type, resides, started_on
@@ -177,6 +181,27 @@ final class PropertyAssignmentService
             $current = [];
             foreach ($currentStatement->fetchAll() as $row) {
                 $current[(string) $row['unit_id']] = $row;
+            }
+
+            // Un inquilino solo se vincula a un inmueble que ya tiene propietario vigente (otra persona).
+            $ownerCheck = $pdo->prepare(
+                "SELECT 1 FROM property_unit_assignments
+                 WHERE tenant_id = ? AND unit_id = ? AND relation_type = 'propietario' AND user_id <> ?
+                 LIMIT 1 FOR UPDATE"
+            );
+            foreach ($wanted as $unitId => $link) {
+                $alreadyTenant = isset($current[$unitId]) && (string) $current[$unitId]['relation_type'] === 'inquilino';
+                if ($link['relation'] !== 'inquilino' || $alreadyTenant) {
+                    continue;
+                }
+                $ownerCheck->execute([Tenant::id(), $unitId, $userId]);
+                if ($ownerCheck->fetchColumn() === false) {
+                    throw new RuntimeException(sprintf(
+                        'No se puede registrar a %s como inquilino de %s: el inmueble aún no tiene propietario. Vincula primero al propietario.',
+                        (string) $user['username'],
+                        $unitNames[$unitId]
+                    ));
+                }
             }
 
             $userName = (string) $user['username'];
@@ -220,13 +245,47 @@ final class PropertyAssignmentService
                 RelationshipHistory::open($pdo, $unitId, $unitNames[$unitId], $userId, $userName,
                     $link['relation'], $link['resides'], $effectiveDate, $actorId);
             }
-            $pdo->commit();
+            if ($ownTransaction) {
+                $pdo->commit();
+            }
         } catch (Throwable $exception) {
-            if ($pdo->inTransaction()) {
+            if ($ownTransaction && $pdo->inTransaction()) {
                 $pdo->rollBack();
             }
             throw $exception;
         }
+    }
+
+    /**
+     * Inmuebles de la estructura con sus propietarios vigentes, para elegir dónde vive un inquilino.
+     *
+     * @return array<string, array{name: string, owners: list<string>}> por id de inmueble, en el orden de la estructura
+     */
+    public function unitsWithOwners(): array
+    {
+        $composition = (new CompositionService())->current();
+        $units = [];
+        foreach ((is_array($composition) && is_array($composition['units'] ?? null)) ? $composition['units'] : [] as $unit) {
+            if (is_array($unit) && is_string($unit['id'] ?? null) && $unit['id'] !== '') {
+                $units[$unit['id']] = ['name' => (string) ($unit['name'] ?? ''), 'owners' => []];
+            }
+        }
+        $statement = Database::connection()->prepare(
+            "SELECT assignments.unit_id, COALESCE(NULLIF(profiles.full_name, ''), users.username) AS owner
+             FROM property_unit_assignments AS assignments
+             JOIN admin_users AS users ON users.id = assignments.user_id
+             LEFT JOIN resident_profiles AS profiles ON profiles.user_id = users.id
+             WHERE assignments.tenant_id = ? AND assignments.relation_type = 'propietario'
+             ORDER BY owner"
+        );
+        $statement->execute([Tenant::id()]);
+        foreach ($statement->fetchAll() as $row) {
+            if (isset($units[(string) $row['unit_id']])) {
+                $units[(string) $row['unit_id']]['owners'][] = (string) $row['owner'];
+            }
+        }
+
+        return $units;
     }
 
     /**

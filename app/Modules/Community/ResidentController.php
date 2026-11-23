@@ -8,6 +8,7 @@ use App\Core\Authorization;
 use App\Core\Http;
 use App\Core\Session;
 use App\Core\View;
+use App\Modules\PropertyAssignment\PropertyAssignmentService;
 use RuntimeException;
 
 /** Comunidad / Residentes en el panel: listado, alta, edición, invitación, activación y eliminación. */
@@ -53,6 +54,9 @@ final class ResidentController
             'resident' => $resident,
             'old' => is_array($old) ? $old : null,
             'documentTypes' => ResidentService::DOCUMENT_TYPES,
+            'residentTypes' => (new ResidentTypeService())->all(),
+            'tenancyUnits' => (new PropertyAssignmentService())->unitsWithOwners(),
+            'hasTenancy' => $resident !== null && $this->service->hasTenancy((int) $resident['id']),
             'canAssign' => Authorization::hasPermission($actor, 'inmuebles.asignaciones', 2),
         ]);
     }

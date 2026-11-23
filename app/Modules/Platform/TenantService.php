@@ -7,6 +7,7 @@ namespace App\Modules\Platform;
 use App\Core\Database;
 use App\Core\ModuleCatalog;
 use App\Core\Tenant;
+use App\Modules\Community\ResidentTypeService;
 use PDOException;
 use RuntimeException;
 use Throwable;
@@ -98,6 +99,7 @@ final class TenantService
 
             $this->writeModules($tenantId, $modules);
             $roleId = self::seedRoles($tenantId);
+            ResidentTypeService::seedDefaults($tenantId);
 
             $pdo->prepare('INSERT INTO copropiedad_settings (tenant_id, property_name) VALUES (?, ?)')
                 ->execute([$tenantId, $name]);

@@ -304,6 +304,42 @@ Get-Content .\database\migrations\028_create_common_areas.sql | & C:\xampp84\mys
 Get-Content .\database\migrations\029_create_community_residents.sql | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
 ```
 
+### Tipos de residente e importación CSV (migración 031)
+
+- **Comunidad / Tipos de residente** (`/comunidad/tipos-residente`): catálogo por conjunto para clasificar a los
+  residentes. Cada conjunto empieza con *Propietario*, *Inquilino* y *Familiar o acompañante* (también al crearlo o
+  al reiniciar esa categoría desde la consola). Se crean y editan con permiso de escritura; un tipo en uso no se
+  elimina: se desactiva y deja de ofrecerse, pero quien ya lo tiene lo conserva.
+- La ficha del residente tiene el campo **Tipo de residente**, visible en el listado y usado por el buscador.
+- **Importar CSV** (`/comunidad/residentes/importar`): se sube el archivo, se revisa fila por fila sin escribir nada
+  (nuevo, ya registrado por correo o documento, o con error) y se confirma. Columnas, en cualquier orden:
+  `nombre_apellidos`, `documento` (cédula o NIT) y `correo` obligatorias; `tipo_documento`, `tipo_residente` y
+  `telefono` opcionales. Sin `tipo_documento`, un número con dígito de verificación (`900123456-7`) se toma como NIT
+  y los demás como cédula. Acepta `;`, `,` o tabulador y archivos UTF-8 o de Excel (Windows-1252); hasta 1 MB y
+  2.000 filas. Hay plantilla descargable. Las cuentas se crean sin invitación, salvo que se marque enviarla (los
+  correos salen después de responder).
+
+```powershell
+Get-Content .\database\migrations\031_create_resident_types.sql | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+```
+
+### Inquilino solo con propietario registrado (migración 032)
+
+- Regla: un residente de tipo **Inquilino** se registra si, y solo si, el inmueble que arrienda ya tiene un
+  propietario vigente. La regla vive en el catálogo como la marca *Exige propietario en el inmueble*
+  (`resident_types.requires_unit_owner`, activa para Inquilino y editable), no en el nombre del tipo.
+- **Formulario del residente:** al elegir un tipo con la marca aparece *Inmueble que arrienda* (obligatorio); los
+  inmuebles sin propietario aparecen deshabilitados. La cuenta y su vínculo como inquilino se guardan en una sola
+  transacción: si el inmueble no tiene propietario, no se crea nada.
+- **Importación CSV:** columna `inmueble` (nombre como en la conformación), obligatoria para esos tipos y validada en
+  la revisión; al confirmar el residente queda vinculado como inquilino.
+- **Asignación de inmuebles:** cualquier vínculo nuevo como *inquilino* exige que el inmueble tenga propietario (otra
+  persona). Los vínculos de inquilino ya existentes se conservan aunque después se retire el propietario.
+
+```powershell
+Get-Content .\database\migrations\032_add_resident_type_owner_rule.sql | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+```
+
 ### Portal exclusivo para residentes y Atención a residentes (migración 030)
 
 - **Solo los residentes** (cuentas con el rol de tipo `resident`) entran al portal `/usuario`; el equipo de la

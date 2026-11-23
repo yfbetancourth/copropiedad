@@ -32,6 +32,41 @@ $value = static function (string $field) use ($old, $resident): string {
                             <label class="form-label" for="full-name">Nombre completo</label>
                             <input class="form-control" id="full-name" name="full_name" minlength="3" maxlength="160" required value="<?= $escape($value('full_name')) ?>">
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="resident-type">Tipo de residente</label>
+                            <select class="form-select" id="resident-type" name="resident_type_id">
+                                <option value="">Sin clasificar</option>
+                                <?php foreach ($residentTypes as $type): ?>
+                                    <?php $selected = $value('resident_type_id') === (string) $type['id']; ?>
+                                    <?php if ($type['is_active'] || $selected): ?>
+                                        <option value="<?= (int) $type['id'] ?>" data-requires-owner="<?= $type['requires_unit_owner'] ? '1' : '0' ?>"<?= $selected ? ' selected' : '' ?>><?= $escape($type['name']) ?><?= $type['is_active'] ? '' : ' (inactivo)' ?></option>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text">El catálogo se administra en <a href="<?= $escape($basePath) ?>/comunidad/tipos-residente">Tipos de residente</a>.</div>
+                        </div>
+                        <div class="mb-3" id="tenancy-unit-field" hidden>
+                            <label class="form-label" for="tenancy-unit">Inmueble que arrienda</label>
+                            <?php if ($hasTenancy): ?>
+                                <div class="small text-success mb-1"><i class="bi bi-check-circle me-1" aria-hidden="true"></i>Ya está vinculado como inquilino. Elige otro inmueble solo si arrienda uno más.</div>
+                            <?php endif; ?>
+                            <select class="form-select" id="tenancy-unit" name="unit_id" aria-describedby="tenancy-unit-help">
+                                <option value=""><?= $hasTenancy ? 'Conservar sus inmuebles actuales' : 'Elige el inmueble…' ?></option>
+                                <?php foreach ($tenancyUnits as $unitId => $unit): ?>
+                                    <option value="<?= $escape((string) $unitId) ?>"<?= $unit['owners'] === [] ? ' disabled' : '' ?><?= $value('unit_id') === (string) $unitId ? ' selected' : '' ?>>
+                                        <?= $escape($unit['name']) ?> · <?= $unit['owners'] === [] ? 'sin propietario' : 'Propietario: ' . $escape(implode(', ', $unit['owners'])) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                            <?php if (array_filter($tenancyUnits, static fn (array $unit): bool => $unit['owners'] !== []) === []): ?>
+                                <div class="alert alert-warning small py-2 mt-2 mb-0" role="status">
+                                    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                                    <?= $tenancyUnits === [] ? 'Aún no hay inmuebles en la conformación.' : 'Ningún inmueble tiene propietario todavía.' ?>
+                                    Un inquilino solo se puede registrar cuando su inmueble ya tiene propietario: vincula primero a los propietarios en Asignación de inmuebles.
+                                </div>
+                            <?php endif; ?>
+                            <div class="form-text" id="tenancy-unit-help">Solo se puede registrar en un inmueble que ya tiene propietario; los demás aparecen deshabilitados. Vincula primero al propietario en Asignación de inmuebles.</div>
+                        </div>
                         <div class="row g-3 mb-3">
                             <div class="col-md-5">
                                 <label class="form-label" for="document-type">Tipo de documento</label>
@@ -114,3 +149,20 @@ $value = static function (string $field) use ($old, $resident): string {
         </div>
     </form>
 </section>
+<script>
+(() => {
+    // El inmueble que arrienda se pide solo para tipos que exigen propietario (p. ej. Inquilino).
+    const type = document.getElementById('resident-type');
+    const field = document.getElementById('tenancy-unit-field');
+    const unit = document.getElementById('tenancy-unit');
+    const hasTenancy = <?= $hasTenancy ? 'true' : 'false' ?>;
+    const sync = () => {
+        const requires = type.selectedOptions[0]?.dataset.requiresOwner === '1';
+        field.hidden = !requires;
+        unit.required = requires && !hasTenancy;
+        unit.disabled = !requires;
+    };
+    type.addEventListener('change', sync);
+    sync();
+})();
+</script>

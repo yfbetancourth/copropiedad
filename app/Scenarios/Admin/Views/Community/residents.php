@@ -12,7 +12,10 @@ $filters = ['active' => 'Activos', 'inactive' => 'Inactivos', 'all' => 'Todos'];
             <p class="text-secondary mb-0">Propietarios, inquilinos y residentes con acceso al portal. Aquí creas su cuenta y su ficha; sus inmuebles se vinculan en Asignación de inmuebles.</p>
         </div>
         <?php if ($canWrite): ?>
-            <a class="btn btn-primary" href="<?= $escape($basePath) ?>/comunidad/residentes/nuevo"><i class="bi bi-person-plus me-1" aria-hidden="true"></i>Nuevo residente</a>
+            <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-outline-primary" href="<?= $escape($basePath) ?>/comunidad/residentes/importar"><i class="bi bi-filetype-csv me-1" aria-hidden="true"></i>Importar CSV</a>
+                <a class="btn btn-primary" href="<?= $escape($basePath) ?>/comunidad/residentes/nuevo"><i class="bi bi-person-plus me-1" aria-hidden="true"></i>Nuevo residente</a>
+            </div>
         <?php endif; ?>
     </div>
 
@@ -33,7 +36,7 @@ $filters = ['active' => 'Activos', 'inactive' => 'Inactivos', 'all' => 'Todos'];
             <form method="get" action="<?= $escape($basePath) ?>/comunidad/residentes" class="d-flex gap-2" role="search">
                 <input type="hidden" name="estado" value="<?= $escape($status) ?>">
                 <label class="visually-hidden" for="resident-search">Buscar residente</label>
-                <input class="form-control form-control-sm" id="resident-search" name="q" type="search" value="<?= $escape($search) ?>" placeholder="Nombre, documento, correo, inmueble…">
+                <input class="form-control form-control-sm" id="resident-search" name="q" type="search" value="<?= $escape($search) ?>" placeholder="Nombre, tipo, documento, correo, inmueble…">
                 <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-search" aria-hidden="true"></i><span class="visually-hidden">Buscar</span></button>
             </form>
         </div>
@@ -55,6 +58,7 @@ $filters = ['active' => 'Activos', 'inactive' => 'Inactivos', 'all' => 'Todos'];
                         <tr>
                             <td>
                                 <strong><?= $escape((string) ($resident['full_name'] ?: $resident['username'])) ?></strong>
+                                <?php if ($resident['resident_type'] !== null): ?><span class="badge text-bg-light border ms-1"><?= $escape((string) $resident['resident_type']) ?></span><?php endif; ?>
                                 <span class="d-block small text-secondary">Usuario: <?= $escape((string) $resident['username']) ?></span>
                             </td>
                             <td class="small"><?= $resident['document_number'] !== null ? $escape($resident['document_type'] . ' ' . $resident['document_number']) : '<span class="text-secondary">—</span>' ?></td>

@@ -6,6 +6,7 @@ namespace App\Modules\Platform;
 
 use App\Core\Database;
 use App\Core\Storage;
+use App\Modules\Community\ResidentTypeService;
 use App\Modules\Configuration\PropertyGalleryService;
 use PDO;
 use RuntimeException;
@@ -109,6 +110,12 @@ final class TenantResetService
             'requires' => ['billing', 'classifieds'],
             'counts' => [':residents' => 'cuentas'],
         ],
+        'resident_types' => [
+            'label' => 'Tipos de residente',
+            'detail' => 'Catálogo de tipos de residente; vuelve a los tipos iniciales (Propietario, Inquilino, Familiar o acompañante).',
+            'requires' => ['residents'],
+            'counts' => ['resident_types' => 'tipos'],
+        ],
         'accounts' => [
             'label' => 'Todas las cuentas y roles',
             'detail' => 'Administradores, equipo de trabajo y roles personalizados. Después asignas el nuevo administrador.',
@@ -150,6 +157,7 @@ final class TenantResetService
         // Las cuentas arrastran fichas, tokens, correos personales, lecturas y bandejas (ON DELETE CASCADE).
         ['residents', 'admin_users', "DELETE users FROM admin_users AS users JOIN admin_roles AS roles ON roles.id = users.role_id
                                        WHERE users.tenant_id = ? AND roles.kind = 'resident'"],
+        ['resident_types', 'resident_types', 'DELETE FROM resident_types WHERE tenant_id = ?'],
         ['accounts', 'resident_profiles', 'DELETE FROM resident_profiles WHERE tenant_id = ?'],
         ['accounts', 'admin_users', 'DELETE FROM admin_users WHERE tenant_id = ?'],
         ['accounts', 'admin_roles', 'DELETE FROM admin_roles WHERE tenant_id = ?'],
@@ -241,6 +249,9 @@ final class TenantResetService
             // Queda como un conjunto recién creado en lo que se borró.
             if (isset($selected['accounts'])) {
                 TenantService::seedRoles($tenantId);
+            }
+            if (isset($selected['resident_types'], $tables['resident_types'])) {
+                ResidentTypeService::seedDefaults($tenantId);
             }
             if (isset($selected['settings'])) {
                 $pdo->prepare('INSERT INTO copropiedad_settings (tenant_id, property_name) VALUES (?, ?)')

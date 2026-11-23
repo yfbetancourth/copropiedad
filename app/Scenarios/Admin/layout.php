@@ -47,6 +47,7 @@ $menu = [
     ]],
     ['Comunidad', [
         ['comunidad.residentes', '/comunidad/residentes', 'bi-people', 'Residentes', ['/comunidad/residentes*']],
+        ['comunidad.residentes', '/comunidad/tipos-residente', 'bi-tags', 'Tipos de residente', ['/comunidad/tipos-residente']],
         ['zonas.comunes', '/zonas-comunes', 'bi-calendar2-check', 'Reservas de zonas comunes', ['/zonas-comunes']],
         ['zonas.comunes', '/zonas-comunes/espacios', 'bi-building', 'Espacios comunes', ['/zonas-comunes/espacios']],
     ]],
