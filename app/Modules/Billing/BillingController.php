@@ -306,6 +306,44 @@ final class BillingController
         echo (new BillingService())->statementHtml($statement);
     }
 
+    /**
+     * Vista previa del documento que recibirá cada residente al emitir (borrador, no se guarda).
+     * Se muestra dentro del modal de emisión: permite marcos del mismo origen y no ejecuta scripts.
+     */
+    public function draft(): void
+    {
+        $actor = Authorization::requirePermission(self::PERMISSION, 'read');
+        if ($actor === null) {
+            return;
+        }
+        $period = Http::string($_GET['periodo'] ?? null);
+        $unitId = Http::string($_GET['inmueble'] ?? null);
+        header('Content-Type: text/html; charset=UTF-8');
+        header('X-Frame-Options: SAMEORIGIN');
+        header("Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'self'; sandbox allow-modals");
+        header('Cache-Control: no-store');
+        try {
+            if (!BillingService::validPeriod($period) || preg_match('/^[a-f0-9]{32}$/D', $unitId) !== 1) {
+                throw new RuntimeException('Elige un inmueble y un período válidos.');
+            }
+            $draft = (new BillingService())->draftStatement($period, $unitId, (int) $actor['id']);
+        } catch (RuntimeException $exception) {
+            http_response_code(404);
+            echo '<!doctype html><meta charset="utf-8"><body style="font:15px Arial,sans-serif;color:#687386;padding:24px">'
+                . htmlspecialchars($exception->getMessage(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</body>';
+            return;
+        }
+        $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $to = implode(', ', array_map(static fn (array $r): string => $escape($r['name'] . ' <' . $r['email'] . '>'), $draft['recipients']));
+        $banner = '<div style="box-sizing:border-box;max-width:8.5in;margin:0 auto 12px;background:#fff3cd;border:1px solid #ffe69c;color:#664d03;border-radius:6px;padding:8px 12px;font:12px Arial,sans-serif">'
+            . '<strong>Vista previa · borrador sin emitir.</strong> Así llegará el correo; el número se asigna al emitir.'
+            . '<br><strong>Para:</strong> ' . $to . '<br><strong>Asunto:</strong> ' . $escape($draft['subject']) . '</div>';
+        $html = (new BillingService())->statementHtml($draft['statement']);
+        // El botón de imprimir no aplica al borrador.
+        $html = preg_replace('#<button type="button" onclick="window\.print\(\)".*?</button>#s', '', $html) ?? $html;
+        echo preg_replace('#(<body[^>]*>)#', '$1' . str_replace(['\\', '$'], ['\\\\', '\\$'], $banner), $html, 1);
+    }
+
     /** «tucorreo@certificado.co (tu correo personal)» o la dirección de la cuenta general. */
     private function senderLabel(int $actorId): string
     {

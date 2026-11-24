@@ -43,6 +43,45 @@ $totalUnits = count($rows);
 $issuedCount = count($statements);
 $readyToIssue = is_array($preview) && $preview['ready'] && $preview['new_count'] > 0;
 
+// Lista de chequeo: conceptos que irán en las notas por emitir, con cuántos inmuebles los llevan y su total.
+$pendingRows = array_values(array_filter($rows, static fn (array $row): bool => !$row['already_issued']));
+$conceptChecklist = [];
+$addConcept = static function (string $key, string $label, string $icon, int $cents, string $hint = '') use (&$conceptChecklist): void {
+    $conceptChecklist[$key] ??= ['label' => $label, 'icon' => $icon, 'units' => 0, 'cents' => 0, 'hint' => $hint];
+    $conceptChecklist[$key]['units']++;
+    $conceptChecklist[$key]['cents'] += $cents;
+};
+foreach ($pendingRows as $row) {
+    if ($row['opening_balance'] !== 0) {
+        $addConcept('opening_balance', 'Saldo del mes anterior', 'bi-arrow-return-right', $row['opening_balance'], 'Lo que cada inmueble trae de la nota anterior (incluye ajustes de saldo inicial).');
+    }
+    if ($row['fee'] > 0) {
+        $addConcept('administration', 'Cuota de administración', 'bi-building', $row['fee'], 'Base mensual × coeficiente de cada inmueble.');
+    }
+    $unitCategories = [];
+    foreach ($row['item_details'] as $item) {
+        if ($item['category'] !== 'opening_balance') {
+            $unitCategories[$item['category']] = ($unitCategories[$item['category']] ?? 0) + BillingService::moneyToCents($item['amount']);
+        }
+    }
+    foreach ($unitCategories as $category => $cents) {
+        $addConcept('item_' . $category, $categories[$category][0] ?? $category, 'bi-plus-square', $cents, 'Concepto adicional registrado en Preparar.');
+    }
+    if ($row['early_discount'] > 0) {
+        $addConcept('early_discount', 'Descuento por pronto pago', 'bi-percent', -$row['early_discount'], 'Se descuenta si se paga antes del día ' . (int) ($preview['discount_day'] ?? 0) . '.');
+    }
+    if ($row['credit'] > 0) {
+        $addConcept('credit', 'Saldo a favor', 'bi-piggy-bank', -$row['credit'], 'Inmuebles cuyo total queda a favor del residente.');
+    }
+}
+$missingConcepts = array_values(array_filter(
+    array_map(static fn (array $c): string => $c[0], array_diff_key($categories, ['opening_balance' => true])),
+    static fn (string $label): bool => !in_array($label, array_column($conceptChecklist, 'label'), true)
+));
+// Firma de la lista: si cambia un valor o un concepto, lo ya marcado como revisado se reinicia.
+$checklistSignature = hash('sha256', $period . json_encode(array_map(static fn (array $c): array => [$c['units'], $c['cents']], $conceptChecklist)));
+$previewUnits = array_values(array_filter($pendingRows, static fn (array $row): bool => !$row['prior_period_invalid'] && !$row['coefficient_missing'] && !$row['invalid_recipient']));
+
 // Avance del período: preparar → emitir → enviar → recaudar.
 $steps = [
     ['Preparar', $itemCount . ' concepto(s) adicional(es)', $issuedCount > 0 || $itemCount > 0 ? 'done' : 'current'],
@@ -188,6 +227,32 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
             <?php if (!is_array($preview)): ?>
                 <p class="text-secondary p-4 mb-0">No se pudo calcular la vista previa de este período.</p>
             <?php else: ?>
+                <?php if ($conceptChecklist !== []): ?>
+                    <div class="p-3 border-bottom" id="concept-checklist" data-signature="<?= $escape($checklistSignature) ?>" data-period="<?= $escape($period) ?>">
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                            <h2 class="h6 mb-0"><i class="bi bi-list-check text-primary me-1" aria-hidden="true"></i>Conceptos incluidos en las notas de <?= $escape($periodLabel) ?></h2>
+                            <span class="badge rounded-pill text-bg-secondary" id="concept-progress" aria-live="polite"></span>
+                            <button class="btn btn-link btn-sm ms-auto p-0" type="button" id="concept-check-all">Marcar todos como revisados</button>
+                        </div>
+                        <p class="small text-secondary mb-2">Marca cada concepto cuando hayas revisado sus valores. Para emitir deben estar todos revisados; si un valor cambia, su revisión se reinicia.</p>
+                        <ul class="list-group">
+                            <?php foreach ($conceptChecklist as $key => $concept): ?>
+                                <li class="list-group-item d-flex flex-wrap align-items-center gap-2">
+                                    <input class="form-check-input mt-0 flex-shrink-0" type="checkbox" id="concept-<?= $escape($key) ?>" value="<?= $escape($key) ?>" data-concept-check>
+                                    <label class="form-check-label flex-grow-1" for="concept-<?= $escape($key) ?>" style="min-width: 12rem">
+                                        <i class="bi <?= $escape($concept['icon']) ?> text-secondary me-1" aria-hidden="true"></i><strong><?= $escape($concept['label']) ?></strong>
+                                        <span class="d-block small text-secondary"><?= $escape($concept['hint']) ?></span>
+                                    </label>
+                                    <span class="small text-secondary text-nowrap"><?= $concept['units'] ?> de <?= count($pendingRows) ?> inmueble(s)</span>
+                                    <strong class="text-nowrap text-end" style="min-width: 8rem"><?= $short($concept['cents']) ?></strong>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                        <?php if ($missingConcepts !== []): ?>
+                            <p class="small text-secondary mt-2 mb-0"><i class="bi bi-dash-circle me-1" aria-hidden="true"></i>No incluidos este mes: <?= $escape(implode(', ', $missingConcepts)) ?>.<?= $canWrite ? ' Agrégalos con «+ Concepto» en el inmueble que corresponda.' : '' ?></p>
+                        <?php endif; ?>
+                    </div>
+                <?php endif; ?>
                 <div class="d-flex flex-wrap gap-2 align-items-center p-3 border-bottom">
                     <div class="btn-group btn-group-sm" role="group" aria-label="Filtrar por estado">
                         <?php foreach (['all' => ['Todos', $totalUnits], 'pending' => ['Listos', $stateCounts['pending']], 'problem' => ['Con problemas', $stateCounts['problem']], 'issued' => ['Emitidos', $stateCounts['issued']]] as $value => [$label, $count]): ?>
@@ -532,7 +597,7 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
     <?php if ($readyToIssue): ?>
         <!-- Confirmar emisión -->
         <div class="modal fade" id="issue-modal" tabindex="-1" aria-labelledby="issue-modal-title" aria-hidden="true">
-            <div class="modal-dialog">
+            <div class="modal-dialog modal-xl modal-dialog-scrollable">
                 <form class="modal-content" method="post" action="<?= $escape($basePath) ?>/cartera/cobros/emitir" id="issue-form">
                     <div class="modal-header">
                         <h2 class="modal-title h5" id="issue-modal-title">Emitir notas de <?= $escape($periodLabel) ?></h2>
@@ -541,6 +606,8 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                     <div class="modal-body">
                         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                         <input type="hidden" name="period" value="<?= $escape($period) ?>">
+                        <div class="row g-3">
+                        <div class="col-lg-5">
                         <ul class="list-group mb-3">
                             <li class="list-group-item d-flex justify-content-between flex-wrap gap-1"><span>Se enviarán desde</span><span><?= $senderHtml ?></span></li>
                             <li class="list-group-item d-flex justify-content-between"><span>Notas a emitir</span><strong><?= (int) $preview['new_count'] ?></strong></li>
@@ -550,9 +617,33 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                             <li class="list-group-item d-flex justify-content-between"><span>Vencimiento el día</span><strong><?= (int) $preview['due_day'] ?></strong></li>
                         </ul>
                         <div class="alert alert-warning small mb-3"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Las notas emitidas <strong>no se pueden editar ni eliminar</strong>, y se enviarán por correo a cada residente. Las correcciones se hacen con conceptos en el mes siguiente.</div>
+                        <?php if ($conceptChecklist !== []): ?>
+                            <div class="small mb-3" id="issue-checklist-status" role="status"></div>
+                        <?php endif; ?>
                         <div class="form-check">
                             <input class="form-check-input" type="checkbox" id="issue-confirm" required>
                             <label class="form-check-label" for="issue-confirm">Revisé los valores y los conceptos de este período.</label>
+                        </div>
+                        </div>
+                        <div class="col-lg-7">
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                <h3 class="h6 mb-0 me-auto"><i class="bi bi-file-earmark-text me-1" aria-hidden="true"></i>Vista previa del documento</h3>
+                                <label class="visually-hidden" for="draft-unit">Inmueble de la vista previa</label>
+                                <select class="form-select form-select-sm w-auto" id="draft-unit">
+                                    <?php foreach ($previewUnits as $unit): ?>
+                                        <option value="<?= $escape($unit['id']) ?>"><?= $escape($unit['name']) ?> · <?= $escape($short($unit['due'])) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="btn-group btn-group-sm" role="group" aria-label="Recorrer inmuebles">
+                                    <button class="btn btn-outline-secondary" type="button" id="draft-prev" title="Inmueble anterior" aria-label="Inmueble anterior"><i class="bi bi-chevron-left" aria-hidden="true"></i></button>
+                                    <button class="btn btn-outline-secondary" type="button" id="draft-next" title="Inmueble siguiente" aria-label="Inmueble siguiente"><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+                                </div>
+                                <a class="btn btn-sm btn-outline-secondary" id="draft-open" href="#" target="_blank" rel="noopener" title="Abrir en una pestaña nueva"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span class="visually-hidden">Abrir en una pestaña nueva</span></a>
+                            </div>
+                            <iframe id="draft-frame" title="Vista previa de la nota de cobro" class="w-100 border rounded bg-white" style="height: 60vh" sandbox
+                                    data-base="<?= $escape($basePath) ?>/cartera/cobros/vista-previa?periodo=<?= $escape(rawurlencode($period)) ?>&amp;inmueble="></iframe>
+                            <p class="small text-secondary mt-1 mb-0">Es el mismo documento que recibirá cada residente por correo, con sus valores. Nada se guarda ni se envía hasta que emitas.</p>
+                        </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -713,9 +804,81 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Emisión: el botón se habilita solo tras marcar la revisión.
+    // Lista de chequeo de conceptos: se recuerda por período en este navegador y se reinicia si cambian los valores.
+    const checklist = document.getElementById('concept-checklist');
+    const conceptChecks = [...document.querySelectorAll('[data-concept-check]')];
+    const checklistKey = checklist ? `billing-checklist:${checklist.dataset.period}` : null;
+    const readChecklist = () => {
+        try {
+            const saved = JSON.parse(localStorage.getItem(checklistKey) || 'null');
+            return saved && saved.signature === checklist.dataset.signature ? saved.checked : [];
+        } catch { return []; }
+    };
+    const saveChecklist = () => {
+        try {
+            localStorage.setItem(checklistKey, JSON.stringify({ signature: checklist.dataset.signature, checked: conceptChecks.filter((c) => c.checked).map((c) => c.value) }));
+        } catch { /* navegador sin almacenamiento: la lista funciona igual en esta visita */ }
+    };
+    const pendingConcepts = () => conceptChecks.filter((c) => !c.checked).map((c) => c.labels[0].querySelector('strong').textContent);
+
+    // Emisión: se habilita al marcar la revisión y con todos los conceptos revisados.
     const issueConfirm = document.getElementById('issue-confirm');
-    issueConfirm?.addEventListener('change', () => { document.getElementById('issue-submit').disabled = !issueConfirm.checked; });
+    const updateIssueState = () => {
+        const pending = pendingConcepts();
+        const progress = document.getElementById('concept-progress');
+        if (progress) {
+            progress.textContent = `${conceptChecks.length - pending.length} de ${conceptChecks.length} revisados`;
+            progress.className = `badge rounded-pill ${pending.length === 0 ? 'text-bg-success' : 'text-bg-secondary'}`;
+        }
+        const status = document.getElementById('issue-checklist-status');
+        if (status) {
+            status.className = `small mb-3 ${pending.length === 0 ? 'text-success' : 'text-warning-emphasis'}`;
+            status.innerHTML = '';
+            const icon = document.createElement('i');
+            icon.className = `bi ${pending.length === 0 ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'} me-1`;
+            icon.setAttribute('aria-hidden', 'true');
+            status.append(icon, pending.length === 0
+                ? 'Todos los conceptos están revisados.'
+                : `Falta revisar en Preparar: ${pending.join(', ')}.`);
+        }
+        const submit = document.getElementById('issue-submit');
+        if (submit) submit.disabled = !(issueConfirm?.checked && pending.length === 0);
+    };
+    if (checklist) {
+        const saved = readChecklist();
+        conceptChecks.forEach((check) => {
+            check.checked = saved.includes(check.value);
+            check.addEventListener('change', () => { saveChecklist(); updateIssueState(); });
+        });
+        document.getElementById('concept-check-all').addEventListener('click', () => {
+            conceptChecks.forEach((check) => { check.checked = true; });
+            saveChecklist();
+            updateIssueState();
+        });
+    }
+    issueConfirm?.addEventListener('change', updateIssueState);
+    updateIssueState();
+
+    // Vista previa del documento en el modal de emisión: se carga al abrir y al cambiar de inmueble.
+    const draftFrame = document.getElementById('draft-frame');
+    const draftUnit = document.getElementById('draft-unit');
+    if (draftFrame && draftUnit) {
+        const loadDraft = () => {
+            const url = draftFrame.dataset.base + encodeURIComponent(draftUnit.value);
+            if (draftFrame.getAttribute('src') !== url) draftFrame.setAttribute('src', url);
+            document.getElementById('draft-open').href = url;
+            document.getElementById('draft-prev').disabled = draftUnit.selectedIndex <= 0;
+            document.getElementById('draft-next').disabled = draftUnit.selectedIndex >= draftUnit.options.length - 1;
+        };
+        const step = (delta) => {
+            draftUnit.selectedIndex = Math.min(Math.max(0, draftUnit.selectedIndex + delta), draftUnit.options.length - 1);
+            loadDraft();
+        };
+        draftUnit.addEventListener('change', loadDraft);
+        document.getElementById('draft-prev').addEventListener('click', () => step(-1));
+        document.getElementById('draft-next').addEventListener('click', () => step(1));
+        document.getElementById('issue-modal').addEventListener('show.bs.modal', () => { updateIssueState(); loadDraft(); });
+    }
 
     // Confirmaciones y estado «procesando» para evitar envíos dobles.
     document.querySelectorAll('form[data-confirm]').forEach((form) => form.addEventListener('submit', (event) => {

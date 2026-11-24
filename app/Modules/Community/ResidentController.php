@@ -28,7 +28,9 @@ final class ResidentController
         $status = in_array($_GET['estado'] ?? null, self::STATUSES, true) ? (string) $_GET['estado'] : 'active';
         $search = trim(Http::string($_GET['q'] ?? null));
         $this->render('residents', 'Comunidad · Residentes', [
-            'residents' => $this->service->list($search, $status),
+            // Se cargan todos: el estado, la búsqueda y la paginación se aplican en la tabla sin recargar.
+            'residents' => $this->service->list('', 'all'),
+            'residentTypes' => (new ResidentTypeService())->all(),
             'search' => $search,
             'status' => $status,
             'canWrite' => Authorization::hasPermission($actor, self::PERMISSION, 2),
@@ -123,6 +125,37 @@ final class ResidentController
             Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
         Http::redirect('/comunidad/residentes?estado=all');
+    }
+
+    /** Acción sobre los residentes seleccionados en el listado. Eliminar exige el permiso total. */
+    public function bulk(): void
+    {
+        $action = (string) ($_POST['action'] ?? '');
+        if (!array_key_exists($action, ResidentService::BULK_ACTIONS)) {
+            Http::flash(self::FLASH, 'error', 'La acción en lote no es válida.');
+            Http::redirect('/comunidad/residentes');
+        }
+        $actor = $this->require($action === 'delete' ? 'total' : 'write');
+        Http::requireCsrf();
+        $status = in_array($_POST['estado'] ?? null, self::STATUSES, true) ? (string) $_POST['estado'] : 'active';
+        $userIds = array_map(static fn (mixed $id): int => Http::id($id), is_array($_POST['user_ids'] ?? null) ? $_POST['user_ids'] : []);
+        try {
+            $result = $this->service->bulk($action, $userIds, (int) $actor['id']);
+        } catch (RuntimeException $exception) {
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
+            Http::redirect('/comunidad/residentes?estado=' . $status);
+        }
+
+        $parts = [$result['done'] . ' residente(s) ' . ResidentService::BULK_ACTIONS[$action] . '.'];
+        if ($result['skipped'] > 0) {
+            $parts[] = $result['skipped'] . ' se omitieron porque ' . ($action === 'activate' ? 'ya estaban activos.' : ($action === 'invite' ? 'están inactivos.' : 'ya estaban inactivos.'));
+        }
+        if ($result['failed'] !== []) {
+            $shown = array_map(static fn (array $f): string => $f['name'] . ': ' . $f['message'], array_slice($result['failed'], 0, 5));
+            $parts[] = 'No se pudo con ' . count($result['failed']) . ': ' . implode(' · ', $shown) . (count($result['failed']) > 5 ? ' · …' : '');
+        }
+        Http::flash(self::FLASH, $result['failed'] === [] ? 'success' : 'error', implode(' ', $parts));
+        Http::redirect('/comunidad/residentes?estado=' . $status);
     }
 
     private function require(string $level): array

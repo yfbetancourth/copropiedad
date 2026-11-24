@@ -9,6 +9,7 @@ use App\Modules\Billing\BillingController;
 $billing = new BillingController();
 $router->get('/cartera/cobros', [$billing, 'index']);
 $router->get('/cartera/cobros/nota', [$billing, 'statement']);
+$router->get('/cartera/cobros/vista-previa', [$billing, 'draft']);
 $router->post('/cartera/cobros/concepto', [$billing, 'addItem']);
 $router->post('/cartera/cobros/concepto/eliminar', [$billing, 'removeItem']);
 $router->post('/cartera/cobros/pago', [$billing, 'addPayment']);

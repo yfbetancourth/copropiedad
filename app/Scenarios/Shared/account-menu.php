@@ -11,14 +11,24 @@ declare(strict_types=1);
  * - $accountGroups list<array{title: string, items: list<array{href: string, icon: string, label: string, active?: bool, newTab?: bool}>}>
  * - $logoutAction  string
  * - $csrfToken     string
+ * - $sidebarSections (opcional) las opciones del menú con contador se suman en el avatar y se listan en «Pendientes»
  */
+$accountPending = [];
+foreach ($sidebarSections ?? [] as $pendingSection) {
+    foreach ($pendingSection['items'] as $pendingItem) {
+        if (($pendingItem['badge'] ?? 0) > 0) {
+            $accountPending[] = $pendingItem;
+        }
+    }
+}
+$accountPendingTotal = array_sum(array_map(static fn (array $item): int => (int) $item['badge'], $accountPending));
 ?>
 <li class="nav-item dropdown">
     <button class="btn btn-link nav-link d-flex align-items-center gap-2 px-2 dropdown-toggle text-body text-decoration-none"
             type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false"
-            aria-label="Menú de la cuenta de <?= $escape($account['name']) ?>">
-        <span class="rounded-circle bg-primary text-white fw-semibold d-inline-flex align-items-center justify-content-center flex-shrink-0"
-              style="width: 2.25rem; height: 2.25rem" aria-hidden="true"><?= $escape($account['initial']) ?></span>
+            aria-label="Menú de la cuenta de <?= $escape($account['name']) ?><?= $accountPendingTotal > 0 ? ': ' . $accountPendingTotal . ' pendiente(s)' : '' ?>">
+        <?php $avatarInitial = $account['initial']; $avatarSize = '2.25rem'; $avatarBadge = $accountPendingTotal; $avatarClass = ''; ?>
+        <?php require __DIR__ . '/avatar.php'; ?>
         <span class="d-none d-md-flex flex-column align-items-start lh-sm text-start">
             <span class="fw-semibold"><?= $escape($account['name']) ?></span>
             <?php if ($account['role'] !== ''): ?>
@@ -40,6 +50,17 @@ declare(strict_types=1);
                 <?php endif; ?>
             </div>
         </div>
+        <?php if ($accountPending !== []): ?>
+            <div class="py-2 border-bottom">
+                <h6 class="dropdown-header">Pendientes</h6>
+                <?php foreach ($accountPending as $item): ?>
+                    <a class="dropdown-item py-2 d-flex align-items-center" href="<?= $escape($item['href']) ?>">
+                        <i class="bi <?= $escape($item['icon']) ?> me-2" aria-hidden="true"></i><?= $escape($item['label']) ?>
+                        <span class="badge rounded-pill text-bg-danger ms-auto ps-2"><?= (int) $item['badge'] ?></span>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
         <?php foreach ($accountGroups as $groupIndex => $group): ?>
             <?php if ($group['items'] === []) { continue; } ?>
             <div class="py-2<?= $groupIndex > 0 ? ' border-top' : '' ?>">

@@ -122,6 +122,8 @@ La migracion 005 agrega el tipo de vivienda como un dato opcional y un permiso i
 
 **Lista de inmuebles como tabla de datos.** En Conformación, la lista de inmuebles tiene paginación (10, 25, 50, 100 o todas las filas, recordado por navegador), orden por columna (el tercer clic restaura el orden original; el orden guardado de la estructura no cambia), columnas visibles, selección de varias filas (la página o todas las filtradas) con acciones masivas —cambiar categoría, asignar coeficiente, repartir un porcentaje total, borrar coeficiente y quitar (los inmuebles con notas de cobro se conservan)— y exportación CSV de las filas filtradas o seleccionadas. Los cambios siguen aplicándose solo al pulsar Guardar. El componente es reutilizable: `public/assets/js/data-grid.js` (`new DataGrid(tabla, opciones)`), configurado con atributos `data-column`, `data-sortable`, `data-hideable` y `data-export` en el encabezado. **Reiniciar conformación:** en la guía de pasos, el paso 2 tiene el botón *Reiniciar* (POST `/configuracion/conformacion/reiniciar`), que borra las respuestas del asistente, los inmuebles, coeficientes y asignaciones vigentes (cerradas en Trazabilidad) y vuelve a la primera pregunta; conserva la caracterización. Solo el Superadmin puede hacerlo, exige escribir REINICIAR y se bloquea si ya hay notas de cobro emitidas.
 
+**Lista de residentes como tabla de datos.** Comunidad / Residentes usa la misma tabla: paginación, orden, columnas visibles y exportación CSV. Las pestañas Activos / Inactivos / Todos, la búsqueda (sin tildes ni mayúsculas) y los filtros por tipo de residente y por inmueble se aplican sin recargar y quedan en la dirección (`?estado=…&q=…`). Con filas seleccionadas se puede enviar el acceso, activar, desactivar o eliminar en lote (`POST /comunidad/residentes/lote`, hasta 1000 por lote; eliminar exige el permiso total). Cada residente se procesa por separado: quien ya está en el estado pedido se omite y quien tiene historial de cartera o mensajes no se elimina, sin detener a los demás; las invitaciones salen después de responder.
+
 La migracion 010 crea el registro de asignaciones entre usuarios e inmuebles y agrega el permiso independiente **Inmuebles / Asignacion de usuarios** (inicializado con el nivel de **Configuracion / Equipo**). En la seccion **Asignacion de inmuebles**, selecciona un usuario y marca uno o varios inmuebles; las asignaciones se mantienen al editar el nombre del inmueble y se eliminan al quitarlo de la estructura.
 
 La migracion 011 habilita el permiso de lectura **Usuario / Portal de inmuebles asignados** para las cuentas existentes. El acceso **Iniciar sesión de usuario** aparece en el pie de pagina; cada cuenta puede consultar unicamente los inmuebles asignados a su usuario en el **Panel de Usuario** y actualizar su nombre de usuario, correo y contrasena confirmando su contrasena actual. El panel muestra el canon y descuento configurados; las notas de cobro se notifican por correo y se consultan desde **Cartera / Cobros** en el panel administrativo. Al iniciar desde el acceso del portal, se prioriza el Panel de Usuario; el ingreso administrativo sigue disponible en `/login`.
@@ -186,6 +188,36 @@ En **Asignación de inmuebles** cada usuario se vincula a sus inmuebles como *Pr
 
 Migración: `database/migrations/024_add_unit_relationship_history.sql` (los vínculos existentes quedan como
 *Propietario* desde la fecha en que se asignaron).
+
+### Liquidación por base mensual o por presupuesto (migración 033)
+
+En **Configuración / Financiera → Administración y descuento** se elige cómo se interpreta el valor:
+
+- **Base mensual de liquidación** (como antes): cada inmueble paga base × su coeficiente (%). Si los coeficientes no
+  suman 100 %, lo recaudado es base × suma de coeficientes.
+- **Valor mensual del presupuesto:** el valor es el total a recaudar. Se reparte entre todos los inmuebles de la
+  conformación en proporción a su coeficiente (`BillingService::budgetShares()`, método del mayor residuo, solo
+  aritmética entera), y las cuotas suman exactamente el presupuesto. Los inmuebles sin residente asignado no se cobran,
+  pero su parte tampoco se carga a los demás.
+
+La pantalla muestra cuánto se recauda al mes con cada opción. Sin la migración, todo conjunto liquida sobre la base
+mensual y la opción de presupuesto pide aplicarla. Las notas ya emitidas conservan su cuota.
+
+```powershell
+Get-Content .\database\migrations\033_add_fee_basis.sql | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+```
+
+### Cartera / Cobros: lista de conceptos y vista previa de la nota
+
+- **Preparar:** la pestaña *Preparar y emitir* muestra la lista de chequeo de los conceptos que irán en las notas por
+  emitir (saldo del mes anterior, cuota de administración, cada tipo de concepto adicional, descuento por pronto pago y
+  saldo a favor), con cuántos inmuebles lo llevan y su total, y los tipos no incluidos ese mes. Cada concepto se marca
+  como revisado; lo marcado se recuerda en el navegador por período y se reinicia si cambia algún valor.
+- **Emitir:** el botón *Emitir y enviar* solo se habilita con todos los conceptos revisados y la confirmación marcada.
+  El modal muestra la **vista previa del documento** que recibirá cada residente (destinatarios, asunto y la nota con sus
+  valores), inmueble por inmueble. Es un borrador: no se guarda nada y el número se asigna al emitir
+  (`GET /cartera/cobros/vista-previa?periodo=AAAA-MM&inmueble=…`, `BillingService::draftStatement()`, con los mismos
+  datos que usa la emisión). Se muestra en un marco del mismo origen, aislado y sin scripts.
 
 ### Avisos de pago, pagos reportados y arriendos (migración 025)
 

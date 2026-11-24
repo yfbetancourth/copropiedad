@@ -407,9 +407,19 @@ final class ConfigurationController
             return;
         }
 
+        // Inmuebles y suma de coeficientes de la conformación: la vista muestra cuánto se recauda con cada opción.
+        $composition = (new CompositionService())->current();
+        $coefficients = [];
+        foreach (is_array($composition['units'] ?? null) ? $composition['units'] : [] as $unit) {
+            if (is_array($unit) && is_numeric($unit['coefficient'] ?? null)) {
+                $coefficients[] = (float) $unit['coefficient'];
+            }
+        }
         $this->render('financial', 'Configuracion / Financiera', [
             'actor' => $actor,
             'settings' => (new SettingsService())->current(),
+            'unitCount' => is_array($composition['units'] ?? null) ? count($composition['units']) : 0,
+            'coefficientSum' => round(array_sum($coefficients), 4),
         ]);
     }
 
@@ -477,18 +487,25 @@ final class ConfigurationController
             Http::redirect('/configuracion/financiera');
         }
 
-        (new SettingsService())->saveFinancial(
-            $administrationFee,
-            $effectiveDate,
-            $discount,
-            $lateFeeType,
-            $lateFeeValue,
-            $lateFeeDays,
-            $fineAmount,
-            $extraordinaryFeeConfigured ? $extraordinaryFee : null,
-            $extraordinaryFeeConfigured ? $extraordinaryFeeStartDate : null,
-            $extraordinaryFeeConfigured ? $extraordinaryFeeEndDate : null
-        );
+        $feeBasis = Http::string($_POST['fee_basis'] ?? 'base');
+        try {
+            (new SettingsService())->saveFinancial(
+                $administrationFee,
+                $effectiveDate,
+                $discount,
+                $lateFeeType,
+                $lateFeeValue,
+                $lateFeeDays,
+                $fineAmount,
+                $extraordinaryFeeConfigured ? $extraordinaryFee : null,
+                $extraordinaryFeeConfigured ? $extraordinaryFeeStartDate : null,
+                $extraordinaryFeeConfigured ? $extraordinaryFeeEndDate : null,
+                $feeBasis
+            );
+        } catch (\RuntimeException $exception) {
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
+            Http::redirect('/configuracion/financiera');
+        }
         Http::flash(self::FLASH, 'success', 'Los parametros financieros se guardaron correctamente.');
         Http::redirect('/configuracion/financiera');
     }

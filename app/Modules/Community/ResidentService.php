@@ -7,6 +7,7 @@ namespace App\Modules\Community;
 use App\Core\Database;
 use App\Core\Tenant;
 use App\Modules\Auth\AccessLinkService;
+use App\Modules\Auth\UserNotifier;
 use App\Modules\Configuration\CompositionService;
 use App\Modules\Configuration\TeamService;
 use App\Modules\PropertyAssignment\PropertyAssignmentService;
@@ -30,6 +31,15 @@ final class ResidentService
         'NIT' => 'NIT',
         'OTRO' => 'Otro',
     ];
+
+    /** Acciones en lote del listado y el texto que se muestra al terminar. */
+    public const BULK_ACTIONS = [
+        'activate' => 'activado(s)',
+        'deactivate' => 'desactivado(s)',
+        'invite' => 'con invitación en camino',
+        'delete' => 'eliminado(s)',
+    ];
+    public const BULK_LIMIT = 1000;
 
     private readonly TeamService $accounts;
 
@@ -210,6 +220,72 @@ final class ResidentService
             }
             throw $exception;
         }
+    }
+
+    /**
+     * Acción sobre varios residentes a la vez. Cada uno se procesa por separado: si uno falla (p. ej. tiene cartera
+     * y no se puede eliminar) los demás siguen. Las invitaciones se validan aquí y los correos salen después de
+     * responder, para que la página no espere a cientos de envíos.
+     *
+     * @param 'activate'|'deactivate'|'invite'|'delete' $action
+     * @param list<int> $userIds
+     * @return array{done: int, skipped: int, failed: list<array{name: string, message: string}>}
+     */
+    public function bulk(string $action, array $userIds, int $actorId): array
+    {
+        if (!array_key_exists($action, self::BULK_ACTIONS)) {
+            throw new RuntimeException('La acción en lote no es válida.');
+        }
+        $userIds = array_values(array_unique(array_filter($userIds, static fn (int $id): bool => $id > 0)));
+        if ($userIds === []) {
+            throw new RuntimeException('Selecciona al menos un residente.');
+        }
+        if (count($userIds) > self::BULK_LIMIT) {
+            throw new RuntimeException('Se pueden procesar hasta ' . self::BULK_LIMIT . ' residentes por lote.');
+        }
+
+        $done = 0;
+        $skipped = 0;
+        $failed = [];
+        $toInvite = [];
+        foreach ($userIds as $userId) {
+            $account = $this->accounts->find($userId);
+            if ($account === null) {
+                $failed[] = ['name' => '#' . $userId, 'message' => 'El residente no existe.'];
+                continue;
+            }
+            $active = (bool) $account['is_active'];
+            // Lo que ya está en el estado pedido no cuenta como error.
+            if (($action === 'activate' && $active) || ($action === 'deactivate' && !$active) || ($action === 'invite' && !$active)) {
+                $skipped++;
+                continue;
+            }
+            try {
+                match ($action) {
+                    'activate' => $this->setActive($userId, true, $actorId),
+                    'deactivate' => $this->setActive($userId, false, $actorId),
+                    'delete' => $this->delete($userId),
+                    'invite' => $toInvite[] = $userId,
+                };
+                $done++;
+            } catch (RuntimeException $exception) {
+                $failed[] = ['name' => (string) $account['username'], 'message' => $exception->getMessage()];
+            }
+        }
+
+        if ($toInvite !== []) {
+            UserNotifier::afterResponse(function () use ($toInvite): void {
+                foreach ($toInvite as $userId) {
+                    try {
+                        $this->invite($userId);
+                    } catch (Throwable $exception) {
+                        error_log('Invitación en lote: no se envió a ' . $userId . ': ' . $exception->getMessage());
+                    }
+                }
+            });
+        }
+
+        return ['done' => $done, 'skipped' => $skipped, 'failed' => $failed];
     }
 
     /** @return array<int, list<array{name: string, relation: string}>> inmuebles vigentes de cada cuenta */

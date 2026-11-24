@@ -23,8 +23,13 @@ $sidebarSections = array_values(array_filter($sidebarSections, static fn (array 
     </div>
     <div class="sidebar-wrapper">
         <div class="d-flex align-items-center gap-2 px-3 py-3 border-bottom border-secondary-subtle">
-            <span class="rounded-circle bg-primary text-white fw-semibold d-inline-flex align-items-center justify-content-center flex-shrink-0"
-                  style="width: 2.25rem; height: 2.25rem" aria-hidden="true"><?= $escape($sidebarUser['initial']) ?></span>
+            <?php
+            $avatarInitial = $sidebarUser['initial'];
+            $avatarSize = '2.25rem';
+            $avatarBadge = array_sum(array_map(static fn (array $s): int => array_sum(array_map(static fn (array $i): int => (int) ($i['badge'] ?? 0), $s['items'])), $sidebarSections));
+            $avatarClass = '';
+            require __DIR__ . '/avatar.php';
+            ?>
             <div class="lh-sm" style="min-width: 0">
                 <div class="fw-semibold text-truncate text-white"><?= $escape($sidebarUser['name']) ?></div>
                 <?php if ($sidebarUser['role'] !== ''): ?>

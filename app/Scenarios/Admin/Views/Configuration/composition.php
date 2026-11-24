@@ -331,7 +331,7 @@ $currentStep = 2;
 
         <script src="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/js/data-grid.js?v=1"></script>
         <?php if ($canWrite): ?>
-            <form id="composition-units-form" method="post" action="<?= $escape($basePath) ?>/configuracion/conformacion/finalizar" novalidate>
+            <form id="composition-units-form" method="post" action="<?= $escape($basePath) ?>/configuracion/conformacion/finalizar" novalidate autocomplete="off">
                 <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                 <input id="composition-units-json" type="hidden" name="units_json" value="">
 
@@ -480,6 +480,41 @@ $currentStep = 2;
                 const submit = document.getElementById('composition-submit');
                 const dirtyIndicator = document.getElementById('dirty-indicator');
                 const field = (row, name) => row.querySelector(`[data-unit-field="${name}"]`);
+                // Al volver con «Atrás» o recargar, el navegador puede rellenar los campos con lo que se escribió
+                // antes sin guardar. La tabla debe mostrar lo guardado (lo que usa Cartera): se descarta lo rellenado.
+                let discardedTotal = 0;
+                const discardRestoredValues = () => {
+                    let discarded = 0;
+                    list.querySelectorAll('[data-unit-field]').forEach((input) => {
+                        if (input.value !== input.defaultValue) {
+                            input.value = input.defaultValue;
+                            discarded++;
+                        }
+                    });
+                    if (discarded > 0) {
+                        discardedTotal += discarded;
+                        let notice = document.getElementById('discarded-notice');
+                        if (!notice) {
+                            notice = document.createElement('div');
+                            notice.id = 'discarded-notice';
+                            notice.className = 'alert alert-info small d-flex gap-2 align-items-start';
+                            notice.setAttribute('role', 'status');
+                            form.prepend(notice);
+                        }
+                        notice.innerHTML = '<i class="bi bi-info-circle mt-1" aria-hidden="true"></i>';
+                        notice.append(`Se descartaron ${discardedTotal} valor(es) escritos en una visita anterior que no se guardaron. La tabla muestra lo guardado, que es lo que usa Cartera.`);
+                    }
+                    return discarded;
+                };
+                discardRestoredValues();
+                window.addEventListener('pageshow', (event) => {
+                    if (event.persisted) {
+                        location.reload(); // copia guardada por «Atrás»: se pide la estructura vigente
+                    } else if (!dirty && discardRestoredValues() > 0) {
+                        validate();
+                        grid.refresh();
+                    }
+                });
                 let dirty = false;
                 let grid = null;
                 // Orden original de la estructura (el orden visual puede cambiar al ordenar por columna).

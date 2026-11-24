@@ -16,6 +16,7 @@ $router->post('/comunidad/residentes/guardar', [$residents, 'save']);
 $router->post('/comunidad/residentes/invitar', [$residents, 'invite']);
 $router->post('/comunidad/residentes/estado', [$residents, 'setStatus']);
 $router->post('/comunidad/residentes/eliminar', [$residents, 'delete']);
+$router->post('/comunidad/residentes/lote', [$residents, 'bulk']);
 
 $import = new ResidentImportController();
 $router->get('/comunidad/residentes/importar', [$import, 'form']);

@@ -80,6 +80,11 @@ final class BillingService
             && $propertySettings['effective_date'] > $periodStart
             && $propertySettings['effective_date'] <= $periodEnd;
         $feeNotYetEffective = $feeReady && $propertySettings['effective_date'] > $periodEnd;
+        // Valor mensual del presupuesto: se reparte entre todos los inmuebles de la conformación (tengan o no
+        // residentes asignados), así la suma de las cuotas es el presupuesto.
+        $budgetShares = ($propertySettings['fee_basis'] ?? 'base') === 'budget'
+            ? self::budgetShares($fee, (new CompositionService())->current()['units'] ?? [])
+            : null;
 
         $rows = [];
         $cycleError = false;
@@ -119,7 +124,9 @@ final class BillingService
             $coefficientMissing = $coefficient === null && $existingStatement === null;
             $currentFee = $existingStatement !== null
                 ? self::cents($existingStatement['administration_fee'])
-                : ($feeApplies && $coefficient !== null ? self::allocatedFeeCents($fee, $coefficient) : 0);
+                : ($feeApplies && $coefficient !== null
+                    ? ($budgetShares !== null ? ($budgetShares[$unitId] ?? 0) : self::allocatedFeeCents($fee, $coefficient))
+                    : 0);
             $total = $openingBalance + $currentFee + array_sum($itemAmounts);
             $discount = min($configuredDiscount, $currentFee);
             $earlyPayable = max(0, $total - $discount);
@@ -706,6 +713,56 @@ final class BillingService
         return $statement;
     }
 
+    /**
+     * Nota de un inmueble tal como quedaría al emitir el período, sin guardar nada: los mismos datos que usa
+     * issue() (statementData, líneas y destinatarios). El número definitivo se asigna al emitir.
+     *
+     * @return array{statement: array, subject: string, recipients: list<array{name: string, email: string}>}
+     */
+    public function draftStatement(string $period, string $unitId, ?int $actorId = null): array
+    {
+        $preview = $this->preview($period, $actorId);
+        $row = null;
+        foreach ($preview['rows'] as $candidate) {
+            if ($candidate['id'] === $unitId) {
+                $row = $candidate;
+                break;
+            }
+        }
+        if ($row === null) {
+            throw new RuntimeException('El inmueble no tiene residentes activos asignados en este período.');
+        }
+        if ($row['already_issued']) {
+            throw new RuntimeException('La nota de este inmueble ya fue emitida: ábrela desde Notas emitidas.');
+        }
+
+        $statement = $this->statementData($row, $preview);
+        $statement['id'] = 0;
+        $statement['number'] = sprintf('NC-%s-(se asigna al emitir)', str_replace('-', '', $period));
+        $statement['lines'] = [];
+        if ($row['fee'] > 0) {
+            $statement['lines'][] = ['category' => 'administration', 'description' => 'Cuota de administración ' . $period, 'amount' => self::decimal($row['fee'])];
+        }
+        foreach ($row['item_details'] as $item) {
+            if ($item['category'] !== 'opening_balance') {
+                $statement['lines'][] = ['category' => $item['category'], 'description' => $item['description'], 'amount' => $item['amount']];
+            }
+        }
+        $statement['recipients'] = array_map(
+            static fn (array $recipient): array => ['recipient_name' => $recipient['username'], 'recipient_email' => $recipient['email']],
+            $row['recipients']
+        );
+
+        return [
+            'statement' => $statement,
+            'subject' => sprintf('Nota de cobro %s · %s', $statement['number'], $period),
+            'recipients' => array_map(
+                static fn (array $recipient): array => ['name' => (string) $recipient['username'], 'email' => (string) $recipient['email']],
+                $row['recipients']
+            ),
+        ];
+    }
+
     public function statementHtml(array $statement): string
     {
         $escape = static fn (mixed $value): string => htmlspecialchars(
@@ -714,52 +771,63 @@ final class BillingService
             'UTF-8'
         );
         $currency = static fn (mixed $cents): string => self::money((int) $cents);
-        $rows = static function (array $items) use ($escape, $currency): string {
+        $cell = 'padding:1px 6px;border-bottom:1px solid #e3e7ee;line-height:1.35';
+        // Filas: [etiqueta, centavos, estilo]. Estilo: '' normal, 'opt' (se omite en cero), 'total', 'key' (destacado).
+        $rows = static function (array $items) use ($escape, $currency, $cell): string {
             $html = '';
-            foreach ($items as [$label, $amount]) {
-                $html .= '<tr><td>' . $escape($label) . '</td><td style="text-align:right">' . $currency($amount) . '</td></tr>';
+            foreach ($items as [$label, $amount, $style]) {
+                if ($style === 'opt' && $amount === 0) {
+                    continue; // los conceptos sin valor no ocupan espacio en la media carta
+                }
+                $rowStyle = match ($style) {
+                    'total' => 'font-weight:bold;background:#f1f4f9',
+                    'key' => 'font-weight:bold;background:#315ea8;color:#ffffff',
+                    default => '',
+                };
+                $html .= '<tr style="' . $rowStyle . '"><td style="' . $cell . '">' . $escape($label)
+                    . '</td><td style="' . $cell . ';text-align:right;white-space:nowrap">' . $currency($amount) . '</td></tr>';
             }
 
             return $html;
         };
+        $table = static fn (string $title, string $body, string $extra = ''): string => '<div style="font-size:9.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.04em;color:#315ea8;margin:0 0 2px">'
+            . $title . '</div><table role="presentation" style="width:100%;border-collapse:collapse;font-size:10.5px' . $extra . '">' . $body . '</table>';
         $previousPeriod = $statement['previous_period'] ?: 'Sin período anterior emitido';
         $previousRows = [
-            ['Saldo mes anterior', self::cents($statement['previous_opening_balance'])],
-            ['Cuota Administración', self::cents($statement['previous_fee'])],
-            ['Interés moratorio', self::cents($statement['previous_interest'])],
-            ['Cobro por proceso jurídico', self::cents($statement['previous_legal'])],
-            ['Multas', self::cents($statement['previous_fine'])],
-            ['Retroactivo', self::cents($statement['previous_retroactive'])],
-            ['Cuota extra', self::cents($statement['previous_extra'])],
-            ['Otros cobros', self::cents($statement['previous_other'])],
-            ['Total a pagar ' . $previousPeriod, max(0, self::cents($statement['previous_total']))],
-            ['Menos pagos realizados', -self::cents($statement['previous_payments'])],
-            ['Descuentos pronto pago', -self::cents($statement['previous_discount'])],
-            ['Saldo ' . $previousPeriod, self::cents($statement['previous_balance'])],
+            ['Saldo mes anterior', self::cents($statement['previous_opening_balance']), ''],
+            ['Cuota Administración', self::cents($statement['previous_fee']), ''],
+            ['Interés moratorio', self::cents($statement['previous_interest']), 'opt'],
+            ['Cobro por proceso jurídico', self::cents($statement['previous_legal']), 'opt'],
+            ['Multas', self::cents($statement['previous_fine']), 'opt'],
+            ['Retroactivo', self::cents($statement['previous_retroactive']), 'opt'],
+            ['Cuota extra', self::cents($statement['previous_extra']), 'opt'],
+            ['Otros cobros', self::cents($statement['previous_other']), 'opt'],
+            ['Total a pagar ' . $previousPeriod, max(0, self::cents($statement['previous_total'])), 'total'],
+            ['Menos pagos realizados', -self::cents($statement['previous_payments']), ''],
+            ['Descuentos pronto pago', -self::cents($statement['previous_discount']), ''],
+            ['Saldo ' . $previousPeriod, self::cents($statement['previous_balance']), 'total'],
         ];
         if (self::cents($statement['previous_balance']) < 0) {
-            $previousRows[] = ['Saldo a favor', -self::cents($statement['previous_balance'])];
+            $previousRows[] = ['Saldo a favor', -self::cents($statement['previous_balance']), ''];
         }
         $feeLabel = empty($statement['coefficient'])
             ? 'Cuota Administración'
             : 'Cuota Administración (coef. ' . number_format((float) $statement['coefficient'], 4, ',', '.') . '%)';
+        $earlyPayable = max(0, self::cents($statement['total_due']) - self::cents($statement['early_discount']));
         $currentRows = [
-            ['Saldo mes anterior', self::cents($statement['opening_balance'])],
-            [$feeLabel, self::cents($statement['administration_fee'])],
-            ['Interés moratorio', self::cents($statement['interest'])],
-            ['Cobro por proceso jurídico', self::cents($statement['legal'])],
-            ['Multas', self::cents($statement['fine'])],
-            ['Retroactivo', self::cents($statement['retroactive'])],
-            ['Cuota extra', self::cents($statement['extra'])],
-            ['Otros cobros', self::cents($statement['other'])],
-            ['Total a pagar ' . $statement['period'], max(0, self::cents($statement['total_due']))],
-            ['A pagar antes del ' . $this->formatDate($statement['early_payment_date']) . ' (pronto pago)', max(
-                0,
-                self::cents($statement['total_due']) - self::cents($statement['early_discount'])
-            )],
+            ['Saldo mes anterior', self::cents($statement['opening_balance']), ''],
+            [$feeLabel, self::cents($statement['administration_fee']), ''],
+            ['Interés moratorio', self::cents($statement['interest']), 'opt'],
+            ['Cobro por proceso jurídico', self::cents($statement['legal']), 'opt'],
+            ['Multas', self::cents($statement['fine']), 'opt'],
+            ['Retroactivo', self::cents($statement['retroactive']), 'opt'],
+            ['Cuota extra', self::cents($statement['extra']), 'opt'],
+            ['Otros cobros', self::cents($statement['other']), 'opt'],
+            ['Total a pagar ' . $statement['period'], max(0, self::cents($statement['total_due'])), 'key'],
+            ['Pagando antes del ' . $this->formatDate($statement['early_payment_date']) . ' (pronto pago)', $earlyPayable, 'total'],
         ];
         if (self::cents($statement['total_due']) < 0) {
-            $currentRows[] = ['Saldo a favor', -self::cents($statement['total_due'])];
+            $currentRows[] = ['Saldo a favor', -self::cents($statement['total_due']), 'total'];
         }
         $recipients = implode(', ', array_map(
             static fn (array $recipient): string => $escape($recipient['recipient_name']),
@@ -767,32 +835,54 @@ final class BillingService
         ));
         $lines = '';
         foreach ($statement['lines'] as $line) {
-            $lines .= '<li>' . $escape($line['description']) . ': ' . $currency(self::cents($line['amount'])) . '</li>';
+            $lines .= '<tr><td style="' . $cell . '">' . $escape($line['description']) . '</td><td style="' . $cell . ';width:9.5em;text-align:right;white-space:nowrap;vertical-align:top">'
+                . $currency(self::cents($line['amount'])) . '</td></tr>';
         }
         $bank = trim((string) $statement['bank_name']) . ' · '
             . ($statement['account_type'] === 'corriente' ? 'Cuenta corriente' : 'Cuenta de ahorros')
             . ' · ' . trim((string) $statement['account_number']);
+        $label = static fn (string $text): string => '<span style="display:block;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#687386">' . $text . '</span>';
+        $column = 'width:50%;vertical-align:top';
 
-        return '<!doctype html><html lang="es"><meta charset="utf-8"><title>Nota de cobro '
-            . $escape($statement['number']) . '</title><body style="font:15px Arial,sans-serif;color:#202633;max-width:800px;margin:24px auto;padding:16px">'
-            . '<header style="border-bottom:2px solid #315ea8;padding-bottom:12px"><h1 style="margin:0">'
-            . $escape($statement['property_name']) . '</h1><p>' . $escape($statement['property_address'])
-            . ' · NIT ' . $escape($statement['property_tax_id']) . '</p><h2>Nota de cobro '
-            . $escape($statement['number']) . '</h2></header>'
-            . '<p><strong>Inmueble:</strong> #' . $escape($statement['unit_name']) . '<br><strong>Propietario o residente / usuario asignado:</strong> '
-            . ($recipients !== '' ? $recipients : 'Usuario asignado') . '<br><strong>Fecha de emisión:</strong> '
-            . $escape($this->formatDate($statement['issue_date'])) . '</p>'
-            . '<h3>Movimiento ' . $escape($previousPeriod) . '</h3><table style="width:100%;border-collapse:collapse" border="1" cellpadding="8">'
-            . $rows($previousRows) . '</table><h3>Movimiento ' . $escape($statement['period']) . '</h3>'
-            . '<table style="width:100%;border-collapse:collapse" border="1" cellpadding="8">' . $rows($currentRows) . '</table>'
-            . '<p>Fecha límite de pronto pago: <strong>' . $escape($this->formatDate($statement['early_payment_date']))
-            . '</strong><br>Vencimiento ordinario: <strong>' . $escape($this->formatDate($statement['payment_due_date'])) . '</strong></p>'
-            . ($lines !== '' ? '<h3>Detalle de conceptos</h3><ul>' . $lines . '</ul>' : '')
-            . '<h3>Datos para el pago</h3><p>' . $escape($bank) . '<br>Titular: ' . $escape($statement['account_holder'])
-            . '<br>Correo de la copropiedad: ' . $escape($statement['property_email']) . '</p>'
-            . '<p style="font-size:12px;color:#687386">Nota de cobro para información y recaudo de la copropiedad. No reemplaza una factura electrónica.</p>'
-            . '<button type="button" onclick="window.print()" style="padding:10px 16px;margin:12px 0">Imprimir o guardar como PDF</button>'
-            . '<style>@media print{button{display:none}body{margin:0 auto}}</style></body></html>';
+        // Media carta horizontal (8,5 × 5,5 in) a dos columnas: movimiento anterior | movimiento del período.
+        // Maquetado con tablas y estilos en línea para que se vea igual en los clientes de correo.
+        return '<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Nota de cobro '
+            . $escape($statement['number']) . '</title>'
+            . '<style>@page{size:8.5in 5.5in;margin:0}@media print{body{background:#ffffff!important;padding:0!important}.sheet{margin:0!important;box-shadow:none!important;border:0!important;width:8.5in!important;max-width:none!important}.no-print{display:none!important}}</style>'
+            . '<body style="margin:0;padding:16px 8px;background:#eef1f5;font-family:Arial,Helvetica,sans-serif;color:#202633">'
+            . '<div class="sheet" style="box-sizing:border-box;width:100%;max-width:8.5in;min-height:5.5in;margin:0 auto;padding:.3in .35in;background:#ffffff;border:1px solid #dfe3ea;box-shadow:0 2px 8px rgba(0,0,0,.08)">'
+            // Encabezado: copropiedad | número de la nota.
+            . '<table role="presentation" style="width:100%;border-collapse:collapse;border-bottom:2px solid #315ea8"><tr>'
+            . '<td style="vertical-align:bottom;padding-bottom:6px"><div style="font-size:17px;font-weight:bold">' . $escape($statement['property_name']) . '</div>'
+            . '<div style="font-size:10px;color:#687386">' . $escape($statement['property_address']) . ' · NIT ' . $escape($statement['property_tax_id'])
+            . ' · ' . $escape($statement['property_email']) . '</div></td>'
+            . '<td style="vertical-align:bottom;text-align:right;padding-bottom:6px;white-space:nowrap"><div style="font-size:10px;font-weight:bold;letter-spacing:.06em;color:#315ea8">NOTA DE COBRO</div>'
+            . '<div style="font-size:13px;font-weight:bold">' . $escape($statement['number']) . '</div></td></tr></table>'
+            // Datos del inmueble y fechas.
+            . '<table role="presentation" style="width:100%;border-collapse:collapse;font-size:11px;margin:6px 0 8px"><tr>'
+            . '<td style="padding:3px 6px 3px 0;vertical-align:top">' . $label('Inmueble') . '<strong>#' . $escape($statement['unit_name']) . '</strong></td>'
+            . '<td style="padding:3px 6px;vertical-align:top">' . $label('Propietario o residente') . ($recipients !== '' ? $recipients : 'Usuario asignado') . '</td>'
+            . '<td style="padding:3px 6px;vertical-align:top;white-space:nowrap">' . $label('Emisión') . $escape($this->formatDate($statement['issue_date'])) . '</td>'
+            . '<td style="padding:3px 6px;vertical-align:top;white-space:nowrap">' . $label('Pronto pago hasta') . '<strong>' . $escape($this->formatDate($statement['early_payment_date'])) . '</strong></td>'
+            . '<td style="padding:3px 0 3px 6px;vertical-align:top;white-space:nowrap">' . $label('Vence') . '<strong>' . $escape($this->formatDate($statement['payment_due_date'])) . '</strong></td>'
+            . '</tr></table>'
+            // Dos columnas. Izquierda: movimiento anterior y datos para el pago. Derecha: movimiento del período y
+            // su detalle de conceptos (así las dos columnas quedan de alto parecido).
+            . '<table role="presentation" style="width:100%;border-collapse:collapse"><tr>'
+            . '<td style="' . $column . ';padding-right:10px">'
+            . $table('Movimiento ' . $escape($previousPeriod), $rows($previousRows))
+            . '<div style="height:8px"></div>'
+            . $table('Datos para el pago', '<tr><td style="padding:1px 6px;line-height:1.45">' . $escape($bank) . '<br>Titular: ' . $escape($statement['account_holder'])
+                . '<br>Correo: ' . $escape($statement['property_email']) . '</td></tr>')
+            . '</td><td style="' . $column . ';padding-left:10px">'
+            . $table('Movimiento ' . $escape($statement['period']), $rows($currentRows))
+            . '<div style="height:8px"></div>'
+            . $table('Detalle de conceptos', $lines !== '' ? $lines : '<tr><td style="' . $cell . ';color:#687386">Sin conceptos adicionales.</td></tr>', ';table-layout:fixed')
+            . '</td></tr></table>'
+            . '<p style="font-size:8.5px;color:#687386;margin:8px 0 0;border-top:1px solid #e3e7ee;padding-top:3px">Nota de cobro para información y recaudo de la copropiedad. No reemplaza una factura electrónica.</p>'
+            . '</div>'
+            . '<p class="no-print" style="text-align:center;margin:12px 0 0"><button type="button" onclick="window.print()" style="padding:8px 16px">Imprimir o guardar como PDF (media carta)</button></p>'
+            . '</body></html>';
     }
 
     public function statementText(array $statement): string
@@ -1377,6 +1467,54 @@ final class BillingService
             return null;
         }
         return $whole . '.' . str_pad((string) $fraction, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Reparte un presupuesto mensual (centavos) en proporción al coeficiente de cada inmueble. Usa el método del
+     * mayor residuo: cada inmueble recibe su parte redondeada hacia abajo y los centavos sobrantes van a quienes
+     * tienen la mayor fracción, de modo que la suma es exactamente el presupuesto aunque los coeficientes no sumen
+     * 100 %. Solo aritmética entera.
+     *
+     * @param list<array{id?: string, coefficient?: mixed}> $units
+     * @return array<string, int> centavos por id de inmueble (los inmuebles sin coeficiente no reciben parte)
+     */
+    public static function budgetShares(int $budgetCents, array $units): array
+    {
+        $scaled = [];
+        foreach ($units as $unit) {
+            $coefficient = is_array($unit) && is_string($unit['id'] ?? null) ? self::normalizedCoefficient($unit['coefficient'] ?? null) : null;
+            if ($coefficient !== null) {
+                [$whole, $fraction] = explode('.', $coefficient, 2);
+                $value = ((int) $whole * 10000) + (int) $fraction;
+                if ($value > 0) {
+                    $scaled[$unit['id']] = $value;
+                }
+            }
+        }
+        $total = array_sum($scaled);
+        if ($total === 0 || $budgetCents <= 0) {
+            return array_map(static fn (): int => 0, $scaled);
+        }
+
+        $shares = [];
+        $remainders = [];
+        $quotient = intdiv($budgetCents, $total);
+        $rest = $budgetCents % $total;
+        foreach ($scaled as $id => $value) {
+            // budget × value / total sin desbordar: (q·total + r) × value / total = q·value + r·value / total
+            $shares[$id] = $quotient * $value + intdiv($rest * $value, $total);
+            $remainders[$id] = ($rest * $value) % $total;
+        }
+        $leftover = $budgetCents - array_sum($shares);
+        // Mayor fracción primero; en empate, el orden de la conformación (resultado reproducible).
+        $order = array_keys($scaled);
+        $position = array_flip($order);
+        usort($order, static fn (string $a, string $b): int => [$remainders[$b], $position[$a]] <=> [$remainders[$a], $position[$b]]);
+        foreach (array_slice($order, 0, $leftover) as $id) {
+            $shares[$id]++;
+        }
+
+        return $shares;
     }
 
     private static function allocatedFeeCents(int $baseCents, string $coefficient): int
