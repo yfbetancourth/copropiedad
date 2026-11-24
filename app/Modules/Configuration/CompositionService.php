@@ -238,7 +238,8 @@ final class CompositionService
         $totalTenThousandths = 0;
         foreach ($units as $unit) {
             $coefficient = is_array($unit) ? (string) ($unit['coefficient'] ?? '') : '';
-            if (preg_match('/^(\d{1,3})\.(\d{4})$/D', $coefficient, $parts) !== 1 || ($parts[1] . $parts[2]) === '00000') {
+            // 0 es un coeficiente válido (inmueble que no paga cuota); solo falta si está vacío o mal escrito.
+            if (preg_match('/^(\d{1,3})\.(\d{4})$/D', $coefficient, $parts) !== 1) {
                 $missing++;
                 continue;
             }

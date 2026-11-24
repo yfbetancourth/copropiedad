@@ -28,6 +28,8 @@ $categories = [
 ];
 
 $rows = is_array($preview) ? $preview['rows'] : [];
+// Valor para ordenar montos (pueden ser negativos): entero desplazado, que el orden numérico compara bien.
+$sortCents = static fn (int $cents): string => (string) ($cents + 1000000000000000);
 $rowState = static function (array $row): string {
     if ($row['already_issued']) return 'issued';
     if ($row['prior_period_invalid'] || $row['coefficient_missing'] || $row['invalid_recipient']) return 'problem';
@@ -42,6 +44,8 @@ $openStatements = array_values(array_filter($statements, static fn (array $s): b
 $totalUnits = count($rows);
 $issuedCount = count($statements);
 $readyToIssue = is_array($preview) && $preview['ready'] && $preview['new_count'] > 0;
+// Emitir solo los seleccionados: basta con la configuración general lista y al menos un inmueble «Listo».
+$canIssueSelected = $canWrite && is_array($preview) && ($preview['global_blocking_reasons'] ?? ['?']) === [] && $stateCounts['pending'] > 0;
 
 // Lista de chequeo: conceptos que irán en las notas por emitir, con cuántos inmuebles los llevan y su total.
 $pendingRows = array_values(array_filter($rows, static fn (array $row): bool => !$row['already_issued']));
@@ -261,11 +265,22 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                         <?php endforeach; ?>
                     </div>
                     <input id="billing-filter" class="form-control form-control-sm ms-auto" style="max-width: 18rem" type="search" placeholder="Buscar inmueble o residente" aria-label="Buscar inmueble o residente">
+                    <div id="billing-grid-tools" class="d-flex flex-wrap gap-2"></div>
                 </div>
+                <div id="billing-grid-bulk" class="px-3 py-2 bg-primary-subtle border-bottom" hidden></div>
                 <div class="table-responsive" style="max-height: 60vh">
                     <table class="table table-hover align-middle mb-0" id="billing-preview-table">
                         <thead class="table-light sticky-top">
-                        <tr><th>Inmueble</th><th>Residente(s)</th><th class="text-end">Saldo anterior</th><th class="text-end">Cuota</th><th class="text-end">Otros</th><th class="text-end">Total</th><th>Estado</th><th></th></tr>
+                        <tr>
+                            <th scope="col" data-column="name" data-label="Inmueble" data-hideable="false" data-sortable>Inmueble</th>
+                            <th scope="col" data-column="recipients" data-label="Residente(s)" data-sortable>Residente(s)</th>
+                            <th scope="col" class="text-end" data-column="opening" data-label="Saldo anterior" data-sortable>Saldo anterior</th>
+                            <th scope="col" class="text-end" data-column="fee" data-label="Cuota" data-sortable>Cuota</th>
+                            <th scope="col" class="text-end" data-column="other" data-label="Otros" data-sortable>Otros</th>
+                            <th scope="col" class="text-end" data-column="total" data-label="Total" data-sortable>Total</th>
+                            <th scope="col" data-column="state" data-label="Estado" data-sortable>Estado</th>
+                            <th scope="col" data-export="false"><span class="visually-hidden">Acciones</span></th>
+                        </tr>
                         </thead>
                         <tbody>
                         <?php foreach ($rows as $row): ?>
@@ -273,8 +288,13 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                             $state = $rowState($row);
                             $recipientNames = implode(', ', array_column($row['recipients'], 'username'));
                             $searchText = mb_strtolower($row['name'] . ' ' . $recipientNames, 'UTF-8');
+                            $otherCents = array_sum($row['items']) + $row['opening_adjustment'];
                             ?>
-                            <tr data-search="<?= $escape($searchText) ?>" data-state="<?= $state ?>">
+                            <tr class="billing-row" data-unit-id="<?= $escape($row['id']) ?>" data-unit-name="<?= $escape($row['name']) ?>" data-issued="<?= $row['already_issued'] ? '1' : '0' ?>"
+                                data-search="<?= $escape($searchText) ?>" data-state="<?= $state ?>"
+                                data-sort-name="<?= $escape($row['name']) ?>" data-sort-opening="<?= $sortCents($row['opening_balance']) ?>" data-sort-fee="<?= $sortCents($row['fee']) ?>"
+                                data-sort-other="<?= $sortCents($otherCents) ?>" data-sort-total="<?= $sortCents($row['total']) ?>"
+                                data-due="<?= (int) $row['due'] ?>" data-items="<?= count(array_filter($row['item_details'], static fn (array $item): bool => $item['category'] !== 'opening_balance')) ?>">
                                 <td>
                                     <span class="fw-semibold"><?= $escape($row['name']) ?></span>
                                     <span class="d-block small text-secondary"><?= $escape($row['category']) ?> · coef. <?= $row['coefficient'] === null ? '—' : $escape(number_format((float) $row['coefficient'], 4, ',', '.')) . ' %' ?></span>
@@ -284,7 +304,7 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                                 <td class="text-end small"><?= $short($row['fee']) ?></td>
                                 <td class="text-end small">
                                     <?php if ($row['item_details'] !== []): ?>
-                                        <button class="btn btn-link btn-sm p-0" type="button" data-bs-toggle="collapse" data-bs-target="#items-<?= $escape($row['id']) ?>" aria-expanded="false"><?= $short(array_sum($row['items']) + $row['opening_adjustment']) ?> <i class="bi bi-chevron-down small" aria-hidden="true"></i></button>
+                                        <button class="btn btn-link btn-sm p-0" type="button" data-bs-toggle="collapse" data-bs-target="#items-<?= $escape($row['id']) ?>" aria-expanded="false"><?= $short($otherCents) ?> <i class="bi bi-chevron-down small" aria-hidden="true"></i></button>
                                     <?php else: ?>
                                         <?= $short(0) ?>
                                     <?php endif; ?>
@@ -314,8 +334,8 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                                 </td>
                             </tr>
                             <?php if ($row['item_details'] !== []): ?>
-                                <tr class="collapse" id="items-<?= $escape($row['id']) ?>" data-search="<?= $escape($searchText) ?>" data-state="<?= $state ?>" data-detail-row>
-                                    <td colspan="8" class="bg-body-tertiary">
+                                <tr class="collapse" id="items-<?= $escape($row['id']) ?>" data-detail-for="<?= $escape($row['id']) ?>">
+                                    <td colspan="9" class="bg-body-tertiary">
                                         <ul class="list-unstyled mb-0 small">
                                             <?php foreach ($row['item_details'] as $item): ?>
                                                 <li class="d-flex flex-wrap justify-content-between align-items-center gap-2 py-1">
@@ -341,10 +361,10 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                         <?php if ($rows === []): ?>
                             <tr><td colspan="8" class="text-center text-secondary py-5">No hay inmuebles con residentes activos asignados. <a href="<?= $escape($basePath) ?>/inmuebles/asignaciones">Asignar inmuebles</a></td></tr>
                         <?php endif; ?>
-                        <tr id="no-billing-results" hidden><td colspan="8" class="text-center text-secondary py-4">Ningún inmueble coincide con el filtro.</td></tr>
                         </tbody>
                     </table>
                 </div>
+                <?php if ($rows !== []): ?><div id="billing-grid-pager" class="px-3 py-2 border-top"></div><?php endif; ?>
                 <?php if ($canWrite): ?>
                     <div class="d-flex flex-wrap align-items-center gap-3 p-3 border-top bg-body-tertiary">
                         <span class="small text-secondary">
@@ -352,14 +372,23 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                                 Se emitirán <strong><?= (int) $preview['new_count'] ?></strong> nota(s) por <strong><?= $short($summary['to_issue']) ?></strong> y se enviarán por correo. Las notas emitidas ya no se pueden editar.
                             <?php elseif ($preview['new_count'] === 0 && $stateCounts['issued'] > 0): ?>
                                 Todas las notas de <?= $escape($periodLabel) ?> están emitidas.
+                            <?php elseif ($canIssueSelected): ?>
+                                Hay inmuebles con pendientes, pero puedes emitir los que están <strong>Listos</strong>: selecciónalos y usa «Emitir y enviar seleccionados».
                             <?php else: ?>
                                 Resuelve los pendientes de arriba para poder emitir.
                             <?php endif; ?>
                         </span>
                         <?php if ($stateCounts['pending'] + $stateCounts['problem'] > 0): ?>
-                            <button class="btn btn-primary ms-auto" type="button" data-bs-toggle="modal" data-bs-target="#issue-modal" <?= $readyToIssue ? '' : 'disabled' ?>>
-                                <i class="bi bi-send me-1" aria-hidden="true"></i>Emitir y enviar <?= (int) $preview['new_count'] ?> nota(s)
-                            </button>
+                            <div class="d-flex flex-wrap gap-2 ms-auto">
+                                <?php if ($canIssueSelected): ?>
+                                    <button class="btn btn-outline-primary" type="button" id="issue-selected-button" disabled title="Selecciona inmuebles en la tabla">
+                                        <i class="bi bi-check2-square me-1" aria-hidden="true"></i>Emitir y enviar seleccionados <span class="badge text-bg-primary ms-1" id="issue-selected-count">0</span>
+                                    </button>
+                                <?php endif; ?>
+                                <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#issue-modal" <?= $readyToIssue ? '' : 'disabled' ?>>
+                                    <i class="bi bi-send me-1" aria-hidden="true"></i>Emitir y enviar <?= (int) $preview['new_count'] ?> nota(s)
+                                </button>
+                            </div>
                         <?php endif; ?>
                     </div>
                 <?php endif; ?>
@@ -392,10 +421,19 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                         <input class="btn-check" type="radio" name="note-state" id="note-mail" value="mail"><label class="btn btn-outline-secondary" for="note-mail">Correo con problema</label>
                     </div>
                     <input class="form-control form-control-sm ms-auto" style="max-width: 18rem" type="search" placeholder="Buscar inmueble o NC-…" aria-label="Buscar nota" data-table-filter="notes-table">
+                    <div id="notes-grid-tools" class="d-flex flex-wrap gap-2"></div>
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive" style="max-height: 60vh">
                     <table class="table table-hover align-middle mb-0" id="notes-table">
-                        <thead class="table-light"><tr><th>Nota</th><th>Inmueble</th><th class="text-end">Total</th><th class="text-end">Pagado</th><th class="text-end">Saldo</th><th>Correo</th><th class="text-end">Acciones</th></tr></thead>
+                        <thead class="table-light sticky-top"><tr>
+                            <th scope="col" data-column="number" data-label="Nota" data-sortable>Nota</th>
+                            <th scope="col" data-column="name" data-label="Inmueble" data-hideable="false" data-sortable>Inmueble</th>
+                            <th scope="col" class="text-end" data-column="total" data-label="Total" data-sortable>Total</th>
+                            <th scope="col" class="text-end" data-column="paid" data-label="Pagado" data-sortable>Pagado</th>
+                            <th scope="col" class="text-end" data-column="balance" data-label="Saldo" data-sortable>Saldo</th>
+                            <th scope="col" data-column="mail" data-label="Correo" data-sortable>Correo</th>
+                            <th scope="col" class="text-end" data-export="false">Acciones</th>
+                        </tr></thead>
                         <tbody>
                         <?php foreach ($statements as $statement): ?>
                             <?php
@@ -406,7 +444,9 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                             $isOpen = $statement['superseded_by_period'] === null;
                             $noteState = ($balance > 0 ? 'debt' : 'paid') . ($failed > 0 || $sent < $recipients ? ' mail' : '');
                             ?>
-                            <tr data-search="<?= $escape(mb_strtolower($statement['number'] . ' ' . $statement['unit_name'], 'UTF-8')) ?>" data-state="<?= $noteState ?>">
+                            <tr class="note-row" data-search="<?= $escape(mb_strtolower($statement['number'] . ' ' . $statement['unit_name'], 'UTF-8')) ?>" data-state="<?= $noteState ?>"
+                                data-sort-name="<?= $escape($statement['unit_name']) ?>" data-sort-total="<?= $sortCents(max(0, (int) $statement['total_cents'])) ?>"
+                                data-sort-paid="<?= $sortCents((int) $statement['paid_cents']) ?>" data-sort-balance="<?= $sortCents($balance) ?>">
                                 <td class="small font-monospace"><?= $escape($statement['number']) ?></td>
                                 <td>
                                     <?= $escape($statement['unit_name']) ?>
@@ -441,6 +481,7 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                         </tbody>
                     </table>
                 </div>
+                <div id="notes-grid-pager" class="px-3 py-2 border-top"></div>
             <?php endif; ?>
         </div>
 
@@ -499,16 +540,32 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                 <div class="text-center text-secondary py-5"><i class="bi bi-cash-stack fs-1 d-block mb-2" aria-hidden="true"></i>No hay pagos registrados en las notas de <?= $escape($periodLabel) ?>.</div>
             <?php else: ?>
                 <div class="d-flex flex-wrap gap-2 align-items-center p-3 border-bottom">
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Filtrar pagos">
+                        <input class="btn-check" type="radio" name="payment-state" id="payment-all" value="all" checked><label class="btn btn-outline-secondary" for="payment-all">Todos</label>
+                        <input class="btn-check" type="radio" name="payment-state" id="payment-valid" value="valid"><label class="btn btn-outline-secondary" for="payment-valid">Vigentes</label>
+                        <input class="btn-check" type="radio" name="payment-state" id="payment-voided" value="voided"><label class="btn btn-outline-secondary" for="payment-voided">Anulados</label>
+                    </div>
                     <span class="small text-secondary">Pagos de las notas de <?= $escape($periodLabel) ?></span>
                     <input class="form-control form-control-sm ms-auto" style="max-width: 18rem" type="search" placeholder="Buscar inmueble, referencia o valor" aria-label="Buscar pago" data-table-filter="payments-table">
+                    <div id="payments-grid-tools" class="d-flex flex-wrap gap-2"></div>
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive" style="max-height: 60vh">
                     <table class="table table-sm table-hover align-middle mb-0" id="payments-table">
-                        <thead class="table-light"><tr><th>Fecha</th><th>Inmueble</th><th class="text-end">Valor</th><th>Referencia / notas</th><th>Registró</th><th>Estado</th></tr></thead>
+                        <thead class="table-light sticky-top"><tr>
+                            <th scope="col" data-column="date" data-label="Fecha" data-sortable>Fecha</th>
+                            <th scope="col" data-column="name" data-label="Inmueble" data-hideable="false" data-sortable>Inmueble</th>
+                            <th scope="col" class="text-end" data-column="amount" data-label="Valor" data-sortable>Valor</th>
+                            <th scope="col" data-column="reference" data-label="Referencia / notas">Referencia / notas</th>
+                            <th scope="col" data-column="by" data-label="Registró" data-sortable>Registró</th>
+                            <th scope="col" data-column="status" data-label="Estado" data-sortable>Estado</th>
+                        </tr></thead>
                         <tbody>
                         <?php foreach ($payments as $payment): ?>
                             <?php $isVoided = $payment['voided_at'] !== null; $amount = BillingService::moneyToCents($payment['amount']); ?>
-                            <tr<?= $isVoided ? ' class="text-secondary"' : '' ?> data-search="<?= $escape(mb_strtolower($payment['unit_name'] . ' ' . $payment['reference'] . ' ' . $payment['notes'] . ' ' . $short($amount) . ' ' . $payment['received_on'], 'UTF-8')) ?>">
+                            <tr class="payment-row<?= $isVoided ? ' text-secondary' : '' ?>" data-state="<?= $isVoided ? 'voided' : 'valid' ?>"
+                                data-search="<?= $escape(mb_strtolower($payment['unit_name'] . ' ' . $payment['reference'] . ' ' . $payment['notes'] . ' ' . $short($amount) . ' ' . $payment['received_on'], 'UTF-8')) ?>"
+                                data-sort-date="<?= $escape($payment['received_on'] . ' ' . str_pad((string) (int) $payment['id'], 10, '0', STR_PAD_LEFT)) ?>"
+                                data-sort-name="<?= $escape($payment['unit_name']) ?>" data-sort-amount="<?= $sortCents($amount) ?>">
                                 <td class="text-nowrap"><?= $escape($payment['received_on']) ?>
                                     <a class="d-block small" target="_blank" rel="noopener" href="<?= $escape($basePath) ?>/cartera/cobros/comprobante?id=<?= (int) $payment['id'] ?>"><?= $escape(BillingService::receiptNumber((int) $payment['id'])) ?></a></td>
                                 <td><?= $escape($payment['unit_name']) ?></td>
@@ -541,6 +598,7 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                         </tbody>
                     </table>
                 </div>
+                <div id="payments-grid-pager" class="px-3 py-2 border-top"></div>
             <?php endif; ?>
         </div>
     </div>
@@ -552,7 +610,8 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
     <!-- Agregar concepto -->
     <div class="modal fade" id="item-modal" tabindex="-1" aria-labelledby="item-modal-title" aria-hidden="true">
         <div class="modal-dialog">
-            <form class="modal-content" method="post" action="<?= $escape($basePath) ?>/cartera/cobros/concepto" data-money-form>
+            <form class="modal-content" method="post" action="<?= $escape($basePath) ?>/cartera/cobros/concepto" data-money-form id="item-form"
+                  data-single-action="<?= $escape($basePath) ?>/cartera/cobros/concepto" data-bulk-action="<?= $escape($basePath) ?>/cartera/cobros/concepto/lote">
                 <div class="modal-header">
                     <h2 class="modal-title h5" id="item-modal-title">Agregar concepto</h2>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
@@ -561,7 +620,8 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                     <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                     <input type="hidden" name="period" value="<?= $escape($period) ?>">
                     <input type="hidden" name="unit_id" id="item-unit">
-                    <p class="mb-3"><span class="text-secondary">Inmueble:</span> <strong id="item-unit-name"></strong> · <?= $escape($periodLabel) ?></p>
+                    <div id="item-bulk-units"></div>
+                    <p class="mb-3"><span class="text-secondary" id="item-unit-label">Inmueble:</span> <strong id="item-unit-name"></strong> · <?= $escape($periodLabel) ?></p>
                     <div class="mb-3">
                         <label for="item-category" class="form-label">Tipo de concepto</label>
                         <select id="item-category" name="category" class="form-select" required>
@@ -594,25 +654,27 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
         </div>
     </div>
 
-    <?php if ($readyToIssue): ?>
-        <!-- Confirmar emisión -->
+    <?php if ($readyToIssue || $canIssueSelected): ?>
+        <!-- Confirmar emisión (todo el período o solo los inmuebles seleccionados) -->
         <div class="modal fade" id="issue-modal" tabindex="-1" aria-labelledby="issue-modal-title" aria-hidden="true">
             <div class="modal-dialog modal-xl modal-dialog-scrollable">
                 <form class="modal-content" method="post" action="<?= $escape($basePath) ?>/cartera/cobros/emitir" id="issue-form">
                     <div class="modal-header">
-                        <h2 class="modal-title h5" id="issue-modal-title">Emitir notas de <?= $escape($periodLabel) ?></h2>
+                        <h2 class="modal-title h5" id="issue-modal-title" data-all="Emitir notas de <?= $escape($periodLabel) ?>">Emitir notas de <?= $escape($periodLabel) ?></h2>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                         <input type="hidden" name="period" value="<?= $escape($period) ?>">
+                        <div id="issue-selected-units"></div>
+                        <div class="alert alert-primary small py-2" id="issue-selected-notice" hidden></div>
                         <div class="row g-3">
                         <div class="col-lg-5">
                         <ul class="list-group mb-3">
                             <li class="list-group-item d-flex justify-content-between flex-wrap gap-1"><span>Se enviarán desde</span><span><?= $senderHtml ?></span></li>
-                            <li class="list-group-item d-flex justify-content-between"><span>Notas a emitir</span><strong><?= (int) $preview['new_count'] ?></strong></li>
-                            <li class="list-group-item d-flex justify-content-between"><span>Valor total</span><strong><?= $short($summary['to_issue']) ?></strong></li>
-                            <li class="list-group-item d-flex justify-content-between"><span>Conceptos adicionales incluidos</span><strong><?= $itemCount ?></strong></li>
+                            <li class="list-group-item d-flex justify-content-between"><span>Notas a emitir</span><strong id="issue-count" data-all="<?= (int) $preview['new_count'] ?>"><?= (int) $preview['new_count'] ?></strong></li>
+                            <li class="list-group-item d-flex justify-content-between"><span>Valor total</span><strong id="issue-total" data-all="<?= $escape($short($summary['to_issue'])) ?>"><?= $short($summary['to_issue']) ?></strong></li>
+                            <li class="list-group-item d-flex justify-content-between"><span>Conceptos adicionales incluidos</span><strong id="issue-items" data-all="<?= $itemCount ?>"><?= $itemCount ?></strong></li>
                             <li class="list-group-item d-flex justify-content-between"><span>Pronto pago hasta el día</span><strong><?= (int) $preview['discount_day'] ?></strong></li>
                             <li class="list-group-item d-flex justify-content-between"><span>Vencimiento el día</span><strong><?= (int) $preview['due_day'] ?></strong></li>
                         </ul>
@@ -656,6 +718,7 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
     <?php endif; ?>
 <?php endif; ?>
 
+<script src="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/js/data-grid.js?v=1"></script>
 <script>
 // Bootstrap se carga al final del layout: se espera a que el documento esté listo.
 document.addEventListener('DOMContentLoaded', () => {
@@ -696,43 +759,159 @@ document.addEventListener('DOMContentLoaded', () => {
         input.syncMoney = sync;
     });
 
-    // Filtros de texto de las pestañas Notas y Pagos (y estados de las notas).
-    const filterTable = (tableId) => {
-        const input = document.querySelector(`[data-table-filter="${tableId}"]`);
-        const query = (input?.value ?? '').trim().toLocaleLowerCase();
-        const state = tableId === 'notes-table' ? (document.querySelector('[name="note-state"]:checked')?.value ?? 'all') : 'all';
-        document.querySelectorAll(`#${tableId} tbody tr[data-search]`).forEach((row) => {
-            row.hidden = !row.dataset.search.includes(query) || (state !== 'all' && !(row.dataset.state ?? '').split(' ').includes(state));
-        });
-    };
-    document.querySelectorAll('[data-table-filter]').forEach((input) => input.addEventListener('input', () => filterTable(input.dataset.tableFilter)));
-    document.querySelectorAll('[name="note-state"]').forEach((radio) => radio.addEventListener('change', () => filterTable('notes-table')));
-
-    // Filtro de la vista previa por estado y texto.
-    const filter = document.getElementById('billing-filter');
-    const applyFilter = () => {
-        const query = (filter?.value ?? '').trim().toLocaleLowerCase();
-        const state = document.querySelector('[name="row-state"]:checked')?.value ?? 'all';
-        let visible = 0;
-        document.querySelectorAll('#billing-preview-table tbody tr[data-state]').forEach((row) => {
-            const match = row.dataset.search.includes(query) && (state === 'all' || row.dataset.state === state);
-            if (row.hasAttribute('data-detail-row')) {
-                row.classList.toggle('d-none', !match);
-            } else {
-                row.hidden = !match;
-                if (match) visible++;
+    // Emitir solo los inmuebles seleccionados: solo cuentan los que están «Listos» (data-state="pending").
+    const readyOnly = (rows) => rows.filter((row) => row.dataset.state === 'pending');
+    let pendingIssueSelection = null;
+    function updateIssueSelectedButton(selectedRows) {
+        const button = document.getElementById('issue-selected-button');
+        if (!button) return;
+        const ready = readyOnly(selectedRows).length;
+        document.getElementById('issue-selected-count').textContent = ready;
+        button.disabled = ready === 0;
+        button.title = selectedRows.length === 0
+            ? 'Selecciona inmuebles en la tabla'
+            : (ready === 0 ? 'Ninguno de los seleccionados está «Listo»' : `${ready} inmueble(s) listos para emitir`);
+    }
+    function openIssueSelected(rows) {
+        if (readyOnly(rows).length === 0) {
+            window.alert('Ninguno de los inmuebles seleccionados está «Listo» para emitir (ya emitidos o con pendientes).');
+            return;
+        }
+        pendingIssueSelection = rows;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('issue-modal')).show();
+    }
+    // rows = null: todo el período (botón principal). Con filas: solo esas.
+    function applyIssueMode(rows) {
+        const ready = rows === null ? null : readyOnly(rows);
+        const set = (id, value) => { const el = document.getElementById(id); el.textContent = value ?? el.dataset.all; };
+        set('issue-modal-title', ready && `Emitir ${ready.length} nota(s) seleccionada(s)`);
+        set('issue-count', ready && String(ready.length));
+        set('issue-total', ready && money(ready.reduce((sum, row) => sum + Number(row.dataset.due), 0)));
+        set('issue-items', ready && String(ready.reduce((sum, row) => sum + Number(row.dataset.items), 0)));
+        document.getElementById('issue-selected-units').replaceChildren(...(ready ?? []).map((row) =>
+            Object.assign(document.createElement('input'), { type: 'hidden', name: 'unit_ids[]', value: row.dataset.unitId })));
+        const notice = document.getElementById('issue-selected-notice');
+        notice.hidden = ready === null;
+        if (ready) {
+            const skipped = rows.length - ready.length;
+            notice.textContent = `Solo se emitirán y enviarán las notas de los ${ready.length} inmueble(s) seleccionados`
+                + (skipped > 0 ? `; se omiten ${skipped} que no están «Listos».` : '.')
+                + ' Los demás quedan pendientes para emitirlos después.';
+        }
+        document.getElementById('issue-submit').innerHTML = '<i class="bi bi-send me-1" aria-hidden="true"></i>'
+            + (ready ? `Emitir y enviar ${ready.length} seleccionada(s)` : 'Emitir y enviar');
+        // La vista previa muestra solo los inmuebles que se van a emitir.
+        const draftUnit = document.getElementById('draft-unit');
+        if (draftUnit) {
+            const ids = ready ? new Set(ready.map((row) => row.dataset.unitId)) : null;
+            [...draftUnit.options].forEach((option) => {
+                option.hidden = ids !== null && !ids.has(option.value);
+                option.disabled = option.hidden;
+            });
+            if (draftUnit.selectedOptions[0]?.disabled) {
+                draftUnit.selectedIndex = [...draftUnit.options].findIndex((option) => !option.disabled);
             }
-        });
-        const empty = document.getElementById('no-billing-results');
-        if (empty) empty.hidden = visible > 0;
-    };
-    filter?.addEventListener('input', applyFilter);
-    document.querySelectorAll('[name="row-state"]').forEach((radio) => radio.addEventListener('change', applyFilter));
+        }
+    }
 
-    // Agregar concepto: abre el formulario con el inmueble ya elegido y una descripción sugerida.
+    // Tablas de datos (como en Residentes): paginación, orden, columnas visibles y exportación CSV.
+    // Búsqueda sin tildes ni mayúsculas; los montos se ordenan por su valor (data-sort-*), no por el texto.
+    const normalize = (text) => String(text).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    const searchFor = (tableId) => normalize(document.querySelector(`[data-table-filter="${tableId}"]`)?.value ?? '');
+    const sortFromData = (row, key) => {
+        const value = row.dataset[`sort${key.charAt(0).toUpperCase()}${key.slice(1)}`];
+        return value === undefined ? undefined : value;
+    };
+    const checked = (name) => document.querySelector(`[name="${name}"]:checked`)?.value ?? 'all';
+    const grids = {};
+
+    // 1. Preparar y emitir. Las filas de detalle de conceptos siguen a su inmueble al paginar u ordenar.
+    const previewTable = document.getElementById('billing-preview-table');
+    if (previewTable && previewTable.querySelector('.billing-row')) {
+        const details = new Map([...previewTable.querySelectorAll('tr[data-detail-for]')].map((row) => [row.dataset.detailFor, row]));
+        const filterInput = document.getElementById('billing-filter');
+        const bulkActions = [];
+        if (document.getElementById('item-modal')) {
+            bulkActions.push({ label: 'Agregar concepto', icon: 'bi-plus-lg', className: 'btn-outline-primary', run: (rows) => openItemModal(rows) });
+        }
+        if (document.getElementById('issue-selected-button')) {
+            bulkActions.push({ label: 'Emitir y enviar seleccionados', icon: 'bi-send', className: 'btn-primary', run: (rows) => openIssueSelected(rows) });
+        }
+        grids.preview = new DataGrid(previewTable, {
+            storageKey: 'billing-preview',
+            rowSelector: '.billing-row',
+            filter: (row) => {
+                const state = checked('row-state');
+                return (state === 'all' || row.dataset.state === state) && normalize(row.dataset.search).includes(normalize(filterInput?.value ?? ''));
+            },
+            sortValue: sortFromData,
+            selectable: bulkActions.length > 0,
+            bulkActions,
+            toolbar: document.getElementById('billing-grid-tools'),
+            bulkBar: document.getElementById('billing-grid-bulk'),
+            pager: document.getElementById('billing-grid-pager'),
+            exportName: `cartera-preparar-<?= $escape($period) ?>`,
+            onChange: (grid) => {
+                updateIssueSelectedButton(grid.selected());
+                grid.rows().forEach((row) => {
+                    const detail = details.get(row.dataset.unitId);
+                    if (!detail) return;
+                    if (row.nextElementSibling !== detail) row.after(detail);
+                    detail.hidden = row.hidden;
+                });
+            },
+        });
+        document.getElementById('issue-selected-button')?.addEventListener('click', () => openIssueSelected(grids.preview.selected()));
+        filterInput?.addEventListener('input', () => grids.preview.refresh(true));
+        document.querySelectorAll('[name="row-state"]').forEach((radio) => radio.addEventListener('change', () => grids.preview.refresh(true)));
+    }
+
+    // 2. Notas emitidas.
+    const notesTable = document.getElementById('notes-table');
+    if (notesTable) {
+        grids.notes = new DataGrid(notesTable, {
+            storageKey: 'billing-notes',
+            rowSelector: '.note-row',
+            filter: (row) => {
+                const state = checked('note-state');
+                return (state === 'all' || row.dataset.state.split(' ').includes(state)) && normalize(row.dataset.search).includes(searchFor('notes-table'));
+            },
+            sortValue: sortFromData,
+            toolbar: document.getElementById('notes-grid-tools'),
+            pager: document.getElementById('notes-grid-pager'),
+            exportName: `cartera-notas-<?= $escape($period) ?>`,
+        });
+        document.querySelector('[data-table-filter="notes-table"]')?.addEventListener('input', () => grids.notes.refresh(true));
+        document.querySelectorAll('[name="note-state"]').forEach((radio) => radio.addEventListener('change', () => grids.notes.refresh(true)));
+    }
+
+    // 3. Pagos.
+    const paymentsTable = document.getElementById('payments-table');
+    if (paymentsTable) {
+        grids.payments = new DataGrid(paymentsTable, {
+            storageKey: 'billing-payments',
+            rowSelector: '.payment-row',
+            filter: (row) => {
+                const state = checked('payment-state');
+                return (state === 'all' || row.dataset.state === state) && normalize(row.dataset.search).includes(searchFor('payments-table'));
+            },
+            sortValue: sortFromData,
+            toolbar: document.getElementById('payments-grid-tools'),
+            pager: document.getElementById('payments-grid-pager'),
+            exportName: `cartera-pagos-<?= $escape($period) ?>`,
+        });
+        document.querySelector('[data-table-filter="payments-table"]')?.addEventListener('input', () => grids.payments.refresh(true));
+        document.querySelectorAll('[name="payment-state"]').forEach((radio) => radio.addEventListener('change', () => grids.payments.refresh(true)));
+    }
+
+    // Agregar concepto: a un inmueble (botón de la fila) o a los seleccionados (acción en lote).
     const itemModalElement = document.getElementById('item-modal');
+    let openItemModal = () => {};
     if (itemModalElement) {
         const itemModal = bootstrap.Modal.getOrCreateInstance(itemModalElement);
+        const itemForm = document.getElementById('item-form');
+        const bulkUnits = document.getElementById('item-bulk-units');
+        const singleUnit = document.getElementById('item-unit');
         const category = document.getElementById('item-category');
         const description = document.getElementById('item-description');
         const help = document.getElementById('item-category-help');
@@ -747,15 +926,34 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         category.addEventListener('change', updateCategory);
-        document.querySelectorAll('[data-add-item]').forEach((button) => button.addEventListener('click', () => {
-            document.getElementById('item-unit').value = button.dataset.unitId;
-            document.getElementById('item-unit-name').textContent = button.dataset.unitName;
+        // units: [{ id, name }]. Con más de uno se envía al endpoint de lote.
+        openItemModal = (rowsOrUnits) => {
+            const units = rowsOrUnits.map((item) => (item instanceof HTMLElement
+                ? { id: item.dataset.unitId, name: item.dataset.unitName, issued: item.dataset.issued === '1' }
+                : item)).filter((unit) => !unit.issued);
+            const skipped = rowsOrUnits.length - units.length;
+            if (units.length === 0) {
+                window.alert('Los inmuebles seleccionados ya tienen la nota emitida: no se les pueden agregar conceptos.');
+                return;
+            }
+            const bulk = units.length > 1 || rowsOrUnits[0] instanceof HTMLElement;
+            itemForm.action = bulk ? itemForm.dataset.bulkAction : itemForm.dataset.singleAction;
+            singleUnit.disabled = bulk;
+            singleUnit.value = bulk ? '' : units[0].id;
+            bulkUnits.replaceChildren(...(bulk ? units.map((unit) => Object.assign(document.createElement('input'), { type: 'hidden', name: 'unit_ids[]', value: unit.id })) : []));
+            document.getElementById('item-unit-label').textContent = bulk ? 'Inmuebles:' : 'Inmueble:';
+            document.getElementById('item-unit-name').textContent = bulk
+                ? `${units.length} seleccionado(s)${units.length <= 3 ? ` (${units.map((unit) => unit.name).join(', ')})` : ''}${skipped > 0 ? ` · se omiten ${skipped} ya emitido(s)` : ''}`
+                : units[0].name;
             description.value = '';
             suggested = '';
             document.getElementById('item-amount-display').value = '';
             document.getElementById('item-amount').value = '';
             updateCategory();
             itemModal.show();
+        };
+        document.querySelectorAll('[data-add-item]').forEach((button) => button.addEventListener('click', () => {
+            openItemModal([{ id: button.dataset.unitId, name: button.dataset.unitName, issued: false }]);
         }));
         itemModalElement.addEventListener('shown.bs.modal', () => document.getElementById('item-amount-display').focus());
     }
@@ -877,7 +1075,13 @@ document.addEventListener('DOMContentLoaded', () => {
         draftUnit.addEventListener('change', loadDraft);
         document.getElementById('draft-prev').addEventListener('click', () => step(-1));
         document.getElementById('draft-next').addEventListener('click', () => step(1));
-        document.getElementById('issue-modal').addEventListener('show.bs.modal', () => { updateIssueState(); loadDraft(); });
+        document.getElementById('issue-modal').addEventListener('show.bs.modal', (event) => {
+            // El botón principal (relatedTarget) emite todo; la acción de selección abre el modal sin relatedTarget.
+            applyIssueMode(event.relatedTarget ? null : pendingIssueSelection);
+            pendingIssueSelection = null;
+            updateIssueState();
+            loadDraft();
+        });
     }
 
     // Confirmaciones y estado «procesando» para evitar envíos dobles.

@@ -143,6 +143,37 @@ final class BillingController
         $this->redirectToPeriod($period, 'preparar');
     }
 
+    /** El mismo concepto para los inmuebles seleccionados en la tabla de Preparar. */
+    public function addItemBulk(): void
+    {
+        $actor = $this->requireAction('write');
+        if ($actor === null) {
+            return;
+        }
+        Http::requireCsrf();
+        $period = Http::string($_POST['period'] ?? null);
+        $unitIds = is_array($_POST['unit_ids'] ?? null) ? array_map(static fn (mixed $id): string => Http::string($id), $_POST['unit_ids']) : [];
+        try {
+            $result = (new BillingService())->addItemToUnits(
+                $unitIds,
+                $period,
+                Http::string($_POST['category'] ?? null),
+                trim(Http::string($_POST['description'] ?? null)),
+                Http::string($_POST['amount'] ?? null),
+                (int) $actor['id']
+            );
+            $message = sprintf('El concepto quedó registrado en %d inmueble(s).', $result['added']);
+            if ($result['skipped'] !== []) {
+                $shown = array_slice($result['skipped'], 0, 5);
+                $message .= ' Se omitieron ' . count($result['skipped']) . ': ' . implode(', ', $shown) . (count($result['skipped']) > 5 ? ', …' : '') . '.';
+            }
+            Http::flash(self::FLASH, $result['added'] > 0 ? 'success' : 'error', $message);
+        } catch (RuntimeException $exception) {
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
+        }
+        $this->redirectToPeriod($period, 'preparar');
+    }
+
     public function addPayment(): void
     {
         $actor = $this->requireAction('write');
@@ -228,19 +259,26 @@ final class BillingController
         }
         Http::requireCsrf();
         $period = Http::string($_POST['period'] ?? null);
+        // Con unit_ids[] se emiten solo los inmuebles seleccionados en la tabla; sin él, todo el período.
+        $unitIds = isset($_POST['unit_ids']) && is_array($_POST['unit_ids'])
+            ? array_map(static fn (mixed $id): string => Http::string($id), $_POST['unit_ids'])
+            : null;
         try {
-            $result = (new BillingService())->issue($period, (int) $actor['id']);
-            Http::flash(self::FLASH, 
-                $result['failed'] > 0 ? 'error' : 'success',
-                sprintf(
-                    'Se emitieron %d notas; se enviaron %d correos desde %s, %d fallaron y %d siguen pendientes.',
-                    $result['issued'],
-                    $result['sent'],
-                    $this->senderLabel((int) $actor['id']),
-                    $result['failed'],
-                    $result['pending']
-                )
+            $result = (new BillingService())->issue($period, (int) $actor['id'], $unitIds);
+            $message = sprintf(
+                'Se emitieron %d notas%s; se enviaron %d correos desde %s, %d fallaron y %d siguen pendientes.',
+                $result['issued'],
+                $unitIds !== null ? ' de los inmuebles seleccionados' : '',
+                $result['sent'],
+                $this->senderLabel((int) $actor['id']),
+                $result['failed'],
+                $result['pending']
             );
+            if ($result['skipped'] !== []) {
+                $message .= ' Se omitieron ' . count($result['skipped']) . ': ' . implode(', ', array_slice($result['skipped'], 0, 5))
+                    . (count($result['skipped']) > 5 ? ', …' : '') . '.';
+            }
+            Http::flash(self::FLASH, $result['failed'] > 0 ? 'error' : 'success', $message);
         } catch (PDOException $exception) {
             if ((string) $exception->getCode() === '23000') {
                 Http::flash(self::FLASH, 'error', 'El período ya fue emitido en otra sesión. Recarga la página para revisar los documentos.');

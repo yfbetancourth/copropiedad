@@ -1071,6 +1071,11 @@ final class ConfigurationController
             'unitCountsByCategory' => $unitCountsByCategory,
             'estimatedUnitCount' => $allAnswered ? $this->compositionUnitCount($housingType, $answers) : null,
             'completed' => (bool) ($composition['completed'] ?? false),
+            // Para estimar la cuota mensual que representa cada categoría en el desglose de coeficientes.
+            'feeSettings' => [
+                'amount' => is_numeric($settings['administration_fee'] ?? null) ? (string) $settings['administration_fee'] : null,
+                'basis' => ($settings['fee_basis'] ?? 'base') === 'budget' ? 'budget' : 'base',
+            ],
         ]);
     }
 
@@ -1319,7 +1324,7 @@ final class ConfigurationController
             }
             $coefficient = $this->coefficientInput($unit['coefficient'] ?? null);
             if ($coefficient === false) {
-                $errors[] = $row . ': el coeficiente debe ser mayor que 0 y hasta 100, con máximo 4 decimales (ej. 1.2500).';
+                $errors[] = $row . ': el coeficiente debe estar entre 0 y 100, con máximo 4 decimales (ej. 1.2500).';
             } else {
                 [$whole, $fraction] = explode('.', $coefficient);
                 $totalTenThousandths += (int) $whole * 10000 + (int) $fraction;
@@ -1533,7 +1538,7 @@ final class ConfigurationController
         $whole = (int) $matches[1];
         $fraction = (int) str_pad($matches[2] ?? '', 4, '0');
         $scaled = $whole * 10000 + $fraction;
-        if ($scaled < 1 || $scaled > 1000000) {
+        if ($scaled < 0 || $scaled > 1000000) { // de 0 % (no paga cuota) a 100 %
             return false;
         }
         return $whole . '.' . str_pad((string) $fraction, 4, '0', STR_PAD_LEFT);

@@ -277,7 +277,7 @@ final class ReportService
             if (isset($assigned[(string) ($unit['id'] ?? '')])) {
                 $withUser++;
             }
-            if (!is_numeric($unit['coefficient'] ?? null) || (float) $unit['coefficient'] <= 0) {
+            if (!is_numeric($unit['coefficient'] ?? null) || (float) $unit['coefficient'] < 0) { // 0 % es válido
                 $missingCoefficient++;
             }
         }

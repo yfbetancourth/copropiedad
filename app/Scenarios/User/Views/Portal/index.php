@@ -39,21 +39,40 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
     <?php endif; ?>
 
     <?php
-    $currency = static function (mixed $amount): string {
-        if (!is_numeric($amount)) {
-            return 'Sin configurar';
-        }
-
-        return '$ ' . number_format((float) $amount, 2, ',', '.') . ' COP';
+    // Cuota del residente: la de sus inmuebles según su coeficiente (no la base general ni el presupuesto del conjunto).
+    $cop = static function (int $cents): string {
+        $text = '$ ' . number_format(intdiv($cents, 100), 0, ',', '.');
+        return $cents % 100 !== 0 ? $text . ',' . str_pad((string) ($cents % 100), 2, '0', STR_PAD_LEFT) : $text;
     };
-    ?>
+    $unitFees = is_array($unitFees ?? null) ? $unitFees : ['configured' => false, 'units' => [], 'effective_date' => '', 'discount_day' => 0, 'basis' => 'base'];
+    $myFee = array_sum(array_column($unitFees['units'], 'fee'));
+    $myDiscount = array_sum(array_column($unitFees['units'], 'discount'));
+    $effectiveDate = DateTimeImmutable::createFromFormat('!Y-m-d', (string) $unitFees['effective_date']);
+    $effectiveText = $effectiveDate instanceof DateTimeImmutable ? $effectiveDate->format('d/m/Y') : 'sin fecha';
+    if (!$unitFees['configured']) {
+        [$feeValue, $feeHint] = ['Sin configurar', 'La administración aún no ha definido la cuota.'];
+    } elseif ($units === []) {
+        [$feeValue, $feeHint] = ['—', 'Sin inmuebles asignados.'];
+    } elseif (count($units) === 1) {
+        $onlyUnit = $units[0];
+        $coefficient = $unitFees['units'][$onlyUnit['id']]['coefficient'] ?? null;
+        [$feeValue, $feeHint] = [$cop($myFee), $onlyUnit['name']
+            . ($coefficient !== null ? ' · coef. ' . rtrim(rtrim(number_format((float) $coefficient, 4, ',', '.'), '0'), ',') . ' %' : '')
+            . ' · mensual desde ' . $effectiveText];
+    } else {
+        [$feeValue, $feeHint] = [$cop($myFee), 'Mensual, suma de tus ' . count($units) . ' inmuebles · desde ' . $effectiveText];
+    }
+    $discountDay = (int) $unitFees['discount_day'];
+    $discountValue = !$unitFees['configured'] ? 'Sin configurar' : $cop($myDiscount);
+    $discountHint = $myDiscount > 0
+        ? 'Pagas ' . $cop(max(0, $myFee - $myDiscount)) . ($discountDay > 0 ? ' si pagas hasta el día ' . $discountDay . ' de cada mes' : ' si pagas antes de la fecha límite')
+        : 'Sin descuento por pronto pago';
 
-    <?php
     // Indicadores con las mismas tarjetas de la bienvenida del panel administrativo.
     $portalKpis = [
         ['Inmuebles asignados', (string) count($units), 'bi-house-door', 'text-primary', count($units) === 1 ? '1 inmueble a tu nombre' : count($units) . ' inmuebles a tu nombre', '#inmuebles', 'Ver mis inmuebles'],
-        ['Cuota de administración', $currency($settings['administration_fee'] ?? null), 'bi-cash-stack', 'text-success', 'Aplica desde ' . ($settings['effective_date'] ?? 'sin fecha'), $basePath . '/usuario/pagos', 'Ir a pagos'],
-        ['Descuento por pronto pago', $currency($settings['early_payment_discount'] ?? null), 'bi-piggy-bank', 'text-info', 'Si pagas antes de la fecha límite', $basePath . '/usuario/pagos', 'Ver fechas'],
+        ['Mi cuota de administración', $feeValue, 'bi-cash-stack', 'text-success', $feeHint, $basePath . '/usuario/pagos', 'Ir a pagos'],
+        ['Descuento por pronto pago', $discountValue, 'bi-piggy-bank', 'text-info', $discountHint, $basePath . '/usuario/pagos', 'Ver fechas'],
         ['Multas', 'Sin registro', 'bi-exclamation-octagon', 'text-warning', 'Aún no hay historial de multas', '#documentos', 'Ver documentos'],
     ];
     ?>
@@ -90,7 +109,7 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                         <div class="table-responsive">
                             <table class="table table-striped align-middle mb-0">
                                 <thead>
-                                <tr><th>Inmueble</th><th>Categoría</th><th>Tu vínculo</th></tr>
+                                <tr><th>Inmueble</th><th>Categoría</th><th>Tu vínculo</th><?php if ($unitFees['configured']): ?><th class="text-end">Cuota mensual</th><?php endif; ?></tr>
                                 </thead>
                                 <tbody>
                                 <?php foreach ($units as $unit): ?>
@@ -101,6 +120,17 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                                             <?= htmlspecialchars((string) ($unit['relation_label'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
                                             <span class="d-block small text-secondary">Desde <?= htmlspecialchars((string) ($unit['started_on'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span>
                                         </td>
+                                        <?php if ($unitFees['configured']): ?>
+                                            <?php $unitFee = $unitFees['units'][$unit['id'] ?? ''] ?? null; ?>
+                                            <td class="text-end text-nowrap">
+                                                <?php if ($unitFee === null || $unitFee['coefficient'] === null): ?>
+                                                    <span class="text-secondary small">Sin coeficiente</span>
+                                                <?php else: ?>
+                                                    <?= htmlspecialchars($cop($unitFee['fee']), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
+                                                    <span class="d-block small text-secondary">coef. <?= htmlspecialchars(rtrim(rtrim(number_format((float) $unitFee['coefficient'], 4, ',', '.'), '0'), ','), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?> %</span>
+                                                <?php endif; ?>
+                                            </td>
+                                        <?php endif; ?>
                                     </tr>
                                 <?php endforeach; ?>
                                 </tbody>

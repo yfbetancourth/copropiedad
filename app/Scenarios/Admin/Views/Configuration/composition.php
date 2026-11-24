@@ -330,6 +330,126 @@ $currentStep = 2;
         </div>
 
         <script src="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/js/data-grid.js?v=1"></script>
+        <?php
+        // Desglose del coeficiente por categoría (Apartamento, Parqueadero, Inmueble comercial…). Se dibuja igual en la
+        // vista editable y en la de solo lectura; en la editable se recalcula mientras se escribe.
+        $feeSettings = is_array($feeSettings ?? null) ? $feeSettings : ['amount' => null, 'basis' => 'base'];
+        $breakdownCard = static function (bool $editable) use ($escape, $feeSettings): void { ?>
+            <div class="card border-0 shadow-sm mb-3" id="category-breakdown">
+                <div class="card-header bg-transparent d-flex flex-wrap gap-2 align-items-center">
+                    <h2 class="card-title h6 mb-0 me-auto"><i class="bi bi-pie-chart me-1" aria-hidden="true"></i>Coeficiente por categoría</h2>
+                    <span class="small text-secondary">
+                        <?php if ($feeSettings['amount'] !== null): ?>
+                            Cuota estimada con <?= $feeSettings['basis'] === 'budget' ? 'el presupuesto mensual' : 'la base mensual' ?> de Configuración / Financiera.
+                        <?php else: ?>
+                            Configura la cuota en Configuración / Financiera para ver cuánto aporta cada categoría.
+                        <?php endif; ?>
+                    </span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">Categoría</th>
+                                <th scope="col" class="text-end">Inmuebles</th>
+                                <th scope="col" class="text-end">Suma del coeficiente</th>
+                                <th scope="col" style="min-width: 9rem">Participación</th>
+                                <th scope="col" class="text-end">Coeficiente por inmueble</th>
+                                <?php if ($feeSettings['amount'] !== null): ?><th scope="col" class="text-end">Cuota mensual ≈</th><?php endif; ?>
+                                <th scope="col" class="text-end"><span class="visually-hidden">Acciones</span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="category-breakdown-body"></tbody>
+                        <tfoot class="table-light fw-semibold" id="category-breakdown-foot"></tfoot>
+                    </table>
+                </div>
+                <?php if ($editable): ?>
+                    <div class="card-footer bg-transparent small text-secondary">
+                        «Seleccionar» marca todos los inmuebles de la categoría en la lista: luego usa <em>Asignar coeficiente</em> o <em>Repartir un total</em> para fijar su valor de una vez.
+                    </div>
+                <?php endif; ?>
+            </div>
+        <?php };
+        ?>
+        <script>
+        // Cálculo del desglose: entradas [{ category, value }] con value en diezmilésimas (1 % = 10000) o null.
+        window.CompositionBreakdown = (() => {
+            const SCALE = 10000;
+            const fee = <?= json_encode($feeSettings['amount'] !== null ? (float) $feeSettings['amount'] : null) ?>;
+            const basis = <?= json_encode($feeSettings['basis']) ?>;
+            const percent = (value) => (value / SCALE).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+            const money = (value) => '$ ' + Math.round(value).toLocaleString('es-CO');
+            const cell = (text, className = '') => Object.assign(document.createElement('td'), { className, textContent: text });
+            return {
+                render(entries, { onView, onSelect } = {}) {
+                    const body = document.getElementById('category-breakdown-body');
+                    const foot = document.getElementById('category-breakdown-foot');
+                    if (!body) return;
+                    const groups = new Map();
+                    entries.forEach(({ category, value }) => {
+                        const key = category.trim() || 'Sin categoría';
+                        const group = groups.get(key) || { count: 0, sum: 0, missing: 0, min: null, max: null };
+                        group.count++;
+                        if (value === null) {
+                            group.missing++;
+                        } else {
+                            group.sum += value;
+                            group.min = group.min === null ? value : Math.min(group.min, value);
+                            group.max = group.max === null ? value : Math.max(group.max, value);
+                        }
+                        groups.set(key, group);
+                    });
+                    const total = [...groups.values()].reduce((sum, group) => sum + group.sum, 0);
+                    const monthly = (sum) => fee === null ? null : (basis === 'budget' ? (total > 0 ? fee * sum / total : 0) : fee * sum / (100 * SCALE));
+                    const rows = [...groups.entries()].sort((a, b) => b[1].sum - a[1].sum || a[0].localeCompare(b[0], 'es'));
+                    body.replaceChildren(...rows.map(([category, group]) => {
+                        const tr = document.createElement('tr');
+                        const share = total > 0 ? (group.sum / total) * 100 : 0;
+                        const shareCell = document.createElement('td');
+                        shareCell.innerHTML = '<div class="d-flex align-items-center gap-2"><div class="progress flex-grow-1" style="height: .45rem"><div class="progress-bar"></div></div><span class="small text-secondary text-nowrap"></span></div>';
+                        shareCell.querySelector('.progress-bar').style.width = `${share.toFixed(2)}%`;
+                        shareCell.querySelector('span').textContent = `${share.toLocaleString('es-CO', { maximumFractionDigits: 2 })} %`;
+                        const perUnit = group.min === null ? '—'
+                            : group.min === group.max ? `${percent(group.min)} % c/u` : `${percent(group.min)} – ${percent(group.max)} %`;
+                        const perUnitCell = cell(perUnit, 'text-end text-nowrap');
+                        if (group.missing > 0) {
+                            const warn = Object.assign(document.createElement('span'), { className: 'd-block small text-warning', textContent: `${group.missing} sin coeficiente` });
+                            perUnitCell.append(warn);
+                        }
+                        tr.append(cell(category, 'fw-semibold'), cell(group.count.toLocaleString('es-CO'), 'text-end'), cell(`${percent(group.sum)} %`, 'text-end text-nowrap'), shareCell, perUnitCell);
+                        if (fee !== null) tr.append(cell(money(monthly(group.sum)), 'text-end text-nowrap'));
+                        const actions = cell('', 'text-end text-nowrap');
+                        const button = (label, icon, handler) => {
+                            const b = Object.assign(document.createElement('button'), { type: 'button', className: 'btn btn-link btn-sm p-0 ms-2' });
+                            b.innerHTML = `<i class="bi ${icon} me-1" aria-hidden="true"></i>`;
+                            b.append(label);
+                            b.setAttribute('aria-label', `${label} ${category}`);
+                            b.addEventListener('click', () => handler(category));
+                            return b;
+                        };
+                        if (onView) actions.append(button('Ver', 'bi-funnel', onView));
+                        if (onSelect) actions.append(button('Seleccionar', 'bi-check2-square', onSelect));
+                        tr.append(actions);
+                        return tr;
+                    }));
+                    const units = entries.length;
+                    const totalRow = document.createElement('tr');
+                    totalRow.append(cell('Total'), cell(units.toLocaleString('es-CO'), 'text-end'), cell(`${percent(total)} %`, 'text-end text-nowrap'), cell(''), cell(''));
+                    if (fee !== null) totalRow.append(cell(money(groups.size ? monthly(total) : 0), 'text-end text-nowrap'));
+                    totalRow.append(cell(''));
+                    foot.replaceChildren(totalRow);
+                },
+                // Opciones del filtro por categoría, conservando la elegida.
+                fillFilter(select, categories) {
+                    if (!select) return;
+                    const current = select.value;
+                    const sorted = [...new Set(categories.map((c) => c.trim() || 'Sin categoría'))].sort((a, b) => a.localeCompare(b, 'es'));
+                    select.replaceChildren(new Option('Todas las categorías', ''), ...sorted.map((c) => new Option(c, c)));
+                    select.value = sorted.includes(current) ? current : '';
+                },
+            };
+        })();
+        </script>
         <?php if ($canWrite): ?>
             <form id="composition-units-form" method="post" action="<?= $escape($basePath) ?>/configuracion/conformacion/finalizar" novalidate autocomplete="off">
                 <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
@@ -360,6 +480,8 @@ $currentStep = 2;
                     </div>
                 </div>
 
+                <?php $breakdownCard(true); ?>
+
                 <div id="error-summary" class="alert alert-danger" hidden role="alert">
                     <strong>Corrige estos datos antes de guardar:</strong>
                     <ul id="error-list" class="mb-0 mt-2"></ul>
@@ -369,17 +491,50 @@ $currentStep = 2;
                     <div class="card-header bg-transparent d-flex flex-wrap gap-2 align-items-center">
                         <h2 class="card-title h6 mb-0 me-auto">Lista de inmuebles</h2>
                         <input id="unit-filter" class="form-control form-control-sm" style="max-width: 16rem" type="search" placeholder="Filtrar: Torre 2, comercial…" aria-label="Filtrar inmuebles">
+                        <select id="unit-category-filter" class="form-select form-select-sm w-auto" aria-label="Filtrar por categoría"><option value="">Todas las categorías</option></select>
                         <div class="btn-group btn-group-sm" role="group" aria-label="Mostrar">
                             <input class="btn-check" type="radio" name="row-view" id="view-all" value="all" checked><label class="btn btn-outline-secondary" for="view-all">Todos</label>
                             <input class="btn-check" type="radio" name="row-view" id="view-errors" value="errors"><label class="btn btn-outline-secondary" for="view-errors">Con errores</label>
                         </div>
-                        <div class="dropdown">
-                            <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-magic me-1" aria-hidden="true"></i>Coeficientes</button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#paste-modal"><i class="bi bi-clipboard me-2" aria-hidden="true"></i>Pegar desde Excel…</button></li>
-                                <li><button class="dropdown-item" type="button" id="distribute-equally"><i class="bi bi-distribute-vertical me-2" aria-hidden="true"></i>Repartir 100 % en partes iguales</button></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><button class="dropdown-item text-danger" type="button" id="clear-coefficients"><i class="bi bi-eraser me-2" aria-hidden="true"></i>Borrar coeficientes filtrados</button></li>
+                        <?php
+                        // Menú «Coeficientes»: cada opción actúa sobre las filas filtradas (todas las páginas).
+                        $magicItem = static function (string $id, string $icon, string $tone, string $title, string $descriptionId, string $extra = '') use ($escape): void { ?>
+                            <li>
+                                <button class="dropdown-item d-flex gap-3 align-items-start py-2 text-wrap" type="button" id="<?= $escape($id) ?>" <?= $extra ?>>
+                                    <span class="rounded-circle d-inline-flex align-items-center justify-content-center flex-shrink-0 bg-<?= $escape($tone) ?>-subtle text-<?= $escape($tone) ?>" style="width: 2.1rem; height: 2.1rem" aria-hidden="true"><i class="bi <?= $escape($icon) ?>"></i></span>
+                                    <span class="lh-sm">
+                                        <span class="d-block fw-semibold"><?= $escape($title) ?></span>
+                                        <span class="d-block small text-secondary mt-1" id="<?= $escape($descriptionId) ?>"></span>
+                                    </span>
+                                </button>
+                            </li>
+                        <?php }; ?>
+                        <div class="dropdown" id="magic-menu">
+                            <button class="btn btn-sm btn-primary dropdown-toggle d-inline-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" id="magic-button">
+                                <i class="bi bi-magic" aria-hidden="true"></i>Coeficientes
+                                <span class="badge rounded-pill text-bg-light" id="magic-badge" title="Inmuebles a los que se aplica"></span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-0 overflow-hidden" style="width: min(25rem, 92vw); z-index: 1030" aria-labelledby="magic-button">
+                                <li class="px-3 py-2 bg-primary-subtle border-bottom">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="bi bi-bullseye text-primary" aria-hidden="true"></i>
+                                        <span class="small">Se aplica a <strong id="magic-scope-count">0</strong> inmueble(s)</span>
+                                    </div>
+                                    <div class="small text-secondary mt-1" id="magic-scope-detail"></div>
+                                    <div class="row g-2 small mt-1">
+                                        <div class="col-6"><span class="text-secondary d-block">Suman ahora</span><strong id="magic-scope-sum">0 %</strong></div>
+                                        <div class="col-6"><span class="text-secondary d-block">Sin coeficiente</span><strong id="magic-scope-missing">0</strong></div>
+                                    </div>
+                                </li>
+                                <?php $magicItem('magic-assign', 'bi-123', 'primary', 'Mismo coeficiente a cada uno', 'magic-assign-text'); ?>
+                                <?php $magicItem('magic-distribute', 'bi-distribute-vertical', 'primary', 'Repartir un total en partes iguales', 'magic-distribute-text'); ?>
+                                <?php $magicItem('magic-fill', 'bi-puzzle', 'success', 'Completar lo que falta', 'magic-fill-text'); ?>
+                                <?php $magicItem('magic-paste', 'bi-clipboard', 'secondary', 'Pegar una columna desde Excel', 'magic-paste-text', 'data-bs-toggle="modal" data-bs-target="#paste-modal"'); ?>
+                                <li><hr class="dropdown-divider my-0"></li>
+                                <?php $magicItem('clear-coefficients', 'bi-eraser', 'danger', 'Borrar coeficientes', 'magic-clear-text'); ?>
+                                <li class="px-3 py-2 bg-body-tertiary border-top small text-secondary">
+                                    <i class="bi bi-funnel me-1" aria-hidden="true"></i>Usa la búsqueda, la categoría o «Con errores» para elegir a cuáles se aplica.
+                                </li>
                             </ul>
                         </div>
                         <div id="unit-grid-tools" class="d-flex flex-wrap gap-2"></div>
@@ -528,7 +683,7 @@ $currentStep = 2;
                     const match = /^(\d{1,3})(?:\.(\d{1,4}))?$/.exec(text);
                     if (!match) return null;
                     const value = parseInt(match[1], 10) * SCALE + parseInt((match[2] || '').padEnd(4, '0'), 10);
-                    return value >= 1 && value <= 100 * SCALE ? value : null;
+                    return value >= 0 && value <= 100 * SCALE ? value : null; // 0 % es válido (no paga cuota)
                 };
                 const formatCoefficient = (value) => `${Math.floor(value / SCALE)}.${String(value % SCALE).padStart(4, '0')}`;
                 const formatPercent = (value) => (value / SCALE).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
@@ -573,7 +728,7 @@ $currentStep = 2;
                         }
                         const parsed = parseCoefficient(coefficient.value);
                         const coefficientOk = parsed !== null;
-                        if (!coefficientOk) rowErrors.push(coefficient.value.trim() === '' ? 'falta el coeficiente' : 'coeficiente inválido (>0, hasta 100, 4 decimales)');
+                        if (!coefficientOk) rowErrors.push(coefficient.value.trim() === '' ? 'falta el coeficiente' : 'coeficiente inválido (entre 0 y 100, 4 decimales)');
                         else total += parsed;
 
                         const show = form.dataset.showErrors === '1' || row.dataset.touched === '1';
@@ -629,6 +784,7 @@ $currentStep = 2;
                     }
                     summary.hidden = errors.length === 0 || !form.dataset.showErrors;
                     submit.disabled = all.length === 0;
+                    if (grid) { renderBreakdown(); updateMagicMenu(); } // grid existe desde el arranque; validate() solo corre después
                     return { errors, sumOk, total };
                 };
 
@@ -638,13 +794,37 @@ $currentStep = 2;
                     validateTimer = setTimeout(validate, 120);
                 };
 
+                const categoryFilter = document.getElementById('unit-category-filter');
+                const rowCategory = (row) => field(row, 'category').value.trim() || 'Sin categoría';
                 const matchesFilter = (row) => {
                     const query = filter.value.trim().toLowerCase();
                     const onlyErrors = document.getElementById('view-errors').checked;
                     const text = `${field(row, 'category').value} ${field(row, 'name').value}`.toLowerCase();
-                    return (query === '' || text.includes(query)) && (!onlyErrors || row.dataset.hasError === '1');
+                    return (query === '' || text.includes(query)) && (!onlyErrors || row.dataset.hasError === '1')
+                        && (categoryFilter.value === '' || rowCategory(row) === categoryFilter.value);
                 };
-                const applyFilter = () => grid.refresh(true);
+                categoryFilter.addEventListener('change', () => applyFilter());
+                // Desglose por categoría: «Ver» filtra la lista; «Seleccionar» marca la categoría para las acciones en lote.
+                const showCategory = (category) => {
+                    categoryFilter.value = category;
+                    applyFilter();
+                    document.getElementById('composition-unit-table').scrollIntoView({ block: 'start', behavior: 'smooth' });
+                };
+                const selectCategory = (category) => {
+                    grid.clearSelection();
+                    rows().filter((row) => rowCategory(row) === category).forEach((row) => grid.setSelected(row, true));
+                    showCategory(category);
+                    grid.update();
+                };
+                const renderBreakdown = () => {
+                    const all = rows();
+                    window.CompositionBreakdown.render(
+                        all.map((row) => ({ category: field(row, 'category').value, value: parseCoefficient(field(row, 'coefficient').value) })),
+                        { onView: showCategory, onSelect: selectCategory }
+                    );
+                    window.CompositionBreakdown.fillFilter(categoryFilter, all.map((row) => field(row, 'category').value));
+                };
+                const applyFilter = () => { grid.refresh(true); updateMagicMenu(); };
 
                 list.addEventListener('input', (event) => {
                     if (event.target.dataset.gridSelect) return; // marcar una fila no es un cambio de datos
@@ -710,28 +890,115 @@ $currentStep = 2;
                     field(row, 'name').focus();
                 });
 
-                document.getElementById('distribute-equally').addEventListener('click', () => {
+                // Menú «Coeficientes»: siempre actúa sobre las filas filtradas (todas las páginas).
+                const coefficientOf = (row) => parseCoefficient(field(row, 'coefficient').value);
+                const sumOf = (list) => list.reduce((sum, row) => sum + (coefficientOf(row) ?? 0), 0);
+                const magicScope = () => {
                     const all = rows();
-                    if (all.length === 0) return;
-                    const filled = all.filter((row) => field(row, 'coefficient').value.trim() !== '').length;
-                    const base = Math.floor(100 * SCALE / all.length);
-                    const remainder = 100 * SCALE - base * all.length;
-                    const message = `Se asignará el mismo coeficiente (${formatPercent(base)} %) a los ${all.length} inmuebles`
-                        + (remainder > 0 ? `; los primeros ${remainder} reciben 0,0001 adicional para que la suma sea exactamente 100 %.` : '.')
-                        + (filled > 0 ? `\n\nSe reemplazarán ${filled} coeficientes ya escritos.` : '')
-                        + '\n\nÚsalo solo si el reglamento asigna el mismo coeficiente a todos. ¿Continuar?';
-                    if (!window.confirm(message)) return;
-                    all.forEach((row, index) => {
+                    const targets = filteredRows();
+                    const others = all.filter((row) => !targets.includes(row));
+                    const missing = targets.filter((row) => coefficientOf(row) === null);
+                    return {
+                        all, targets, missing,
+                        filtered: targets.length !== all.length,
+                        // Lo que les toca a los filtrados para que el total sea 100 % con lo que ya tienen los demás.
+                        room: 100 * SCALE - sumOf(others),
+                        // Lo que falta para 100 % contando todo lo escrito.
+                        gap: 100 * SCALE - sumOf(all),
+                    };
+                };
+                const scopeLabel = () => {
+                    const parts = [];
+                    if (categoryFilter.value) parts.push(`categoría «${categoryFilter.value}»`);
+                    if (filter.value.trim()) parts.push(`búsqueda «${filter.value.trim()}»`);
+                    if (document.getElementById('view-errors').checked) parts.push('solo filas con errores');
+                    return parts.length ? `Filtrados por ${parts.join(', ')} · todas las páginas` : 'Todos los inmuebles (sin filtro)';
+                };
+                const setItem = (id, enabled, text) => {
+                    const item = document.getElementById(id);
+                    item.disabled = !enabled;
+                    item.classList.toggle('opacity-50', !enabled);
+                    document.getElementById(item.querySelector('[id]').id).textContent = text;
+                };
+                const updateMagicMenu = () => {
+                    const { all, targets, missing, filtered, room, gap } = magicScope();
+                    const n = targets.length;
+                    const badge = document.getElementById('magic-badge');
+                    badge.textContent = filtered ? `${n} de ${all.length}` : String(n);
+                    badge.className = `badge rounded-pill ${filtered ? 'text-bg-warning' : 'text-bg-light'}`;
+                    document.getElementById('magic-scope-count').textContent = n.toLocaleString('es-CO');
+                    document.getElementById('magic-scope-detail').textContent = scopeLabel();
+                    document.getElementById('magic-scope-sum').textContent = `${formatPercent(sumOf(targets))} %`;
+                    document.getElementById('magic-scope-missing').textContent = missing.length.toLocaleString('es-CO');
+                    setItem('magic-assign', n > 0, `Escribe un valor (p. ej. 0,5 %) y se pone en los ${n} inmueble(s).`);
+                    setItem('magic-distribute', n > 0, room > 0
+                        ? `Divide un porcentaje entre los ${n}. Sugerido: ${formatPercent(room)} % para que el total quede en 100 %.`
+                        : `Divide un porcentaje entre los ${n} inmueble(s).`);
+                    setItem('magic-fill', missing.length > 0 && gap > 0, missing.length === 0
+                        ? 'Todos los filtrados ya tienen coeficiente.'
+                        : gap > 0 ? `Reparte lo que falta para 100 % (${formatPercent(gap)} %) entre los ${missing.length} sin coeficiente.`
+                            : `Hay ${missing.length} sin coeficiente, pero la suma ya llega a 100 %.`);
+                    setItem('magic-paste', n > 0, `Un valor por línea, aplicado en orden a los ${n} inmueble(s) como se ven.`);
+                    setItem('clear-coefficients', n > 0 && missing.length < n, `Deja vacío el coeficiente de los ${n} inmueble(s).`);
+                };
+                document.getElementById('magic-menu').addEventListener('show.bs.dropdown', updateMagicMenu);
+                // Reparte total (diezmilésimas) en partes iguales; el residuo de 0,0001 va a los primeros.
+                const spread = (targets, total) => {
+                    // Con 0 % permitido siempre alcanza: si el total es muy pequeño, algunos quedan en 0.
+                    const base = Math.floor(total / targets.length);
+                    const remainder = total - base * targets.length;
+                    targets.forEach((row, index) => {
                         field(row, 'coefficient').value = formatCoefficient(base + (index < remainder ? 1 : 0));
+                        row.dataset.touched = '1';
                     });
+                    return null;
+                };
+                document.getElementById('magic-assign').addEventListener('click', () => {
+                    const { targets, filtered } = magicScope();
+                    askValue({
+                        title: `Mismo coeficiente a ${targets.length} inmueble(s)${filtered ? ' filtrados' : ''}`,
+                        label: 'Coeficiente para cada uno (%)',
+                        hint: `${scopeLabel()}. Ejemplo: 0,5000. Reemplaza lo que tengan escrito.`,
+                        inputmode: 'decimal',
+                        apply: (raw) => {
+                            const parsed = parseCoefficient(raw);
+                            if (parsed === null) return 'Coeficiente inválido: entre 0 y 100, con máximo 4 decimales.';
+                            targets.forEach((row) => { field(row, 'coefficient').value = formatCoefficient(parsed); row.dataset.touched = '1'; });
+                            return null;
+                        },
+                    });
+                });
+                document.getElementById('magic-distribute').addEventListener('click', () => {
+                    const { targets, filtered, room } = magicScope();
+                    askValue({
+                        title: `Repartir entre ${targets.length} inmueble(s)${filtered ? ' filtrados' : ''}`,
+                        label: 'Porcentaje total a repartir (%)',
+                        hint: `${scopeLabel()}. `
+                            + (room > 0 ? `Con ${formatPercent(room)} % la suma total queda en 100 %. ` : '')
+                            + 'Se reparte en partes iguales; el residuo de 0,0001 va a los primeros.',
+                        value: room > 0 ? formatPercent(room) : '',
+                        inputmode: 'decimal',
+                        apply: (raw) => {
+                            const total = parseCoefficient(raw);
+                            if (total === null) return 'Porcentaje inválido: entre 0 y 100, con máximo 4 decimales.';
+                            return spread(targets, total);
+                        },
+                    });
+                });
+                document.getElementById('magic-fill').addEventListener('click', () => {
+                    const { missing, gap } = magicScope();
+                    if (missing.length === 0 || gap <= 0) return;
+                    if (!window.confirm(`Se repartirán ${formatPercent(gap)} % en partes iguales entre los ${missing.length} inmueble(s) filtrados que no tienen coeficiente, para que la suma llegue a 100 %. Los que ya tienen valor no cambian. ¿Continuar?`)) return;
+                    const problem = spread(missing, gap);
+                    if (problem) { window.alert(problem); return; }
                     markDirty();
                     validate();
+                    grid.refresh();
                 });
-
                 document.getElementById('clear-coefficients').addEventListener('click', () => {
-                    const targets = filteredRows();
-                    if (targets.length === 0 || !window.confirm(`¿Borrar el coeficiente de ${targets.length} inmueble(s) filtrados (todas las páginas)?`)) return;
-                    targets.forEach((row) => { field(row, 'coefficient').value = ''; });
+                    const { targets, filtered } = magicScope();
+                    if (targets.length === 0 || !window.confirm(`¿Borrar el coeficiente de ${targets.length} inmueble(s)${filtered ? ' filtrados (todas las páginas)' : ''}?`)) return;
+                    targets.forEach((row) => { field(row, 'coefficient').value = ''; row.dataset.touched = '1'; });
                     markDirty();
                     validate();
                 });
@@ -872,7 +1139,7 @@ $currentStep = 2;
                                 inputmode: 'decimal',
                                 apply: (raw) => {
                                     const parsed = parseCoefficient(raw);
-                                    if (parsed === null) return 'Coeficiente inválido: mayor que 0, hasta 100 y con máximo 4 decimales.';
+                                    if (parsed === null) return 'Coeficiente inválido: entre 0 y 100, con máximo 4 decimales.';
                                     selected.forEach((row) => { field(row, 'coefficient').value = formatCoefficient(parsed); touch(row); });
                                     return null;
                                 },
@@ -887,9 +1154,8 @@ $currentStep = 2;
                                 inputmode: 'decimal',
                                 apply: (raw) => {
                                     const total = parseCoefficient(raw);
-                                    if (total === null) return 'Porcentaje inválido: mayor que 0, hasta 100 y con máximo 4 decimales.';
+                                    if (total === null) return 'Porcentaje inválido: entre 0 y 100, con máximo 4 decimales.';
                                     const base = Math.floor(total / selected.length);
-                                    if (base < 1) return `No alcanza: ${selected.length} inmuebles necesitan al menos ${formatPercent(selected.length)} %.`;
                                     const remainder = total - base * selected.length;
                                     selected.forEach((row, index) => {
                                         field(row, 'coefficient').value = formatCoefficient(base + (index < remainder ? 1 : 0));
@@ -937,10 +1203,12 @@ $currentStep = 2;
             })();
             </script>
         <?php else: ?>
+            <?php $breakdownCard(false); ?>
             <div class="card border-0 shadow-sm">
                 <div class="card-header bg-transparent d-flex flex-wrap gap-2 align-items-center">
                     <h2 class="card-title h6 mb-0 me-auto">Lista de inmuebles</h2>
                     <input id="unit-filter" class="form-control form-control-sm" style="max-width: 16rem" type="search" placeholder="Filtrar: Torre 2, comercial…" aria-label="Filtrar inmuebles">
+                    <select id="unit-category-filter" class="form-select form-select-sm w-auto" aria-label="Filtrar por categoría"><option value="">Todas las categorías</option></select>
                     <div id="unit-grid-tools" class="d-flex flex-wrap gap-2"></div>
                 </div>
                 <div class="table-responsive" style="max-height: 70vh">
@@ -955,7 +1223,7 @@ $currentStep = 2;
                         </thead>
                         <tbody>
                             <?php foreach ($units as $index => $unit): ?>
-                                <tr><td class="text-secondary"><?= $index + 1 ?></td><td><?= $escape($unit['category'] ?? '') ?></td><td><?= $escape($unit['name'] ?? '') ?></td><td class="text-end"><?= isset($unit['coefficient']) && $unit['coefficient'] !== '' ? $escape(number_format((float) $unit['coefficient'], 4, ',', '.')) : '<span class="text-warning">Pendiente</span>' ?></td></tr>
+                                <tr data-category="<?= $escape(trim((string) ($unit['category'] ?? '')) ?: 'Sin categoría') ?>" data-coefficient="<?= $escape((string) ($unit['coefficient'] ?? '')) ?>"><td class="text-secondary"><?= $index + 1 ?></td><td><?= $escape($unit['category'] ?? '') ?></td><td><?= $escape($unit['name'] ?? '') ?></td><td class="text-end"><?= isset($unit['coefficient']) && $unit['coefficient'] !== '' ? $escape(number_format((float) $unit['coefficient'], 4, ',', '.')) : '<span class="text-warning">Pendiente</span>' ?></td></tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
@@ -965,15 +1233,30 @@ $currentStep = 2;
             <script>
             (() => {
                 const filter = document.getElementById('unit-filter');
-                const grid = new DataGrid(document.getElementById('composition-unit-table'), {
+                const categoryFilter = document.getElementById('unit-category-filter');
+                const table = document.getElementById('composition-unit-table');
+                const grid = new DataGrid(table, {
                     storageKey: 'composition-units-read',
-                    filter: (row) => filter.value.trim() === '' || row.textContent.toLowerCase().includes(filter.value.trim().toLowerCase()),
+                    filter: (row) => (filter.value.trim() === '' || row.textContent.toLowerCase().includes(filter.value.trim().toLowerCase()))
+                        && (categoryFilter.value === '' || row.dataset.category === categoryFilter.value),
                     sortValue: (row, key) => (key === 'position' ? row.dataset.gridOrder : undefined),
                     toolbar: document.getElementById('unit-grid-tools'),
                     pager: document.getElementById('unit-grid-pager'),
                     exportName: 'inmuebles',
                 });
                 filter.addEventListener('input', () => grid.refresh(true));
+                categoryFilter.addEventListener('change', () => grid.refresh(true));
+                // "12.5" o "12.5000" → diezmilésimas; null si falta.
+                const scaled = (text) => {
+                    const match = /^(\d{1,3})(?:\.(\d{1,4}))?$/.exec(String(text).trim());
+                    return match ? parseInt(match[1], 10) * 10000 + parseInt((match[2] || '').padEnd(4, '0'), 10) : null;
+                };
+                const rows = grid.rowsInOrder();
+                window.CompositionBreakdown.render(
+                    rows.map((row) => ({ category: row.dataset.category, value: scaled(row.dataset.coefficient) })),
+                    { onView: (category) => { categoryFilter.value = category; grid.refresh(true); table.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }
+                );
+                window.CompositionBreakdown.fillFilter(categoryFilter, rows.map((row) => row.dataset.category));
             })();
             </script>
         <?php endif; ?>

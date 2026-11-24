@@ -207,6 +207,11 @@ final class AuthController
                 ? (new ClassifiedsService())->listingsForOwner((int) $user['id'])
                 : [],
             'settings' => (new \App\Modules\Configuration\SettingsService())->current(),
+            // Cuota de cada inmueble del residente (no la base general ni el presupuesto completo del conjunto).
+            'unitFees' => (new \App\Modules\Billing\BillingService())->monthlyFeesFor(array_map(
+                static fn (array $unit): string => (string) $unit['id'],
+                $assignedUnits
+            )),
             'flash' => Http::pullFlash(self::FLASH),
             'csrfToken' => Session::csrfToken(),
         ]);

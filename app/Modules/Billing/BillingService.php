@@ -191,6 +191,12 @@ final class BillingService
         } elseif ($feeNotYetEffective) {
             $blockingReasons[] = 'La cuota aún no está vigente en el período seleccionado.';
         }
+        // Bloqueos generales (configuración): impiden emitir cualquier nota. Los demás dependen de cada inmueble y,
+        // al emitir solo los seleccionados, se revisan en esas filas.
+        $globalBlockingReasons = array_values(array_filter(
+            $blockingReasons,
+            static fn (string $reason): bool => !str_contains($reason, 'coeficiente')
+        ));
         if ($cycleError) {
             $blockingReasons[] = 'Emite los meses anteriores en orden antes de continuar.';
         }
@@ -224,6 +230,7 @@ final class BillingService
             'due_day' => $dueDay,
             'ready' => $blockingReasons === [],
             'blocking_reasons' => array_values(array_unique($blockingReasons)),
+            'global_blocking_reasons' => $globalBlockingReasons,
             'warnings' => $warnings,
             'new_count' => count($eligibleRows),
             'issued_count' => count(array_filter($rows, static fn (array $row): bool => $row['already_issued'])),
@@ -268,6 +275,118 @@ final class BillingService
             }
             throw $exception;
         }
+    }
+
+    /**
+     * Cuota mensual vigente de cada inmueble con la misma regla de la liquidación (base × coeficiente, o su parte del
+     * presupuesto) y su descuento por pronto pago. Para mostrarla al residente; no crea cobros.
+     *
+     * @param list<string> $unitIds
+     * @return array{configured: bool, basis: string, effective_date: string, discount_day: int,
+     *               units: array<string, array{fee: int, discount: int, coefficient: ?string}>}
+     */
+    public function monthlyFeesFor(array $unitIds): array
+    {
+        $settings = (new SettingsService())->current();
+        $configured = ($settings['administration_fee'] ?? '') !== '' && ($settings['administration_fee'] ?? null) !== null
+            && ($settings['effective_date'] ?? '') !== '';
+        $basis = ($settings['fee_basis'] ?? 'base') === 'budget' ? 'budget' : 'base';
+        $fee = $configured ? self::cents($settings['administration_fee']) : 0;
+        $configuredDiscount = self::cents($settings['early_payment_discount'] ?? '0');
+        $compositionUnits = (new CompositionService())->current()['units'] ?? [];
+        $coefficients = [];
+        foreach (is_array($compositionUnits) ? $compositionUnits : [] as $unit) {
+            if (is_array($unit) && is_string($unit['id'] ?? null)) {
+                $coefficients[$unit['id']] = self::normalizedCoefficient($unit['coefficient'] ?? null);
+            }
+        }
+        $shares = $configured && $basis === 'budget' ? self::budgetShares($fee, is_array($compositionUnits) ? $compositionUnits : []) : [];
+
+        $units = [];
+        foreach ($unitIds as $unitId) {
+            $coefficient = $coefficients[$unitId] ?? null;
+            $unitFee = !$configured || $coefficient === null
+                ? 0
+                : ($basis === 'budget' ? ($shares[$unitId] ?? 0) : self::allocatedFeeCents($fee, $coefficient));
+            $units[$unitId] = ['fee' => $unitFee, 'discount' => min($configuredDiscount, $unitFee), 'coefficient' => $coefficient];
+        }
+
+        return [
+            'configured' => $configured,
+            'basis' => $basis,
+            'effective_date' => (string) ($settings['effective_date'] ?? ''),
+            'discount_day' => (int) ($settings['early_payment_day'] ?? 0),
+            'units' => $units,
+        ];
+    }
+
+    /** Máximo de inmuebles por concepto en lote. */
+    public const BULK_ITEM_LIMIT = 5000;
+
+    /**
+     * Agrega el mismo concepto a varios inmuebles del período en una sola transacción. Los inmuebles que ya tienen la
+     * nota emitida o que no están en la estructura (con residentes) se omiten y se informan; los demás se guardan.
+     *
+     * @param list<string> $unitIds
+     * @return array{added: int, skipped: list<string>}
+     */
+    public function addItemToUnits(array $unitIds, string $period, string $category, string $description, string $amount, int $actorId): array
+    {
+        $periodDate = self::periodDate($period);
+        if ($periodDate > new DateTimeImmutable('first day of this month')) {
+            throw new RuntimeException('No se pueden registrar conceptos en un período futuro.');
+        }
+        if (!isset(self::ITEM_LABELS[$category])) {
+            throw new RuntimeException('Selecciona un concepto válido.');
+        }
+        if ($description === '' || strlen($description) > 160) {
+            throw new RuntimeException('La descripción es obligatoria y admite hasta 160 caracteres.');
+        }
+        $amountCents = self::cents($amount);
+        if ($amountCents < 1 || $amountCents > 999999999999999) {
+            throw new RuntimeException('El valor debe ser mayor que cero y no superar $ 9.999.999.999.999,99.');
+        }
+        $unitIds = array_values(array_unique(array_filter($unitIds, static fn (mixed $id): bool => is_string($id) && preg_match('/^[a-f0-9]{32}$/D', $id) === 1)));
+        if ($unitIds === []) {
+            throw new RuntimeException('Selecciona al menos un inmueble.');
+        }
+        if (count($unitIds) > self::BULK_ITEM_LIMIT) {
+            throw new RuntimeException('Se pueden agregar conceptos a ' . self::BULK_ITEM_LIMIT . ' inmuebles por lote como máximo.');
+        }
+
+        $units = $this->unitMap();
+        $pdo = Database::connection();
+        $pdo->beginTransaction();
+        try {
+            $this->lockPeriodItems($pdo, $period);
+            $issued = $this->statementMap($period);
+            $insert = $pdo->prepare(
+                'INSERT INTO billing_monthly_items (tenant_id, unit_id, period, category, description, amount, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
+            );
+            $added = 0;
+            $skipped = [];
+            foreach ($unitIds as $unitId) {
+                if (!isset($units[$unitId])) {
+                    $skipped[] = 'un inmueble que ya no está en la estructura';
+                    continue;
+                }
+                if (isset($issued[$unitId])) {
+                    $skipped[] = $units[$unitId]['name'] . ' (nota ya emitida)';
+                    continue;
+                }
+                $insert->execute([Tenant::id(), $unitId, $period, $category, $description, self::decimal($amountCents), $actorId]);
+                $added++;
+            }
+            $pdo->commit();
+        } catch (Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $exception;
+        }
+
+        return ['added' => $added, 'skipped' => $skipped];
     }
 
     /**
@@ -440,8 +559,23 @@ final class BillingService
         }
     }
 
-    public function issue(string $period, int $actorId): array
+    /**
+     * Emite las notas del período y envía sus correos.
+     *
+     * @param list<string>|null $unitIds null emite todo el período (exige que todo esté listo); con una lista emite solo
+     *        esos inmuebles: basta con que la configuración general esté lista y que cada uno esté «Listo». Los
+     *        seleccionados que no están listos (ya emitidos, sin coeficiente, sin residente válido, falta el mes
+     *        anterior) se omiten y se informan.
+     * @return array{issued: int, sent: int, failed: int, pending: int, skipped: list<string>}
+     */
+    public function issue(string $period, int $actorId, ?array $unitIds = null): array
     {
+        if ($unitIds !== null) {
+            $unitIds = array_values(array_unique(array_filter($unitIds, static fn (mixed $id): bool => is_string($id) && preg_match('/^[a-f0-9]{32}$/D', $id) === 1)));
+            if ($unitIds === []) {
+                throw new RuntimeException('Selecciona al menos un inmueble para emitir.');
+            }
+        }
         $periodDate = self::periodDate($period);
         $this->assignedUnits();
         $previousPeriod = $periodDate->modify('-1 month')->format('Y-m');
@@ -458,13 +592,44 @@ final class BillingService
             $lockPrevious->execute([Tenant::id(), $previousPeriod]);
             $lockPrevious->fetchAll();
             $preview = $this->preview($period, $actorId);
-            if (!$preview['ready']) {
-                throw new RuntimeException(implode(' ', $preview['blocking_reasons']));
-            }
-            foreach ($preview['rows'] as $row) {
-                if ($row['already_issued']) {
-                    continue;
+            $skipped = [];
+            if ($unitIds === null) {
+                if (!$preview['ready']) {
+                    throw new RuntimeException(implode(' ', $preview['blocking_reasons']));
                 }
+                $toIssue = array_filter($preview['rows'], static fn (array $row): bool => !$row['already_issued']);
+            } else {
+                if ($preview['global_blocking_reasons'] !== []) {
+                    throw new RuntimeException(implode(' ', $preview['global_blocking_reasons']));
+                }
+                $selected = array_flip($unitIds);
+                $toIssue = [];
+                foreach ($preview['rows'] as $row) {
+                    if (!isset($selected[$row['id']])) {
+                        continue;
+                    }
+                    unset($selected[$row['id']]);
+                    $reason = match (true) {
+                        $row['already_issued'] => 'ya emitida',
+                        $row['prior_period_invalid'] => 'falta emitir el mes anterior',
+                        $row['coefficient_missing'] => 'sin coeficiente',
+                        $row['invalid_recipient'] => 'revisar residente o correo',
+                        default => null,
+                    };
+                    if ($reason === null) {
+                        $toIssue[] = $row;
+                    } else {
+                        $skipped[] = $row['name'] . ' (' . $reason . ')';
+                    }
+                }
+                if ($selected !== []) {
+                    $skipped[] = count($selected) . ' inmueble(s) sin residentes activos o fuera de la estructura';
+                }
+                if ($toIssue === []) {
+                    throw new RuntimeException('Ninguno de los inmuebles seleccionados está listo para emitir: ' . implode(', ', $skipped) . '.');
+                }
+            }
+            foreach ($toIssue as $row) {
                 $data = $this->statementData($row, $preview);
                 $fields = array_keys($data);
                 $insert = $pdo->prepare(
@@ -518,13 +683,15 @@ final class BillingService
             throw $exception;
         }
 
-        $delivery = $this->sendPeriod($period, $actorId);
+        // Al emitir una selección solo salen los correos de esas notas; los pendientes de otras se reintentan aparte.
+        $delivery = $this->sendPeriod($period, $actorId, $unitIds === null ? null : $statementIds);
 
         return [
             'issued' => count($statementIds),
             'sent' => $delivery['sent'],
             'failed' => $delivery['failed'],
             'pending' => $delivery['pending'],
+            'skipped' => $skipped,
         ];
     }
 
@@ -547,17 +714,25 @@ final class BillingService
         ];
     }
 
-    public function sendPeriod(string $period, ?int $actorId = null): array
+    /**
+     * @param list<int>|null $statementIds solo esas notas (emisión de una selección); null = todo el período
+     */
+    public function sendPeriod(string $period, ?int $actorId = null, ?array $statementIds = null): array
     {
         self::periodDate($period);
         $sender = $this->senderFor($actorId);
         $settings = $sender['settings'];
+        $statementIds = $statementIds === null ? null : array_values(array_map('intval', $statementIds));
+        if ($statementIds === []) {
+            return ['sent' => 0, 'failed' => 0, 'pending' => 0];
+        }
+        $onlySql = $statementIds === null ? '' : ' AND statements.id IN (' . implode(', ', array_fill(0, count($statementIds), '?')) . ')';
         $query = Database::connection()->prepare(
             "SELECT recipients.id AS recipient_id, recipients.recipient_email, recipients.recipient_name,
                     statements.id AS statement_id, statements.period
              FROM billing_statement_recipients AS recipients
              JOIN billing_statements AS statements ON statements.id = recipients.statement_id
-             WHERE statements.tenant_id = ? AND statements.period = ?
+             WHERE statements.tenant_id = ? AND statements.period = ?{$onlySql}
                AND (
                     recipients.delivery_status IN ('pending', 'failed')
                     OR (recipients.delivery_status = 'sending'
@@ -565,7 +740,7 @@ final class BillingService
                )
              ORDER BY statements.id, recipients.id"
         );
-        $query->execute([Tenant::id(), $period]);
+        $query->execute([Tenant::id(), $period, ...($statementIds ?? [])]);
         $recipients = array_slice($query->fetchAll(), 0, 50);
         $sent = 0;
         foreach ($recipients as $recipient) {
@@ -613,11 +788,11 @@ final class BillingService
             "SELECT delivery_status, COUNT(*) AS status_count
              FROM billing_statement_recipients AS recipients
              JOIN billing_statements AS statements ON statements.id = recipients.statement_id
-             WHERE statements.tenant_id = ? AND statements.period = ?
+             WHERE statements.tenant_id = ? AND statements.period = ?{$onlySql}
                AND recipients.delivery_status IN ('pending', 'failed', 'sending')
              GROUP BY delivery_status"
         );
-        $remaining->execute([Tenant::id(), $period]);
+        $remaining->execute([Tenant::id(), $period, ...($statementIds ?? [])]);
         $remainingCounts = ['pending' => 0, 'failed' => 0];
         foreach ($remaining->fetchAll() as $row) {
             $remainingCounts[$row['delivery_status']] = (int) $row['status_count'];
@@ -1463,7 +1638,7 @@ final class BillingService
         $whole = (int) $matches[1];
         $fraction = (int) str_pad($matches[2] ?? '', 4, '0');
         $scaled = $whole * 10000 + $fraction;
-        if ($scaled < 1 || $scaled > 1000000) {
+        if ($scaled < 0 || $scaled > 1000000) { // 0 % es válido: el inmueble no paga cuota
             return null;
         }
         return $whole . '.' . str_pad((string) $fraction, 4, '0', STR_PAD_LEFT);
