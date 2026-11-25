@@ -48,11 +48,41 @@ final class MailSettingsService
         ];
     }
 
+    /** Cuenta del conjunto conectada con Google o Microsoft (tiene prioridad sobre el SMTP), o null. */
+    public function connectedAccount(): ?array
+    {
+        return Tenant::scopeId() === null ? null : (new MailOAuthService())->connection('tenant');
+    }
+
+    /** El conjunto puede enviar correo: cuenta conectada, SMTP propio completo o la cuenta de la plataforma. */
+    public function isReady(): bool
+    {
+        if ($this->connectedAccount() !== null) {
+            return true;
+        }
+        $settings = $this->current();
+
+        return trim($settings['host']) !== ''
+            && (int) $settings['port'] >= 1 && (int) $settings['port'] <= 65535
+            && trim($settings['username']) !== ''
+            && ($settings['password_configured'] || $settings['using_platform'])
+            && in_array($settings['encryption'], ['tls', 'ssl'], true)
+            && filter_var($settings['from_address'], FILTER_VALIDATE_EMAIL) !== false;
+    }
+
     /**
-     * @return array{host: string, port: int, username: string, password: string, encryption: string, from_address: string, from_name: string}
+     * Configuración de envío del conjunto: la cuenta conectada si la hay; si no, el SMTP propio o el de la plataforma.
+     *
+     * @return array<string, mixed>
      */
     public function credentials(): array
     {
+        if (Tenant::scopeId() !== null) {
+            $connected = (new MailOAuthService())->sendingSettings('tenant', null, $this->senderName());
+            if ($connected !== null) {
+                return $connected;
+            }
+        }
         $row = $this->storedRow('host, port, username, password_ciphertext, encryption, from_address, from_name');
 
         if (is_array($row)) {
@@ -127,6 +157,15 @@ final class MailSettingsService
      *
      * @return array<string, mixed>|false
      */
+    /** Nombre del remitente con la cuenta conectada: el configurado en el SMTP o, si no hay, el del conjunto. */
+    private function senderName(): string
+    {
+        $row = $this->storedRow('from_name');
+        $name = is_array($row) ? trim((string) $row['from_name']) : '';
+
+        return $name !== '' ? $name : (new SettingsService())->propertyName();
+    }
+
     private function storedRow(string $columns): array|false
     {
         $tenantId = Tenant::scopeId();

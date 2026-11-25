@@ -22,6 +22,11 @@ $router->post('/configuracion/financiera/guardar', [$configuration, 'saveFinanci
 $router->get('/configuracion/correo', [$configuration, 'mail']);
 $router->post('/configuracion/correo/guardar', [$configuration, 'saveMail']);
 $router->post('/configuracion/correo/probar', [$configuration, 'testMail']);
+$mailOAuth = new \App\Modules\Configuration\MailOAuthController();
+$router->post('/configuracion/correo/conectar', [$mailOAuth, 'connectTenant']);
+$router->post('/configuracion/correo/desconectar', [$mailOAuth, 'disconnectTenant']);
+$router->post('/configuracion/mi-correo/conectar', [$mailOAuth, 'connectPersonal']);
+$router->post('/configuracion/mi-correo/desconectar', [$mailOAuth, 'disconnectPersonal']);
 $router->get('/configuracion/mi-correo', [$configuration, 'myMail']);
 $router->post('/configuracion/mi-correo/guardar', [$configuration, 'saveMyMail']);
 $router->post('/configuracion/mi-correo/probar', [$configuration, 'testMyMail']);

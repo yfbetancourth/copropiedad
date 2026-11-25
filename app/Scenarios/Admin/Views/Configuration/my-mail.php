@@ -7,12 +7,15 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
     ENT_QUOTES | ENT_SUBSTITUTE,
     'UTF-8'
 );
+$connectedAccount = $connectedAccount ?? null;
+$oauthProviders = $oauthProviders ?? [];
 $configured = is_array($personal);
 $active = $configured && $personal['active'];
 $verified = $configured && $personal['verified_at'] !== null;
 $value = static fn (string $key, string $default = ''): string => $configured ? (string) $personal[$key] : $default;
-$state = !$configured ? 'none' : ($active ? 'active' : ($verified ? 'paused' : 'unverified'));
+$state = $connectedAccount !== null ? 'connected' : (!$configured ? 'none' : ($active ? 'active' : ($verified ? 'paused' : 'unverified')));
 $stateInfo = [
+    'connected' => ['success', 'bi-patch-check-fill', 'Cuenta conectada', 'Las notas que tú emitas o reenvíes salen desde tu cuenta conectada.'],
     'none' => ['secondary', 'bi-envelope', 'Sin configurar', 'Tus envíos salen por la cuenta general de la copropiedad.'],
     'unverified' => ['warning', 'bi-hourglass-split', 'Pendiente de prueba', 'Guardaste los datos, pero aún no se usan: envía el correo de prueba para activarla.'],
     'paused' => ['secondary', 'bi-pause-circle', 'En pausa', 'La cuenta está verificada pero desactivada: tus envíos salen por la cuenta general.'],
@@ -37,20 +40,20 @@ $stateInfo = [
                 <i class="bi <?= $stateInfo[1] ?> fs-4"></i>
             </span>
             <div class="flex-grow-1" style="min-width: 14rem">
-                <div class="fw-semibold">Estado: <?= $escape($stateInfo[2]) ?><?= $configured ? ' · ' . $escape($personal['from_address']) : '' ?></div>
+                <div class="fw-semibold">Estado: <?= $escape($stateInfo[2]) ?><?= $connectedAccount !== null ? ' · ' . $escape($connectedAccount['email']) : ($configured ? ' · ' . $escape($personal['from_address']) : '') ?></div>
                 <div class="small text-secondary"><?= $escape($stateInfo[3]) ?>
                     <?php if ($verified): ?> Última verificación: <?= $escape($personal['verified_at']) ?>.<?php endif; ?></div>
             </div>
             <div class="d-flex flex-wrap gap-2">
-                <?php if ($configured): ?>
+                <?php if ($configured || $connectedAccount !== null): ?>
                     <form method="post" action="<?= $escape($basePath) ?>/configuracion/mi-correo/probar">
                         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
-                        <button class="btn btn-<?= $active ? 'outline-primary' : 'primary' ?>" type="submit" data-loading-label="Enviando prueba…">
-                            <i class="bi bi-send-check me-1" aria-hidden="true"></i><?= $active ? 'Volver a probar' : 'Enviar prueba y activar' ?>
+                        <button class="btn btn-<?= $active || $connectedAccount !== null ? 'outline-primary' : 'primary' ?>" type="submit" data-loading-label="Enviando prueba…">
+                            <i class="bi bi-send-check me-1" aria-hidden="true"></i><?= $connectedAccount !== null ? 'Enviar correo de prueba' : ($active ? 'Volver a probar' : 'Enviar prueba y activar') ?>
                         </button>
                     </form>
                 <?php endif; ?>
-                <?php if ($verified): ?>
+                <?php if ($verified && $connectedAccount === null): ?>
                     <form method="post" action="<?= $escape($basePath) ?>/configuracion/mi-correo/estado">
                         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                         <input type="hidden" name="active" value="<?= $active ? '0' : '1' ?>">
@@ -61,10 +64,18 @@ $stateInfo = [
         </div>
     </div>
 
+    <?php
+    $canWrite = true; // Esta página ya exige permiso de escritura.
+    $connectPath = '/configuracion/mi-correo/conectar';
+    $disconnectPath = '/configuracion/mi-correo/desconectar';
+    $accountDescription = 'Las notas de cobro que tú emitas o reenvíes salen desde esta cuenta.';
+    require __DIR__ . '/partials/mail-connect.php';
+    ?>
+
     <div class="row g-3">
         <div class="col-xl-8">
             <form class="card border-0 shadow-sm" method="post" action="<?= $escape($basePath) ?>/configuracion/mi-correo/guardar" autocomplete="off">
-                <div class="card-header bg-transparent"><h2 class="card-title h6 mb-0">Datos SMTP de tu cuenta</h2></div>
+                <div class="card-header bg-transparent"><h2 class="card-title h6 mb-0"><?= $connectedAccount !== null ? 'Servidor SMTP de tu cuenta (no se usa mientras haya una cuenta conectada)' : 'Otra opción: datos SMTP de tu cuenta' ?></h2></div>
                 <div class="card-body">
                     <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                     <div class="row g-3">

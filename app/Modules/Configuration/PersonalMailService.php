@@ -64,9 +64,25 @@ final class PersonalMailService
         ];
     }
 
-    /** Credenciales listas para enviar, solo si la cuenta está activa y verificada. */
+    /** Cuenta personal conectada con Google o Microsoft (tiene prioridad sobre el SMTP personal), o null. */
+    public function connectedAccount(int $userId): ?array
+    {
+        return \App\Core\Tenant::scopeId() === null ? null : (new MailOAuthService())->connection('personal', $userId);
+    }
+
+    /**
+     * Credenciales listas para enviar: la cuenta conectada, o el SMTP personal si está activo y verificado.
+     *
+     * @return array<string, mixed>|null
+     */
     public function activeCredentials(int $userId): ?array
     {
+        if (\App\Core\Tenant::scopeId() !== null) {
+            $connected = (new MailOAuthService())->sendingSettings('personal', $userId, '');
+            if ($connected !== null) {
+                return $connected;
+            }
+        }
         $current = $this->current($userId);
 
         return $current !== null && $current['active'] ? $this->credentials($userId) : null;

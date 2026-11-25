@@ -94,9 +94,9 @@ final class TenantResetService
         ],
         'mail' => [
             'label' => 'Configuración de correo',
-            'detail' => 'Servidor SMTP del conjunto.',
+            'detail' => 'Servidor SMTP y cuenta de Google o Microsoft conectada del conjunto.',
             'requires' => [],
-            'counts' => ['copropiedad_mail_settings' => 'configuraciones'],
+            'counts' => ['copropiedad_mail_settings' => 'configuraciones', 'mail_oauth_connections' => 'cuentas conectadas'],
         ],
         'payment_settings' => [
             'label' => 'Credenciales de pasarelas',
@@ -163,6 +163,8 @@ final class TenantResetService
         // Los inmuebles nuevos reciben referencias nuevas; las anteriores ya no corresponden a ninguno.
         ['composition', 'billing_unit_references', 'DELETE FROM billing_unit_references WHERE tenant_id = ?'],
         ['mail', 'copropiedad_mail_settings', 'DELETE FROM copropiedad_mail_settings WHERE tenant_id = ?'],
+        // La cuenta conectada del conjunto; las personales se borran en cascada con su cuenta de usuario.
+        ['mail', 'mail_oauth_connections', 'DELETE FROM mail_oauth_connections WHERE tenant_id = ? AND owner_scope = 0'],
         ['payment_settings', 'bold_payment_settings', 'DELETE FROM bold_payment_settings WHERE tenant_id = ?'],
         ['payment_settings', 'wompi_payment_settings', 'DELETE FROM wompi_payment_settings WHERE tenant_id = ?'],
         ['gallery', 'public_site_content', 'DELETE FROM public_site_content WHERE tenant_id = ?'],

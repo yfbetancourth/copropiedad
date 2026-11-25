@@ -620,9 +620,13 @@ final class ConfigurationController
             return;
         }
 
+        $service = new MailSettingsService();
         $this->render('mail', 'Configuracion / Correo', [
             'actor' => $actor,
-            'settings' => (new MailSettingsService())->current(),
+            'settings' => $service->current(),
+            'connectedAccount' => $service->connectedAccount(),
+            'oauthProviders' => MailOAuthService::availableProviders(),
+            'oauthResult' => MailOAuthController::resultFlash(),
         ]);
     }
 
@@ -728,10 +732,14 @@ final class ConfigurationController
             return;
         }
         $general = (new MailSettingsService())->current();
+        $personal = new PersonalMailService();
         $this->render('my-mail', 'Mi correo de envío', [
             'actor' => $actor,
-            'personal' => (new PersonalMailService())->current((int) $actor['id']),
-            'generalAddress' => $general['from_address'],
+            'personal' => $personal->current((int) $actor['id']),
+            'generalAddress' => (new MailSettingsService())->credentials()['from_address'] ?? $general['from_address'],
+            'connectedAccount' => $personal->connectedAccount((int) $actor['id']),
+            'oauthProviders' => MailOAuthService::availableProviders(),
+            'oauthResult' => MailOAuthController::resultFlash(),
         ]);
     }
 
@@ -769,9 +777,11 @@ final class ConfigurationController
 
         $service = new PersonalMailService();
         try {
-            $settings = $service->credentials((int) $actor['id']);
+            // La cuenta conectada con Google o Microsoft tiene prioridad; si no hay, se prueba el SMTP personal.
+            $connected = (new MailOAuthService())->sendingSettings('personal', (int) $actor['id'], '');
+            $settings = $connected ?? $service->credentials((int) $actor['id']);
             if ($settings === null) {
-                throw new RuntimeException('Primero guarda los datos de tu cuenta de correo.');
+                throw new RuntimeException('Primero conecta tu cuenta o guarda los datos de tu servidor de correo.');
             }
             $name = htmlspecialchars($actor['username'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             $from = htmlspecialchars($settings['from_address'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
@@ -784,7 +794,9 @@ final class ConfigurationController
                     . '<p>Si tu proveedor certifica los envíos, deberías recibir también su constancia.</p>',
                 'Tu cuenta ' . $settings['from_address'] . ' quedo lista para enviar las notificaciones de cobro que tu emitas.'
             );
-            $service->markVerified((int) $actor['id']);
+            if ($connected === null) {
+                $service->markVerified((int) $actor['id']);
+            }
             Http::flash(self::FLASH, 'success', 'La prueba se envió a ' . $actor['email'] . ' y tu correo personal quedó ACTIVO: las notas que emitas o reenvíes saldrán desde ' . $settings['from_address'] . '.');
         } catch (RuntimeException $exception) {
             Http::flash(self::FLASH, 'error', $exception->getMessage());

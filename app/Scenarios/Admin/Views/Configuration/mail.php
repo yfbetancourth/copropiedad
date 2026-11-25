@@ -8,7 +8,9 @@ $escape = static fn (mixed $value): string => htmlspecialchars(
     'UTF-8'
 );
 $canWrite = \App\Core\Authorization::hasPermission($actor, 'configuracion.correo', 2);
-$mailReady = $settings['host'] !== ''
+$connectedAccount = $connectedAccount ?? null;
+$oauthProviders = $oauthProviders ?? [];
+$mailReady = $connectedAccount !== null || $settings['host'] !== ''
     && filter_var($settings['port'], FILTER_VALIDATE_INT) !== false
     && (int) $settings['port'] >= 1
     && (int) $settings['port'] <= 65535
@@ -28,11 +30,18 @@ $mailReady = $settings['host'] !== ''
         <div class="alert alert-<?= $flash['type'] === 'success' ? 'success' : 'danger' ?>" role="<?= $flash['type'] === 'success' ? 'status' : 'alert' ?>"><?= $escape($flash['message']) ?></div>
     <?php endif; ?>
 
+    <?php
+    $connectPath = '/configuracion/correo/conectar';
+    $disconnectPath = '/configuracion/correo/desconectar';
+    $accountDescription = 'Los avisos, las notas de cobro y la recuperación de acceso del conjunto salen desde esta cuenta.';
+    require __DIR__ . '/partials/mail-connect.php';
+    ?>
+
     <div class="row g-3">
         <div class="col-xl-8">
             <div class="card">
                 <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
-                    <h2 class="card-title mb-0">Proveedor SMTP</h2>
+                    <h2 class="card-title mb-0"><?= $connectedAccount !== null ? 'Servidor SMTP (no se usa mientras haya una cuenta conectada)' : 'Otra opción: servidor SMTP' ?></h2>
                     <span class="badge text-bg-<?= $mailReady ? 'success' : 'warning' ?>" role="status">
                         <?= $mailReady ? 'Configuración lista para probar' : 'Configuración incompleta' ?>
                     </span>
@@ -80,7 +89,7 @@ $mailReady = $settings['host'] !== ''
                             </div>
                         </div>
                         <div class="alert alert-info mt-3 mb-0">
-                            No uses la contraseña de inicio de sesión si tu proveedor ofrece claves de aplicación. Para Gmail, crea una contraseña de aplicación y usa smtp.gmail.com, puerto 587 y STARTTLS.
+                            Para Gmail, Outlook o Microsoft 365 es más fácil y seguro conectar la cuenta arriba. El servidor SMTP es para otros proveedores; no uses la contraseña de inicio de sesión si el proveedor ofrece claves de aplicación.
                         </div>
                     </div>
                     <?php if ($canWrite): ?>

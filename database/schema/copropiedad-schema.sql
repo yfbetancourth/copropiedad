@@ -1,5 +1,5 @@
--- Estructura completa de la base de datos Copropiedad (sin datos), con las migraciones 001 a 041 aplicadas.
--- Generado el 2026-11-25 13:28 desde la base local con mysqldump --no-data.
+-- Estructura completa de la base de datos Copropiedad (sin datos), con las migraciones 001 a 042 aplicadas.
+-- Generado el 2026-11-25 16:48 desde la base local con mysqldump --no-data.
 -- Uso en una base nueva y vacía:
 --   mysql -u root -e "CREATE DATABASE copropiedad CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 --   mysql -u root copropiedad < database/schema/copropiedad-schema.sql
@@ -832,6 +832,55 @@ CREATE TABLE `data_consents` (
   CONSTRAINT `fk_data_consents_policy` FOREIGN KEY (`data_policy_version_id`) REFERENCES `privacy_document_versions` (`id`),
   CONSTRAINT `fk_data_consents_revoked_by` FOREIGN KEY (`revoked_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_data_consents_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `mail_oauth_connections`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `mail_oauth_connections` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint(20) unsigned NOT NULL,
+  `owner_scope` bigint(20) unsigned NOT NULL,
+  `user_id` bigint(20) unsigned DEFAULT NULL,
+  `provider` enum('google','microsoft') NOT NULL,
+  `email` varchar(254) NOT NULL,
+  `display_name` varchar(160) NOT NULL DEFAULT '',
+  `refresh_token_ciphertext` text NOT NULL,
+  `access_token_ciphertext` text DEFAULT NULL,
+  `access_expires_at` datetime DEFAULT NULL,
+  `connected_by` bigint(20) unsigned DEFAULT NULL,
+  `connected_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `last_sent_at` datetime DEFAULT NULL,
+  `last_error` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_mail_oauth_owner` (`tenant_id`,`owner_scope`),
+  KEY `fk_mail_oauth_user` (`user_id`),
+  KEY `fk_mail_oauth_connected_by` (`connected_by`),
+  CONSTRAINT `fk_mail_oauth_connected_by` FOREIGN KEY (`connected_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_mail_oauth_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `fk_mail_oauth_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_mail_oauth_owner` CHECK (`owner_scope` = 0 and `user_id` is null or `owner_scope` > 0 and `user_id` = `owner_scope`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `mail_oauth_states`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `mail_oauth_states` (
+  `state_hash` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `tenant_id` bigint(20) unsigned NOT NULL,
+  `user_id` bigint(20) unsigned NOT NULL,
+  `target` enum('tenant','personal') NOT NULL,
+  `provider` enum('google','microsoft') NOT NULL,
+  `code_verifier_ciphertext` text NOT NULL,
+  `return_url` varchar(500) NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`state_hash`),
+  KEY `idx_mail_oauth_states_expires` (`expires_at`),
+  KEY `fk_mail_oauth_states_tenant` (`tenant_id`),
+  KEY `fk_mail_oauth_states_user` (`user_id`),
+  CONSTRAINT `fk_mail_oauth_states_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_mail_oauth_states_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `privacy_document_versions`;

@@ -48,7 +48,6 @@ final class BillingService
         }
 
         $propertySettings = (new SettingsService())->current();
-        $mailSettings = (new MailSettingsService())->current();
         $units = $this->assignedUnits();
         $existing = $this->statementMap($period);
         $items = $this->itemMap($period);
@@ -67,13 +66,10 @@ final class BillingService
             && trim((string) ($propertySettings['bank_name'] ?? '')) !== ''
             && trim((string) ($propertySettings['account_type'] ?? '')) !== ''
             && trim((string) ($propertySettings['account_number'] ?? '')) !== '';
-        $personalMail = $actorId !== null ? (new \App\Modules\Configuration\PersonalMailService())->current($actorId) : null;
-        $mailSettingsReady = ($personalMail['active'] ?? false) || trim($mailSettings['host']) !== ''
-            && (int) $mailSettings['port'] >= 1 && (int) $mailSettings['port'] <= 65535
-            && trim($mailSettings['username']) !== ''
-            && $mailSettings['password_configured']
-            && in_array($mailSettings['encryption'], ['tls', 'ssl'], true)
-            && filter_var($mailSettings['from_address'], FILTER_VALIDATE_EMAIL) !== false;
+        // Se puede enviar con el correo personal del administrador (SMTP verificado o cuenta conectada) o con la cuenta
+        // del conjunto (cuenta conectada, SMTP propio o el de la plataforma).
+        $mailSettingsReady = ($actorId !== null && (new \App\Modules\Configuration\PersonalMailService())->activeCredentials($actorId) !== null)
+            || (new MailSettingsService())->isReady();
         $feeReady = ($propertySettings['administration_fee'] ?? '') !== ''
             && ($propertySettings['effective_date'] ?? '') !== '';
         $periodStart = $periodDate->format('Y-m-d');

@@ -191,8 +191,21 @@ function writeEnvironment(string $source, string $target, string $slug, ?string 
     $envFile = $target . DIRECTORY_SEPARATOR . '.env';
     if (is_file($envFile)) {
         $content = (string) file_get_contents($envFile);
+        $original = $content;
         if ($url !== null) {
             $content = setEnvValue($content, 'APP_URL', $url);
+        }
+        // Variables nuevas del proyecto original (p. ej. las de Google/Microsoft): se agregan las que falten; las que
+        // la copia ya tiene nunca se tocan.
+        $own = Dotenv::parse($content);
+        $missing = array_diff_key(Dotenv::parse((string) file_get_contents($source . DIRECTORY_SEPARATOR . '.env')), $own, ['APP_DEFAULT_TENANT' => true]);
+        if ($missing !== []) {
+            $content = rtrim($content, "\r\n") . "\n\n# Agregadas desde el proyecto original por bin/deploy-conjunto.php (" . date('Y-m-d') . ")\n";
+            foreach ($missing as $name => $value) {
+                $content .= $name . '=' . (preg_match('/[\s#"\']/', (string) $value) === 1 ? '"' . addcslashes((string) $value, '"\\') . '"' : $value) . "\n";
+            }
+        }
+        if ($content !== $original) {
             file_put_contents($envFile, $content);
         }
 

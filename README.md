@@ -481,3 +481,40 @@ de 2026; la reforma a la Ley 1581 (PL 274/2025C) seguía en trámite.
   registrado del mismo inmueble y valor → se omite; el resto → Consignaciones por identificar. El administrador puede
   cambiar cada acción y confirma.
 - Cargar el mismo extracto dos veces es seguro: cada movimiento confirmado queda con una huella y se omite después.
+
+## Correo con Google y Microsoft (migración 042)
+
+En **Configuración › Correo** (cuenta del conjunto) y en **Mi correo** (cuenta personal) el administrador pulsa
+**Conectar con Google** o **Conectar con Microsoft** e inicia sesión con el correo que ya usa. La plataforma recibe un
+permiso solo para **enviar** (`gmail.send` en Google; `Mail.Send` en Microsoft Graph): no lee el buzón y nunca ve la
+contraseña. Los permisos se guardan cifrados y se revocan con **Desconectar**. Una cuenta conectada tiene prioridad sobre
+el SMTP, que sigue disponible para otros proveedores. Todos los envíos (notas de cobro, avisos, recuperación de acceso,
+comprobantes, pruebas) la usan sin más cambios.
+
+Límites de los proveedores: unos 500 correos/día en Gmail personal, 2.000 en Google Workspace y 300 en Outlook.com.
+
+### Configuración (una sola vez, la hace el dueño de la plataforma)
+
+Dirección de retorno, la misma para todos los conjuntos (en producción, con el dominio de la plataforma y HTTPS):
+`MAIL_OAUTH_REDIRECT_URI=https://plataforma.com/correo-oauth.php` (en local: `http://localhost/Copropiedad/public/correo-oauth.php`).
+
+**Google** (Google Cloud Console):
+1. Crea un proyecto y habilita la **Gmail API**.
+2. *Pantalla de consentimiento de OAuth*: tipo **Externo**, nombre de la aplicación, correo de soporte, dominio y enlaces
+   a la política de privacidad; agrega los permisos `openid`, `email` y `.../auth/gmail.send`.
+3. *Credenciales › Crear ID de cliente de OAuth › Aplicación web*, con la dirección de retorno en «URI de redireccionamiento autorizados».
+4. Copia el ID y el secreto a `GOOGLE_OAUTH_CLIENT_ID` y `GOOGLE_OAUTH_CLIENT_SECRET`.
+5. Mientras la app esté en modo **Prueba**, solo pueden conectarse los «usuarios de prueba» que agregues (hasta 100) y el
+   permiso vence a los 7 días. Para producción, solicita la **verificación** de Google: `gmail.send` es un permiso
+   *sensible* (requiere verificación, no la auditoría de seguridad anual que exigen los permisos restringidos).
+
+**Microsoft** (portal de Microsoft Entra › Registros de aplicaciones):
+1. *Nuevo registro*, tipo de cuenta **«Cuentas en cualquier directorio organizativo y cuentas personales de Microsoft»**;
+   URI de redireccionamiento de tipo **Web** con la dirección de retorno.
+2. *Permisos de API › Microsoft Graph › Delegados*: `openid`, `email`, `offline_access`, `User.Read`, `Mail.Send`.
+3. *Certificados y secretos › Nuevo secreto de cliente* (anota su vencimiento para renovarlo).
+4. Copia el *Id. de aplicación (cliente)* y el secreto a `MICROSOFT_OAUTH_CLIENT_ID` y `MICROSOFT_OAUTH_CLIENT_SECRET`
+   (`MICROSOFT_OAUTH_AUTHORITY=common`). Algunas organizaciones de Microsoft 365 exigen que su administrador apruebe la app.
+
+Después ejecuta `php bin/deploy-conjunto.php --all`: el script agrega a cada copia las variables nuevas que le falten
+(nunca cambia las que ya tiene). Los botones aparecen solo para los proveedores configurados.
