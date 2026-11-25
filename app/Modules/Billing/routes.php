@@ -45,6 +45,12 @@ $router->get('/cartera/documentos/estado-de-cuenta', [$accountDocuments, 'accoun
 $router->get('/cartera/documentos/paz-y-salvo', [$accountDocuments, 'clearance']);
 $router->post('/cartera/documentos/paz-y-salvo/expedir', [$accountDocuments, 'issueClearance']);
 $router->post('/cartera/cobros/comprobante/reenviar', [$accountDocuments, 'resendReceipt']);
+$bankImports = new \App\Modules\Billing\BankImportController();
+$router->get('/cartera/extractos', [$bankImports, 'index']);
+$router->post('/cartera/extractos/cargar', [$bankImports, 'upload']);
+$router->get('/cartera/extractos/revisar', [$bankImports, 'review']);
+$router->post('/cartera/extractos/confirmar', [$bankImports, 'confirm']);
+$router->post('/cartera/extractos/descartar', [$bankImports, 'discard']);
 
 $paymentLinks = new \App\Modules\Billing\PaymentLinkController();
 $router->get('/cartera/cobros/enlaces', [$paymentLinks, 'index']);

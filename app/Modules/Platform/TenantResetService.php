@@ -134,6 +134,7 @@ final class TenantResetService
      * Pasos de borrado en orden seguro para las llaves foráneas: [categoría, tabla que debe existir, SQL].
      */
     private const STEPS = [
+        ['billing', 'billing_bank_imports', 'DELETE FROM billing_bank_imports WHERE tenant_id = ?'],
         ['billing', 'billing_clearances', 'DELETE FROM billing_clearances WHERE tenant_id = ?'],
         ['billing', 'billing_unidentified_deposits', 'DELETE FROM billing_unidentified_deposits WHERE tenant_id = ?'],
         ['billing', 'billing_payment_links', 'DELETE FROM billing_payment_links WHERE tenant_id = ?'],

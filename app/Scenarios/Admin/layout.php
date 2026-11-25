@@ -41,6 +41,7 @@ $menu = [
         ['cartera.cobros', '/cartera/reportes', 'bi-graph-up', 'Reportes de cartera', ['/cartera/reportes*']],
         ['cartera.cobros', '/cartera/buscar', 'bi-search', 'Buscar en cartera', ['/cartera/buscar']],
         ['cartera.cobros', '/cartera/pagos-reportados', 'bi-inbox', 'Pagos reportados', ['/cartera/pagos-reportados*']],
+        ['cartera.cobros', '/cartera/extractos', 'bi-bank', 'Importar extracto bancario', ['/cartera/extractos*']],
         ['cartera.cobros', '/cartera/consignaciones', 'bi-question-diamond', 'Consignaciones por identificar', ['/cartera/consignaciones*']],
         ['cartera.cobros', '/cartera/documentos', 'bi-file-earmark-text', 'Estados de cuenta y paz y salvo', ['/cartera/documentos*']],
     ]],

@@ -466,3 +466,18 @@ de 2026; la reforma a la Ley 1581 (PL 274/2025C) seguía en trámite.
   estado de cuenta o un paz y salvo (que se expide al enviar). Solo se ofrecen los documentos de los inmuebles del
   residente, se exige acceso a Cartera y el enlace llega también en el correo.
 - **Cartera › Cobros › Pagos**: botón «Reenviar» para enviar otra vez el comprobante por correo a las cuentas del inmueble.
+
+## Importar extracto bancario (migración 041)
+
+**Cartera › Importar extracto bancario** carga los movimientos de la cuenta y toma solo los ingresos:
+
+- **Formatos**: movimientos de la banca virtual (pensado para AV Villas, sirve para la mayoría de bancos) en Excel
+  `.xlsx`, CSV o TXT con una fila de títulos (fecha, descripción/concepto, referencia, documento, crédito/débito o un
+  valor con signo; valores colombianos `1.234.567,89` o internacionales). También el archivo de recaudo
+  **Asobancaria 2001** de un convenio de recaudo con referencia. No sirven el PDF ni el `.xls` antiguo (se pide
+  guardarlo como `.xlsx` o CSV).
+- **Propuesta por ingreso** antes de registrar nada: con la referencia de pago de un inmueble → pago de su nota; igual a
+  un único pago reportado → se aprueba el reporte; abonos de Bold/Wompi/PayU y otras dispersiones, o un pago ya
+  registrado del mismo inmueble y valor → se omite; el resto → Consignaciones por identificar. El administrador puede
+  cambiar cada acción y confirma.
+- Cargar el mismo extracto dos veces es seguro: cada movimiento confirmado queda con una huella y se omite después.

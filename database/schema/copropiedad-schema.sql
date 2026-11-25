@@ -1,5 +1,5 @@
--- Estructura completa de la base de datos Copropiedad (sin datos), con las migraciones 001 a 040 aplicadas.
--- Generado el 2026-11-25 13:16 desde la base local con mysqldump --no-data.
+-- Estructura completa de la base de datos Copropiedad (sin datos), con las migraciones 001 a 041 aplicadas.
+-- Generado el 2026-11-25 13:28 desde la base local con mysqldump --no-data.
 -- Uso en una base nueva y vacía:
 --   mysql -u root -e "CREATE DATABASE copropiedad CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 --   mysql -u root copropiedad < database/schema/copropiedad-schema.sql
@@ -138,6 +138,66 @@ CREATE TABLE `admin_users` (
   KEY `idx_admin_users_tenant` (`tenant_id`),
   CONSTRAINT `fk_admin_users_role` FOREIGN KEY (`role_id`) REFERENCES `admin_roles` (`id`),
   CONSTRAINT `fk_admin_users_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `billing_bank_imports`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `billing_bank_imports` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint(20) unsigned NOT NULL,
+  `file_name` varchar(160) NOT NULL,
+  `format` varchar(30) NOT NULL,
+  `status` enum('draft','confirmed') NOT NULL DEFAULT 'draft',
+  `movements_count` int(10) unsigned NOT NULL DEFAULT 0,
+  `total_amount` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `uploaded_by` bigint(20) unsigned DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `confirmed_by` bigint(20) unsigned DEFAULT NULL,
+  `confirmed_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_bank_imports_tenant` (`tenant_id`,`created_at`),
+  KEY `fk_bank_imports_uploaded_by` (`uploaded_by`),
+  KEY `fk_bank_imports_confirmed_by` (`confirmed_by`),
+  CONSTRAINT `fk_bank_imports_confirmed_by` FOREIGN KEY (`confirmed_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_bank_imports_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `fk_bank_imports_uploaded_by` FOREIGN KEY (`uploaded_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `billing_bank_movements`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `billing_bank_movements` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint(20) unsigned NOT NULL,
+  `import_id` bigint(20) unsigned NOT NULL,
+  `line_number` int(10) unsigned NOT NULL,
+  `movement_date` date NOT NULL,
+  `amount` decimal(15,2) NOT NULL,
+  `description` varchar(255) NOT NULL DEFAULT '',
+  `reference` varchar(80) NOT NULL DEFAULT '',
+  `document` varchar(40) NOT NULL DEFAULT '',
+  `fingerprint` char(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `fingerprint_final` char(64) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
+  `proposed_action` enum('apply','report','unidentified','omit') NOT NULL,
+  `proposed_statement_id` bigint(20) unsigned DEFAULT NULL,
+  `proposed_report_id` bigint(20) unsigned DEFAULT NULL,
+  `proposal_note` varchar(255) NOT NULL DEFAULT '',
+  `status` enum('pending','applied','unidentified','omitted','failed') NOT NULL DEFAULT 'pending',
+  `result_note` varchar(255) DEFAULT NULL,
+  `deposit_id` bigint(20) unsigned DEFAULT NULL,
+  `payment_id` bigint(20) unsigned DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_bank_movement_final` (`tenant_id`,`fingerprint_final`),
+  KEY `idx_bank_movements_import` (`import_id`,`line_number`),
+  KEY `idx_bank_movements_fingerprint` (`tenant_id`,`fingerprint`),
+  KEY `fk_bank_movements_deposit` (`deposit_id`),
+  KEY `fk_bank_movements_payment` (`payment_id`),
+  CONSTRAINT `fk_bank_movements_deposit` FOREIGN KEY (`deposit_id`) REFERENCES `billing_unidentified_deposits` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_bank_movements_import` FOREIGN KEY (`import_id`) REFERENCES `billing_bank_imports` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_bank_movements_payment` FOREIGN KEY (`payment_id`) REFERENCES `billing_payments` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_bank_movements_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `chk_bank_movement_amount` CHECK (`amount` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `billing_bold_terminal_payments`;
