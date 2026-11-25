@@ -206,7 +206,7 @@ $maxCollection = max(1, ...array_map(static fn (array $row): int => $row['total'
         </div>
     </div>
 </section>
-<script>
+<script nonce="<?= \App\Core\Csp::nonce() ?>">
 (() => {
     const body = document.querySelector('#portfolio-table tbody');
     const rows = [...body.querySelectorAll('tr[data-search]')];

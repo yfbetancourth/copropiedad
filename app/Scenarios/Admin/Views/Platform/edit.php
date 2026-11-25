@@ -96,7 +96,7 @@ $tenantId = (int) $tenant['id'];
                         <p class="mb-3">El conjunto está suspendido: su sitio y sus cuentas no tienen acceso.</p>
                     <?php endif; ?>
                     <form method="post" action="<?= $escape($basePath) ?>/clientes/estado"
-                          onsubmit="return <?= $isActive ? "confirm('¿Suspender el servicio de este conjunto?')" : 'true' ?>;">
+                          <?= $isActive ? 'data-confirm="¿Suspender el servicio de este conjunto?"' : '' ?>>
                         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                         <input type="hidden" name="tenant_id" value="<?= $tenantId ?>">
                         <input type="hidden" name="status" value="<?= $isActive ? 'suspended' : 'active' ?>">
@@ -162,7 +162,7 @@ $tenantId = (int) $tenant['id'];
                         </div>
                     </div>
                 </form>
-                <script>
+                <script nonce="<?= \App\Core\Csp::nonce() ?>">
                 (() => {
                     const form = document.getElementById('reset-form');
                     const boxes = [...form.querySelectorAll('.reset-category')];

@@ -84,7 +84,7 @@ $canManage = \App\Core\Authorization::hasPermission($actor, 'configuracion.roles
                                             <a class="btn btn-outline-primary btn-sm" href="<?= $escape($basePath) ?>/configuracion/roles?editar=<?= (int) $role['id'] ?>">Editar</a>
                                         <?php endif; ?>
                                         <?php if (!(bool) $role['is_system'] && $canManage && (int) $role['user_count'] === 0): ?>
-                                            <form class="d-inline" method="post" action="<?= $escape($basePath) ?>/configuracion/roles/eliminar" onsubmit="return confirm('Eliminar este rol?')">
+                                            <form class="d-inline" method="post" action="<?= $escape($basePath) ?>/configuracion/roles/eliminar" data-confirm="Eliminar este rol?">
                                                 <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                                 <input type="hidden" name="role_id" value="<?= (int) $role['id'] ?>">
                                                 <button class="btn btn-outline-danger btn-sm" type="submit">Eliminar</button>

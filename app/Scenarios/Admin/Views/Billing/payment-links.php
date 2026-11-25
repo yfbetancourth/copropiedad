@@ -129,7 +129,7 @@ $superseded = $statement['superseded_by'];
                                     <input type="hidden" name="link_id" value="<?= (int) $link['id'] ?>">
                                     <button class="btn btn-outline-secondary btn-sm" type="submit"><i class="bi bi-envelope me-1" aria-hidden="true"></i><?= $link['sent_at'] !== null ? 'Reenviar' : 'Enviar' ?></button>
                                 </form>
-                                <form method="post" action="<?= $escape($basePath) ?>/cartera/cobros/enlaces/revocar" onsubmit="return confirm('¿Revocar este enlace? Dejará de permitir el pago.');">
+                                <form method="post" action="<?= $escape($basePath) ?>/cartera/cobros/enlaces/revocar" data-confirm="¿Revocar este enlace? Dejará de permitir el pago.">
                                     <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                     <input type="hidden" name="statement_id" value="<?= (int) $statement['id'] ?>">
                                     <input type="hidden" name="link_id" value="<?= (int) $link['id'] ?>">

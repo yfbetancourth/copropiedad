@@ -71,7 +71,7 @@ $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOT
                                                 </form>
                                                 <?php if ($canDelete): ?>
                                                     <form method="post" action="<?= $escape($basePath) ?>/comunidad/tipos-residente/eliminar"
-                                                          onsubmit="return confirm('¿Eliminar este tipo de residente?');">
+                                                          data-confirm="¿Eliminar este tipo de residente?">
                                                         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                                         <input type="hidden" name="type_id" value="<?= $id ?>">
                                                         <button class="btn btn-sm btn-outline-danger" type="submit" title="<?= $type['residents'] > 0 ? 'Tiene residentes: desactívalo' : 'Eliminar' ?>"

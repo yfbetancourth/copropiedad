@@ -156,7 +156,7 @@ $currentStep = 1;
     </form>
 </section>
 <?php if ($editable): ?>
-<script>
+<script nonce="<?= \App\Core\Csp::nonce() ?>">
 (() => {
     const form = document.getElementById('characterization-form');
     const group = document.getElementById('tower-nomenclature-group');

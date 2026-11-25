@@ -93,7 +93,7 @@ $operationCounts = array_count_values(array_map(static fn (array $listing): stri
                 </article>
             <?php endforeach; ?>
         </div>
-        <script>
+        <script nonce="<?= \App\Core\Csp::nonce() ?>">
         (() => {
             const group = document.querySelector('.catalog-filters');
             const chips = group ? group.querySelectorAll('[data-filter]') : [];

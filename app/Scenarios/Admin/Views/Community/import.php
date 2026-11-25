@@ -134,7 +134,7 @@ $columns = [
             </div>
             <div id="import-grid-pager" class="px-3 py-2 border-top"></div>
             <form class="card-footer d-flex flex-wrap gap-3 align-items-center" method="post" action="<?= $escape($basePath) ?>/comunidad/residentes/importar/confirmar"
-                  onsubmit="this.querySelector('[type=submit]').disabled = true;">
+                  data-disable-on-submit>
                 <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                 <div class="form-check mb-0">
                     <input class="form-check-input" type="checkbox" id="send-invitations" name="send_invitations" value="1">
@@ -147,7 +147,7 @@ $columns = [
             </form>
         </div>
         <script src="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/js/data-grid.js?v=1"></script>
-        <script>
+        <script nonce="<?= \App\Core\Csp::nonce() ?>">
         (() => {
             const status = document.getElementById('import-status-filter');
             const grid = new DataGrid(document.getElementById('import-table'), {

@@ -159,7 +159,7 @@ $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 
             <button class="button button-dark" type="button" data-cookie-dismiss>Entendido</button>
         </div>
     </div>
-    <script>
+    <script nonce="<?= \App\Core\Csp::nonce() ?>">
         (function () {
             var notice = document.querySelector('[data-cookie-notice]');
             if (!notice) { return; }
@@ -175,5 +175,6 @@ $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 
         })();
     </script>
 <?php endif; ?>
+<script src="<?= $escape(\App\Core\Csp::appScriptUrl()) ?>" defer></script>
 </body>
 </html>

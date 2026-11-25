@@ -185,7 +185,7 @@ $currentStep = 2;
                 </div>
             </div>
         </div>
-        <script>
+        <script nonce="<?= \App\Core\Csp::nonce() ?>">
         (() => {
             const housing = <?= $json($housingType) ?>;
             const answers = <?= $json((object) $answers) ?>;
@@ -372,7 +372,7 @@ $currentStep = 2;
             </div>
         <?php };
         ?>
-        <script>
+        <script nonce="<?= \App\Core\Csp::nonce() ?>">
         // Cálculo del desglose: entradas [{ category, value }] con value en diezmilésimas (1 % = 10000) o null.
         window.CompositionBreakdown = (() => {
             const SCALE = 10000;
@@ -627,7 +627,7 @@ $currentStep = 2;
                 </div>
             </div>
 
-            <script>
+            <script nonce="<?= \App\Core\Csp::nonce() ?>">
             (() => {
                 const SCALE = 10000; // los coeficientes se manejan en diezmilésimas para evitar errores de redondeo
                 const TOLERANCE = 100; // ±0,01 %
@@ -1233,7 +1233,7 @@ $currentStep = 2;
                 </div>
                 <div id="unit-grid-pager" class="px-3 py-2 border-top"></div>
             </div>
-            <script>
+            <script nonce="<?= \App\Core\Csp::nonce() ?>">
             (() => {
                 const filter = document.getElementById('unit-filter');
                 const categoryFilter = document.getElementById('unit-category-filter');

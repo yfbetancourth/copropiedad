@@ -532,3 +532,17 @@ Después ejecuta `php bin/deploy-conjunto.php --all`: el script agrega a cada co
   pantalla), encabezados con `scope="col"` y su contenedor desplazable es una región con nombre y foco por teclado
   (`role="region" tabindex="0" aria-labelledby`), para que quien navega con teclado pueda desplazarla.
 - Se añadió la cabecera `Cross-Origin-Opener-Policy: same-origin`.
+
+## Modernización: CSP estricta para scripts (fase 2)
+
+- La CSP ya no admite `'unsafe-inline'` en `script-src`. La arma `App\Core\Csp::policy()` con un nonce aleatorio
+  por petición y `script-src-attr 'none'` (ningún atributo `on*="…"` se ejecuta).
+- Un `<script>` en línea en una plantilla debe llevar `nonce="<?= \App\Core\Csp::nonce() ?>"`; sin él, el navegador
+  lo bloquea. Lo preferible es un archivo en `public/assets/js/`.
+- Los comportamientos simples se declaran con atributos y los atiende `public/assets/js/app.js`, que cargan todas
+  las plantillas: `data-confirm="¿…?"` (en el formulario o su botón), `data-autosubmit` (enviar al cambiar),
+  `data-print`, `data-disable-on-submit` y `data-back`.
+- Los documentos imprimibles (estado de cuenta, recibo, paz y salvo) se entregan con `Csp::printable($html)`, que
+  añade `app.js` solo a la versión web; el HTML que va por correo no lleva scripts.
+- Los textos que se pintan con JavaScript se insertan con `textContent` / `replaceChildren()` en lugar de
+  `innerHTML`. `style-src` conserva `'unsafe-inline'` por los atributos `style` (no ejecutan código).

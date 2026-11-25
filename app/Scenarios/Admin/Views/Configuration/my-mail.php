@@ -156,7 +156,7 @@ $stateInfo = [
         </div>
     </div>
 </section>
-<script>
+<script nonce="<?= \App\Core\Csp::nonce() ?>">
 document.getElementById('toggle-password')?.addEventListener('click', (event) => {
     const button = event.currentTarget;
     const input = document.getElementById('password');
@@ -173,7 +173,10 @@ document.querySelectorAll('form').forEach((form) => form.addEventListener('submi
     const button = form.querySelector('[data-loading-label]');
     if (button) setTimeout(() => {
         button.disabled = true;
-        button.innerHTML = `<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>${button.dataset.loadingLabel}`;
+        const spinner = document.createElement('span');
+        spinner.className = 'spinner-border spinner-border-sm me-1';
+        spinner.setAttribute('aria-hidden', 'true');
+        button.replaceChildren(spinner, button.dataset.loadingLabel);
     });
 }));
 </script>

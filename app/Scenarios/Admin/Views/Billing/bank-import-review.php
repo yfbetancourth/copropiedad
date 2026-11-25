@@ -109,8 +109,8 @@ $actionBadges = ['apply' => 'text-bg-success', 'report' => 'text-bg-primary', 'u
 
     <?php if ($isDraft && $canWrite): ?>
         <div class="d-flex gap-2 flex-wrap">
-            <button class="btn btn-primary" type="submit" form="import-form" onclick="return confirm('¿Confirmar la importación? Los pagos se registran y se avisa a los residentes.');"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Confirmar importación</button>
-            <form method="post" action="<?= $escape($basePath) ?>/cartera/extractos/descartar" onsubmit="return confirm('¿Descartar esta importación? No se registrará nada.');">
+            <button class="btn btn-primary" type="submit" form="import-form" data-confirm="¿Confirmar la importación? Los pagos se registran y se avisa a los residentes."><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>Confirmar importación</button>
+            <form method="post" action="<?= $escape($basePath) ?>/cartera/extractos/descartar" data-confirm="¿Descartar esta importación? No se registrará nada.">
                 <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                 <input type="hidden" name="import_id" value="<?= (int) $import['id'] ?>">
                 <button class="btn btn-outline-danger" type="submit">Descartar</button>

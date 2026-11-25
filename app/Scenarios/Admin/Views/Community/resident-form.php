@@ -149,7 +149,7 @@ $value = static function (string $field) use ($old, $resident): string {
         </div>
     </form>
 </section>
-<script>
+<script nonce="<?= \App\Core\Csp::nonce() ?>">
 (() => {
     // El inmueble que arrienda se pide solo para tipos que exigen propietario (p. ej. Inquilino).
     const type = document.getElementById('resident-type');

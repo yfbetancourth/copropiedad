@@ -18,7 +18,8 @@ final class WebBootstrap
         header('Referrer-Policy: no-referrer');
         header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
         // Todos los recursos se sirven desde el propio sitio (public/assets/vendor): la CSP no admite terceros.
-        header("Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://checkout.bold.co https://checkout.wompi.co; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'");
+        // Sin 'unsafe-inline' en scripts: los <script> en línea llevan nonce y no se admiten atributos on*.
+        header('Content-Security-Policy: ' . Csp::policy());
         // Aísla la ventana de las que abra (WhatsApp, Google Maps, pasarelas): ninguna puede manipularla.
         header('Cross-Origin-Opener-Policy: same-origin');
         if (Session::isHttps()) {
@@ -69,6 +70,7 @@ final class WebBootstrap
             . '<body style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#f6f4ee;color:#1f2721;margin:0;padding:48px 16px">'
             . '<main style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:28px">'
             . '<h1 style="font-size:20px;margin:0 0 12px">' . $title . '</h1><p style="margin:0 0 20px;line-height:1.5">' . $message . '</p>'
-            . '<a href="javascript:history.back()" style="color:#2f4637;font-weight:600">← Volver</a></main></body></html>';
+            . '<a href="' . htmlspecialchars(Url::publicBasePath() . '/', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" data-back style="color:#2f4637;font-weight:600">← Volver</a></main>'
+            . '<script src="' . htmlspecialchars(Csp::appScriptUrl(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" defer></script></body></html>';
     }
 }

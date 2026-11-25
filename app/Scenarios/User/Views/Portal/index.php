@@ -285,7 +285,7 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                                     </button>
                                 </form>
                                 <?php endif; ?>
-                                <form method="post" action="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/clasificados/eliminar" onsubmit="return confirm('¿Eliminar este clasificado y sus imágenes?');">
+                                <form method="post" action="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/clasificados/eliminar" data-confirm="¿Eliminar este clasificado y sus imágenes?">
                                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
                                     <input type="hidden" name="listing_id" value="<?= (int) $classified['id'] ?>">
                                     <button class="btn btn-outline-danger btn-sm" type="submit">Eliminar</button>

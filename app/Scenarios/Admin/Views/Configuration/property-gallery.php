@@ -50,7 +50,7 @@ $publicBasePath = preg_replace('~/admin$~', '', $basePath) ?? $basePath;
                         <div class="card-body d-flex align-items-center justify-content-between gap-2">
                             <span class="small text-secondary">Foto <?= $index + 1 ?></span>
                             <?php if ($canWrite): ?>
-                                <form method="post" action="<?= $escape($basePath) ?>/configuracion/galeria-publica/eliminar" onsubmit="return confirm('¿Retirar esta foto de la portada?')">
+                                <form method="post" action="<?= $escape($basePath) ?>/configuracion/galeria-publica/eliminar" data-confirm="¿Retirar esta foto de la portada?">
                                     <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                     <input type="hidden" name="image" value="<?= $escape($image['name']) ?>">
                                     <button class="btn btn-sm btn-outline-danger" type="submit">Retirar</button>

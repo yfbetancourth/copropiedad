@@ -341,7 +341,7 @@ final class BillingController
             return;
         }
         header('Content-Type: text/html; charset=UTF-8');
-        echo (new BillingService())->statementHtml($statement);
+        echo \App\Core\Csp::printable((new BillingService())->statementHtml($statement));
     }
 
     /**
@@ -378,7 +378,7 @@ final class BillingController
             . '<br><strong>Para:</strong> ' . $to . '<br><strong>Asunto:</strong> ' . $escape($draft['subject']) . '</div>';
         $html = (new BillingService())->statementHtml($draft['statement']);
         // El botón de imprimir no aplica al borrador.
-        $html = preg_replace('#<button type="button" onclick="window\.print\(\)".*?</button>#s', '', $html) ?? $html;
+        $html = preg_replace('#<button type="button" data-print.*?</button>#s', '', $html) ?? $html;
         echo preg_replace('#(<body[^>]*>)#', '$1' . str_replace(['\\', '$'], ['\\\\', '\\$'], $banner), $html, 1);
     }
 

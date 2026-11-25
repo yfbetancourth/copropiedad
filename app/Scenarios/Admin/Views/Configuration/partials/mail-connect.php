@@ -36,7 +36,7 @@ $providerIcons = ['google' => 'bi-google', 'microsoft' => 'bi-microsoft'];
                     <div class="small"><?= $escape($accountDescription) ?></div>
                 </div>
                 <?php if ($canWrite): ?>
-                    <form method="post" action="<?= $escape($basePath . $disconnectPath) ?>" onsubmit="return confirm('¿Desconectar esta cuenta? Se revoca el permiso de envío.');">
+                    <form method="post" action="<?= $escape($basePath . $disconnectPath) ?>" data-confirm="¿Desconectar esta cuenta? Se revoca el permiso de envío.">
                         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                         <button class="btn btn-outline-danger btn-sm" type="submit">Desconectar</button>
                     </form>

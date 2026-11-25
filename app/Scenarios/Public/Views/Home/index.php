@@ -218,7 +218,7 @@ $contactError = static fn (string $key): string => isset($contactErrors[$key])
         </form>
     </div>
 </section>
-<script>
+<script nonce="<?= \App\Core\Csp::nonce() ?>">
     // Lleva el foco al resultado del envío para que lectores de pantalla lo anuncien.
     document.querySelector('[data-focus-on-load]')?.focus();
 </script>

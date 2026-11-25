@@ -137,7 +137,7 @@ $hasSelection = $canWrite || $canDelete;
                                     <?php endif; ?>
                                     <?php if ($canDelete): ?>
                                         <form method="post" action="<?= $escape($basePath) ?>/comunidad/residentes/eliminar"
-                                              onsubmit="return confirm('¿Eliminar definitivamente a este residente? Se borran su cuenta, sus vínculos con inmuebles, reservas y clasificados. Si tiene cobros o pagos registrados no se podrá: desactívalo.');">
+                                              data-confirm="¿Eliminar definitivamente a este residente? Se borran su cuenta, sus vínculos con inmuebles, reservas y clasificados. Si tiene cobros o pagos registrados no se podrá: desactívalo.">
                                             <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                             <input type="hidden" name="user_id" value="<?= $id ?>">
                                             <button class="btn btn-sm btn-outline-danger" type="submit" title="Eliminar"><i class="bi bi-trash" aria-hidden="true"></i><span class="visually-hidden">Eliminar</span></button>
@@ -182,7 +182,7 @@ $hasSelection = $canWrite || $canDelete;
 </section>
 <?php if ($residents !== []): ?>
 <script src="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/js/data-grid.js?v=1"></script>
-<script>
+<script nonce="<?= \App\Core\Csp::nonce() ?>">
 (() => {
     const table = document.getElementById('resident-table');
     const search = document.getElementById('resident-search');

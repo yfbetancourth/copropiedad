@@ -69,7 +69,7 @@ $emptyMessages = ['new' => 'No hay mensajes nuevos.', 'read' => 'No hay mensajes
                                     <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-check2 me-1" aria-hidden="true"></i>Marcar como leído</button>
                                 </form>
                             <?php endif; ?>
-                            <form method="post" action="<?= $escape($basePath) ?>/comunicacion/contacto/eliminar" onsubmit="return confirm('¿Eliminar este mensaje? La autorización se conserva en el registro.');">
+                            <form method="post" action="<?= $escape($basePath) ?>/comunicacion/contacto/eliminar" data-confirm="¿Eliminar este mensaje? La autorización se conserva en el registro.">
                                 <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                 <input type="hidden" name="message_id" value="<?= $messageId ?>">
                                 <input type="hidden" name="estado" value="<?= $escape($filter) ?>">

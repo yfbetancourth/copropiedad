@@ -55,7 +55,7 @@ $formId = (int) $form['id'];
                                                 <button class="btn btn-sm btn-outline-<?= $active ? 'secondary' : 'success' ?>" type="submit"><?= $active ? 'Desactivar' : 'Activar' ?></button>
                                             </form>
                                             <?php if ((int) $area['booking_count'] === 0): ?>
-                                                <form method="post" action="<?= $escape($basePath) ?>/zonas-comunes/espacios/eliminar" onsubmit="return confirm('¿Eliminar este espacio?');">
+                                                <form method="post" action="<?= $escape($basePath) ?>/zonas-comunes/espacios/eliminar" data-confirm="¿Eliminar este espacio?">
                                                     <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                                     <input type="hidden" name="area_id" value="<?= $id ?>">
                                                     <button class="btn btn-sm btn-outline-danger" type="submit">Eliminar</button>

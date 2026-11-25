@@ -112,7 +112,7 @@ final class PaymentReportController
         }
         header('Content-Type: text/html; charset=UTF-8');
         header('Cache-Control: no-store, private');
-        echo $service->receiptHtml($receipt);
+        echo \App\Core\Csp::printable($service->receiptHtml($receipt));
     }
 
     /** @param array{path: string, mime_type: string, byte_size: int, download_name: string}|null $proof */

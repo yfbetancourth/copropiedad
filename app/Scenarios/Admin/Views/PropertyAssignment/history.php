@@ -132,7 +132,7 @@ $relationBadge = static fn (string $relation): string => match ($relation) {
     <?php endif; ?>
 </section>
 
-<script>
+<script nonce="<?= \App\Core\Csp::nonce() ?>">
 (() => {
     const filter = document.getElementById('unit-filter');
     if (!filter) return;

@@ -125,7 +125,7 @@ $mailReady = $connectedAccount !== null || $settings['host'] !== ''
     </div>
 </section>
 <?php if ($canWrite): ?>
-<script>
+<script nonce="<?= \App\Core\Csp::nonce() ?>">
     document.getElementById('toggle-mail-password')?.addEventListener('click', function () {
         const password = document.getElementById('mail-password');
         const isVisible = password.type === 'text';

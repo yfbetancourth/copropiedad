@@ -115,7 +115,7 @@ $date = static fn (?string $value): string => $value ? date('d/m/Y h:i a', strto
                                     </form>
                                 <?php endif; ?>
                                 <?php if ($canReject): ?>
-                                    <form class="col-md-6" method="post" action="<?= $escape($basePath) ?>/clasificados/rechazar"<?= $status === 'published' ? ' onsubmit="return confirm(\'¿Retirar este clasificado de la página pública?\')"' : '' ?>>
+                                    <form class="col-md-6" method="post" action="<?= $escape($basePath) ?>/clasificados/rechazar"<?= $status === 'published' ? ' data-confirm="¿Retirar este clasificado de la página pública?"' : '' ?>>
                                         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                         <input type="hidden" name="listing_id" value="<?= $listingId ?>">
                                         <input type="hidden" name="estado" value="<?= $escape($filter) ?>">

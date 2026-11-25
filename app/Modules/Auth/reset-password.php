@@ -41,7 +41,7 @@ $linkValid = $token !== '';
         </div>
         <button class="btn btn-primary w-100" type="submit" data-loading-label="Guardando…">Guardar contraseña</button>
     </form>
-    <script>
+    <script nonce="<?= \App\Core\Csp::nonce() ?>">
     (() => {
         const password = document.getElementById('password');
         const confirmation = document.getElementById('password_confirmation');

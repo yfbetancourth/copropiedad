@@ -134,7 +134,7 @@ $coefficientSum = (float) ($coefficientSum ?? 0);
         </div>
     </form>
 </section>
-<script>
+<script nonce="<?= \App\Core\Csp::nonce() ?>">
 (() => {
     // Texto de ayuda según la opción: cuánto se recauda al mes con la conformación actual.
     const input = document.getElementById('administration_fee');

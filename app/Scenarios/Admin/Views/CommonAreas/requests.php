@@ -91,7 +91,7 @@ $areaQuery = $areaId > 0 ? '&zona=' . $areaId : '';
             <form method="get" action="<?= $escape($basePath) ?>/zonas-comunes#agenda" class="d-flex gap-2">
                 <input type="hidden" name="desde" value="<?= $escape($from->format('Y-m-d')) ?>">
                 <label class="visually-hidden" for="agenda-area">Espacio</label>
-                <select class="form-select form-select-sm" id="agenda-area" name="zona" onchange="this.form.submit()">
+                <select class="form-select form-select-sm" id="agenda-area" name="zona" data-autosubmit>
                     <option value="0">Todos los espacios</option>
                     <?php foreach ($areas as $area): ?>
                         <option value="<?= (int) $area['id'] ?>"<?= (int) $area['id'] === $areaId ? ' selected' : '' ?>><?= $escape((string) $area['name']) ?></option>

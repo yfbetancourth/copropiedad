@@ -118,7 +118,7 @@ $brandIcon = '<svg viewBox="0 0 36 36" aria-hidden="true" focusable="false"><pat
         </footer>
     </main>
 </div>
-<script>
+<script nonce="<?= \App\Core\Csp::nonce() ?>">
 // Mostrar/ocultar contraseña, aviso de Bloq Mayús y evitar doble envío; compartido por las pantallas de acceso.
 document.querySelectorAll('[data-toggle-password]').forEach((button) => {
     const input = document.getElementById(button.dataset.togglePassword);
@@ -145,9 +145,13 @@ document.querySelectorAll('form[data-auth-form]').forEach((form) => {
         form.dataset.sending = '1';
         const button = form.querySelector('[type="submit"]');
         button.disabled = true;
-        button.innerHTML = `<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>${button.dataset.loadingLabel || 'Enviando…'}`;
+        const spinner = document.createElement('span');
+        spinner.className = 'spinner-border spinner-border-sm me-2';
+        spinner.setAttribute('aria-hidden', 'true');
+        button.replaceChildren(spinner, button.dataset.loadingLabel || 'Enviando…');
     });
 });
 </script>
+<script src="<?= $escape(\App\Core\Csp::appScriptUrl()) ?>" defer></script>
 </body>
 </html>

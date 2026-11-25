@@ -393,7 +393,7 @@ final class AccountDocumentService
             . '<h2 style="font-size:17px;margin:0 0 12px">' . $e(explode(' · ', $title)[0]) . '</h2>'
             . $body
             . '<p style="margin:20px 0 0;color:#6b7280;font-size:12px">Documento generado por la plataforma de administración el ' . $e(date('d/m/Y h:i a')) . '. No es una factura electrónica.</p>'
-            . '<p class="no-print" style="margin:20px 0 0"><button type="button" onclick="window.print()" style="padding:8px 14px;border-radius:6px;border:1px solid #2563eb;background:#2563eb;color:#fff;cursor:pointer">Imprimir o guardar en PDF</button></p>'
+            . '<p class="no-print" style="margin:20px 0 0"><button type="button" data-print style="padding:8px 14px;border-radius:6px;border:1px solid #2563eb;background:#2563eb;color:#fff;cursor:pointer">Imprimir o guardar en PDF</button></p>'
             . '</div></body></html>';
     }
 

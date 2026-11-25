@@ -1068,7 +1068,7 @@ final class BillingService
             . '</td></tr></table>'
             . '<p style="font-size:8.5px;color:#687386;margin:8px 0 0;border-top:1px solid #e3e7ee;padding-top:3px">Nota de cobro para información y recaudo de la copropiedad. No reemplaza una factura electrónica.</p>'
             . '</div>'
-            . '<p class="no-print" style="text-align:center;margin:12px 0 0"><button type="button" onclick="window.print()" style="padding:8px 16px">Imprimir o guardar como PDF (media carta)</button></p>'
+            . '<p class="no-print" style="text-align:center;margin:12px 0 0"><button type="button" data-print style="padding:8px 16px">Imprimir o guardar como PDF (media carta)</button></p>'
             . '</body></html>';
     }
 

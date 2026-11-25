@@ -93,7 +93,7 @@ $domainSuffix = $baseDomain !== '' ? '.' . $baseDomain : '';
         </div>
     </form>
 </section>
-<script>
+<script nonce="<?= \App\Core\Csp::nonce() ?>">
     (() => {
         const name = document.getElementById('name');
         const slug = document.getElementById('slug');

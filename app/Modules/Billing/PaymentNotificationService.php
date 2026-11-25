@@ -226,7 +226,7 @@ final class PaymentNotificationService
             . '<h2 style="font-size:16px;margin:0 0 12px">Comprobante de pago</h2>' . $voided
             . '<table style="width:100%;border-collapse:collapse;font-size:14px">' . $rowsHtml . '</table>'
             . '<p style="margin:20px 0 0;color:#6b7280;font-size:12px">Documento informativo generado por la plataforma de administración. No es una factura electrónica.</p>'
-            . '<p class="no-print" style="margin:20px 0 0"><button type="button" onclick="window.print()" style="padding:8px 14px;border-radius:6px;border:1px solid #2563eb;background:#2563eb;color:#fff;cursor:pointer">Imprimir o guardar en PDF</button></p>'
+            . '<p class="no-print" style="margin:20px 0 0"><button type="button" data-print style="padding:8px 14px;border-radius:6px;border:1px solid #2563eb;background:#2563eb;color:#fff;cursor:pointer">Imprimir o guardar en PDF</button></p>'
             . '</div></body></html>';
     }
 

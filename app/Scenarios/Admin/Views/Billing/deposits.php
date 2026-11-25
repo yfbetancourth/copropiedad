@@ -161,7 +161,7 @@ $emptyMessages = [
                                                     <a href="<?= $escape($basePath) ?>/cartera/consignaciones/reclamo/soporte?id=<?= $claimId ?>" target="_blank" rel="noopener"><i class="bi bi-paperclip" aria-hidden="true"></i> Ver soporte del residente</a>
                                                 </div>
                                                 <?php if ($canWrite): ?>
-                                                    <form method="post" action="<?= $escape($basePath) ?>/cartera/consignaciones/reclamo/aprobar" onsubmit="return confirm(<?= $escape(json_encode('¿Aprobar el reclamo y registrar ' . $money((int) $deposit['amount_cents']) . ' como pago de ' . $claim['unit_name'] . '?', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)) ?>);">
+                                                    <form method="post" action="<?= $escape($basePath) ?>/cartera/consignaciones/reclamo/aprobar" data-confirm="<?= $escape('¿Aprobar el reclamo y registrar ' . $money((int) $deposit['amount_cents']) . ' como pago de ' . $claim['unit_name'] . '?') ?>">
                                                         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                                         <input type="hidden" name="claim_id" value="<?= $claimId ?>">
                                                         <button class="btn btn-sm btn-success" type="submit">Aprobar reclamo</button>
@@ -201,7 +201,7 @@ $emptyMessages = [
                                                 <div class="text-secondary"><?= $escape($suggestion['reason']) ?></div>
                                             </div>
                                             <?php if ($canWrite): ?>
-                                                <form method="post" action="<?= $escape($basePath) ?>/cartera/consignaciones/identificar" onsubmit="return confirm(<?= $escape(json_encode('¿Registrar ' . $money((int) $deposit['amount_cents']) . ' como pago de ' . $suggestion['unit_name'] . '?', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)) ?>);">
+                                                <form method="post" action="<?= $escape($basePath) ?>/cartera/consignaciones/identificar" data-confirm="<?= $escape('¿Registrar ' . $money((int) $deposit['amount_cents']) . ' como pago de ' . $suggestion['unit_name'] . '?') ?>">
                                                     <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                                     <input type="hidden" name="deposit_id" value="<?= $depositId ?>">
                                                     <input type="hidden" name="statement_id" value="<?= (int) $suggestion['statement_id'] ?>">
@@ -217,7 +217,7 @@ $emptyMessages = [
                             <?php if ($canWrite): ?>
                                 <div class="row g-2">
                                     <div class="col-lg-7">
-                                        <form method="post" action="<?= $escape($basePath) ?>/cartera/consignaciones/identificar" class="d-flex gap-2" onsubmit="return confirm('¿Registrar esta consignación como pago del inmueble seleccionado?');">
+                                        <form method="post" action="<?= $escape($basePath) ?>/cartera/consignaciones/identificar" class="d-flex gap-2" data-confirm="¿Registrar esta consignación como pago del inmueble seleccionado?">
                                             <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                             <input type="hidden" name="deposit_id" value="<?= $depositId ?>">
                                             <label class="visually-hidden" for="assign-<?= $depositId ?>">Asignar a un inmueble</label>

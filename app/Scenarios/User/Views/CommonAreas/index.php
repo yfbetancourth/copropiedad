@@ -132,7 +132,7 @@ $now = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
                             </td>
                             <td class="text-end">
                                 <?php if ($cancellable): ?>
-                                    <form method="post" action="<?= $escape($basePath) ?>/usuario/zonas-comunes/cancelar" onsubmit="return confirm('¿Cancelar esta reserva?');">
+                                    <form method="post" action="<?= $escape($basePath) ?>/usuario/zonas-comunes/cancelar" data-confirm="¿Cancelar esta reserva?">
                                         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                         <input type="hidden" name="booking_id" value="<?= (int) $booking['id'] ?>">
                                         <button class="btn btn-sm btn-outline-danger" type="submit">Cancelar</button>

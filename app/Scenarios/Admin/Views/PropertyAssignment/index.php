@@ -250,7 +250,7 @@ $groupOf = static function (array $unit): string {
 </section>
 
 <?php if ($hasStructure && $users !== []): ?>
-<script>
+<script nonce="<?= \App\Core\Csp::nonce() ?>">
 (() => {
     const userFilter = document.getElementById('user-filter');
     userFilter?.addEventListener('input', () => {
@@ -298,11 +298,12 @@ $groupOf = static function (array $unit): string {
             })));
         checkboxes.forEach((c) => { relationOf(c).hidden = !c.checked; });
         const { added, removed, changed } = diff();
+        const tag = (className, text) => Object.assign(document.createElement('span'), { className, textContent: text });
         const parts = [];
-        if (added.length) parts.push(`<span class="text-success">+${added.length} por agregar</span>`);
-        if (removed.length) parts.push(`<span class="text-danger">−${removed.length} por quitar</span>`);
-        if (changed.length) parts.push(`<span class="text-warning-emphasis">${changed.length} con vínculo cambiado</span>`);
-        changes.innerHTML = parts.length ? parts.join(' · ') : '<span class="text-secondary">Sin cambios</span>';
+        if (added.length) parts.push(tag('text-success', `+${added.length} por agregar`));
+        if (removed.length) parts.push(tag('text-danger', `−${removed.length} por quitar`));
+        if (changed.length) parts.push(tag('text-warning-emphasis', `${changed.length} con vínculo cambiado`));
+        changes.replaceChildren(...(parts.length ? parts.flatMap((part, i) => (i ? [' · ', part] : [part])) : [tag('text-secondary', 'Sin cambios')]));
         submit.disabled = parts.length === 0;
         reset.hidden = parts.length === 0;
     };

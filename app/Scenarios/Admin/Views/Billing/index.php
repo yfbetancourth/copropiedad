@@ -127,7 +127,7 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
             <a class="btn btn-outline-secondary" href="<?= $escape($basePath) ?>/cartera/cobros?periodo=<?= $escape($previousPeriod) ?>" title="Mes anterior" aria-label="Mes anterior"><i class="bi bi-chevron-left" aria-hidden="true"></i></a>
             <label class="visually-hidden" for="billing-period">Período</label>
             <input id="billing-period" name="periodo" type="month" class="form-control fw-semibold text-center" style="width: 11rem" required
-                   value="<?= $escape($period) ?>" max="<?= $escape($currentPeriod) ?>" onchange="this.form.submit()">
+                   value="<?= $escape($period) ?>" max="<?= $escape($currentPeriod) ?>" data-autosubmit>
             <?php if ($nextPeriod !== null): ?>
                 <a class="btn btn-outline-secondary" href="<?= $escape($basePath) ?>/cartera/cobros?periodo=<?= $escape($nextPeriod) ?>" title="Mes siguiente" aria-label="Mes siguiente"><i class="bi bi-chevron-right" aria-hidden="true"></i></a>
             <?php else: ?>
@@ -736,7 +736,7 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
 <?php endif; ?>
 
 <script src="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/js/data-grid.js?v=1"></script>
-<script>
+<script nonce="<?= \App\Core\Csp::nonce() ?>">
 // Bootstrap se carga al final del layout: se espera a que el documento esté listo.
 document.addEventListener('DOMContentLoaded', () => {
     const page = document.getElementById('billing-page');
@@ -815,8 +815,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 + (skipped > 0 ? `; se omiten ${skipped} que no están «Listos».` : '.')
                 + ' Los demás quedan pendientes para emitirlos después.';
         }
-        document.getElementById('issue-submit').innerHTML = '<i class="bi bi-send me-1" aria-hidden="true"></i>'
-            + (ready ? `Emitir y enviar ${ready.length} seleccionada(s)` : 'Emitir y enviar');
+        const issueIcon = document.createElement('i');
+        issueIcon.className = 'bi bi-send me-1';
+        issueIcon.setAttribute('aria-hidden', 'true');
+        document.getElementById('issue-submit').replaceChildren(issueIcon, ready ? `Emitir y enviar ${ready.length} seleccionada(s)` : 'Emitir y enviar');
         // La vista previa muestra solo los inmuebles que se van a emitir.
         const draftUnit = document.getElementById('draft-unit');
         if (draftUnit) {
@@ -986,7 +988,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const refresh = () => {
             const owed = balance();
             const hasStatement = paymentSelect.value !== '';
-            balanceText.innerHTML = !hasStatement ? '' : owed > 0 ? `Saldo pendiente: <strong>${money(owed)}</strong>` : '<span class="text-success">Esta nota no tiene saldo pendiente.</span>';
+            if (!hasStatement) {
+                balanceText.replaceChildren();
+            } else if (owed > 0) {
+                const amount = document.createElement('strong');
+                amount.textContent = money(owed);
+                balanceText.replaceChildren('Saldo pendiente: ', amount);
+            } else {
+                const settled = document.createElement('span');
+                settled.className = 'text-success';
+                settled.textContent = 'Esta nota no tiene saldo pendiente.';
+                balanceText.replaceChildren(settled);
+            }
             payFull.hidden = !hasStatement || owed <= 0;
             const cents = parseMoney(display.value);
             amountHelp.className = 'form-text';
@@ -1048,7 +1061,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = document.getElementById('issue-checklist-status');
         if (status) {
             status.className = `small mb-3 ${pending.length === 0 ? 'text-success' : 'text-warning-emphasis'}`;
-            status.innerHTML = '';
+            status.replaceChildren();
             const icon = document.createElement('i');
             icon.className = `bi ${pending.length === 0 ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'} me-1`;
             icon.setAttribute('aria-hidden', 'true');
@@ -1111,7 +1124,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (button) {
             setTimeout(() => {
                 button.disabled = true;
-                button.innerHTML = `<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>${button.dataset.loadingLabel}`;
+                const spinner = document.createElement('span');
+                spinner.className = 'spinner-border spinner-border-sm me-1';
+                spinner.setAttribute('aria-hidden', 'true');
+                button.replaceChildren(spinner, button.dataset.loadingLabel);
             });
         }
     }));

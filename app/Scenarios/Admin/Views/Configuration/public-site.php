@@ -62,11 +62,11 @@ $hiddenByGallery = $galleryCount > 0 ? 'values' : 'spaces';
             <div class="d-flex gap-2 flex-wrap">
                 <a class="btn btn-outline-primary" href="<?= $escape($basePath) ?>/configuracion/sitio-publico/vista-previa" target="_blank" rel="noopener"><i class="bi bi-eye me-1" aria-hidden="true"></i>Vista previa</a>
                 <?php if ($canWrite && $hasDraft): ?>
-                    <form method="post" action="<?= $escape($basePath) ?>/configuracion/sitio-publico/descartar" onsubmit="return confirm('¿Descartar el borrador? Se pierden los cambios sin publicar.')">
+                    <form method="post" action="<?= $escape($basePath) ?>/configuracion/sitio-publico/descartar" data-confirm="¿Descartar el borrador? Se pierden los cambios sin publicar.">
                         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                         <button class="btn btn-outline-danger" type="submit">Descartar borrador</button>
                     </form>
-                    <form method="post" action="<?= $escape($basePath) ?>/configuracion/sitio-publico/publicar" onsubmit="return confirm('¿Publicar el borrador? El público verá los cambios de inmediato.')">
+                    <form method="post" action="<?= $escape($basePath) ?>/configuracion/sitio-publico/publicar" data-confirm="¿Publicar el borrador? El público verá los cambios de inmediato.">
                         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                         <button class="btn btn-success" type="submit"><i class="bi bi-send-check me-1" aria-hidden="true"></i>Publicar</button>
                     </form>

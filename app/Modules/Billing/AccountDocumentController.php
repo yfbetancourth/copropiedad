@@ -155,6 +155,6 @@ final class AccountDocumentController
         }
         header('Content-Type: text/html; charset=UTF-8');
         header('Cache-Control: no-store, private');
-        echo $html;
+        echo \App\Core\Csp::printable($html);
     }
 }

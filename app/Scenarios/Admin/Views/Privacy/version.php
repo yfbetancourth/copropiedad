@@ -22,7 +22,7 @@ $date = static fn (?string $value): string => $value ? date('d/m/Y h:i a', strto
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <a class="btn btn-outline-secondary" href="<?= $escape($basePath) ?>/configuracion/privacidad?documento=<?= $escape($version['document']) ?>"><i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Volver</a>
-            <button class="btn btn-outline-secondary" type="button" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>Imprimir</button>
+            <button class="btn btn-outline-secondary" type="button" data-print><i class="bi bi-printer me-1" aria-hidden="true"></i>Imprimir</button>
         </div>
     </div>
     <div class="card">

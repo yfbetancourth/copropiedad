@@ -196,7 +196,7 @@ final class ResidentPaymentController
         }
         header('Content-Type: text/html; charset=UTF-8');
         header('Cache-Control: no-store, private');
-        echo (new BillingService())->statementHtml($statement);
+        echo \App\Core\Csp::printable((new BillingService())->statementHtml($statement));
     }
 
     public function account(): void
@@ -237,7 +237,7 @@ final class ResidentPaymentController
         }
         header('Content-Type: text/html; charset=UTF-8');
         header('Cache-Control: no-store, private');
-        echo $documents->clearanceHtml($clearance);
+        echo \App\Core\Csp::printable($documents->clearanceHtml($clearance));
     }
 
     /** El residente expide su propio paz y salvo cuando el inmueble está al día. */
