@@ -51,7 +51,10 @@ final class ConversationAdminController
             'conversation' => $conversation,
             'canWrite' => Authorization::hasPermission($actor, self::PERMISSION, 2),
             'documentGroups' => $canAttach && $conversation['status'] !== 'closed'
-                ? (new AccountDocumentService())->documentsForResident((int) $conversation['resident_id'])
+                ? (new AccountDocumentService())->documentsForResident(
+                    (int) $conversation['resident_id'],
+                    Authorization::hasPermission($actor, 'cartera.cobros', 2)
+                )
                 : [],
         ]);
     }
@@ -67,6 +70,10 @@ final class ConversationAdminController
             if ($selected !== '') {
                 if (!$this->canAttachDocuments($actor)) {
                     throw new RuntimeException('Necesitas acceso a Cartera para adjuntar documentos de cobro.');
+                }
+                // Adjuntar un paz y salvo lo expide: exige el mismo nivel que expedirlo desde Cartera (escritura).
+                if (str_starts_with($selected, 'clearance:') && !Authorization::hasPermission($actor, 'cartera.cobros', 2)) {
+                    throw new RuntimeException('Expedir un paz y salvo requiere permiso de escritura en Cartera.');
                 }
                 $conversation = $this->service->thread($conversationId);
                 if ($conversation['status'] === 'closed') {

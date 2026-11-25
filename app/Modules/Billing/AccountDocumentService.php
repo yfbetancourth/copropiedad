@@ -214,7 +214,7 @@ final class AccountDocumentService
      *
      * @return list<array{unit_name: string, options: list<array{value: string, label: string, disabled?: bool}>}>
      */
-    public function documentsForResident(int $residentId): array
+    public function documentsForResident(int $residentId, bool $canIssueClearance = true): array
     {
         $groups = [];
         foreach ($this->unitsForUser($residentId) as $unitId => $unitName) {
@@ -224,9 +224,11 @@ final class AccountDocumentService
                 continue;
             }
             $options = [['value' => 'account:' . $unitId, 'label' => 'Estado de cuenta de ' . $unitName]];
-            $options[] = $account['balance'] > 0
-                ? ['value' => '', 'label' => 'Paz y salvo (no disponible: saldo de ' . BillingService::money($account['balance']) . ')', 'disabled' => true]
-                : ['value' => 'clearance:' . $unitId, 'label' => 'Paz y salvo de ' . $unitName . ' (se expide al enviar)'];
+            if ($canIssueClearance) {
+                $options[] = $account['balance'] > 0
+                    ? ['value' => '', 'label' => 'Paz y salvo (no disponible: saldo de ' . BillingService::money($account['balance']) . ')', 'disabled' => true]
+                    : ['value' => 'clearance:' . $unitId, 'label' => 'Paz y salvo de ' . $unitName . ' (se expide al enviar)'];
+            }
             $ids = Database::connection()->prepare(
                 'SELECT id, period FROM billing_statements WHERE tenant_id = ? AND unit_id = ? ORDER BY period DESC LIMIT 6'
             );

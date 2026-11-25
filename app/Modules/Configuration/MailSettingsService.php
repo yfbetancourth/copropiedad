@@ -13,7 +13,9 @@ use RuntimeException;
 final class MailSettingsService
 {
     /**
-     * @return array{host: string, port: string, username: string, encryption: string, from_address: string, from_name: string, password_configured: bool}
+     * @return array{host: string, port: string, username: string, encryption: string, from_address: string, from_name: string, password_configured: bool, using_platform: bool}
+     *         password_configured = el conjunto tiene su propia contraseña guardada; using_platform = aún envía con
+     *         la cuenta de la plataforma (.env), cuya contraseña nunca se le entrega.
      */
     public function current(): array
     {
@@ -28,6 +30,7 @@ final class MailSettingsService
                 'from_address' => (string) $row['from_address'],
                 'from_name' => (string) $row['from_name'],
                 'password_configured' => (string) $row['password_ciphertext'] !== '',
+                'using_platform' => false,
             ];
         }
 
@@ -38,7 +41,10 @@ final class MailSettingsService
             'encryption' => strtolower(Env::get('MAIL_ENCRYPTION')),
             'from_address' => Env::get('MAIL_FROM_ADDRESS'),
             'from_name' => Env::get('MAIL_FROM_NAME'),
-            'password_configured' => Env::get('MAIL_PASSWORD') !== '',
+            // La contraseña de la plataforma (.env) nunca se ofrece como «guardada» al conjunto: al guardar su propia
+            // configuración debe escribir la suya. Si no, quien cambiara el servidor recibiría la de la plataforma.
+            'password_configured' => false,
+            'using_platform' => Env::get('MAIL_PASSWORD') !== '',
         ];
     }
 
@@ -84,12 +90,17 @@ final class MailSettingsService
         string $fromName
     ): void {
         if ($password === '') {
-            $current = $this->current();
-            if (!$current['password_configured']) {
+            // Solo se conserva la contraseña guardada del propio conjunto y para el mismo servidor, puerto y usuario:
+            // si cambiaran, la contraseña viajaría a un servidor que no es el suyo (p. ej. uno de un atacante).
+            $stored = $this->storedRow('host, port, username, password_ciphertext');
+            if (!is_array($stored) || (string) $stored['password_ciphertext'] === '') {
                 throw new RuntimeException('Ingresa la contrasena SMTP del proveedor.');
             }
+            if (strcasecmp((string) $stored['host'], $host) !== 0 || (int) $stored['port'] !== $port || (string) $stored['username'] !== $username) {
+                throw new RuntimeException('Cambiaste el servidor, el puerto o el usuario: escribe de nuevo la contrasena SMTP.');
+            }
 
-            $password = $this->credentials()['password'];
+            $password = $this->decrypt((string) $stored['password_ciphertext']);
         }
         if ($password === '') {
             throw new RuntimeException('Ingresa la contrasena SMTP del proveedor.');

@@ -13,7 +13,7 @@ $mailReady = $settings['host'] !== ''
     && (int) $settings['port'] >= 1
     && (int) $settings['port'] <= 65535
     && $settings['username'] !== ''
-    && $settings['password_configured']
+    && ($settings['password_configured'] || ($settings['using_platform'] ?? false))
     && in_array($settings['encryption'], ['tls', 'ssl'], true)
     && filter_var($settings['from_address'], FILTER_VALIDATE_EMAIL) !== false;
 
