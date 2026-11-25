@@ -28,6 +28,24 @@ $threadResident = (string) ($conversation['full_name'] ?: $conversation['usernam
                     <span class="fw-normal text-secondary ms-1"><?= $escape(date('d/m/Y H:i', strtotime((string) $threadMessage['created_at']) ?: time())) ?></span>
                 </div>
                 <div style="white-space: pre-wrap"><?= $escape((string) $threadMessage['body']) ?></div>
+                <?php if (($threadMessage['attachment_type'] ?? null) !== null): ?>
+                    <?php
+                    // Documento adjunto: el enlace abre el documento con el control de acceso de cada escenario.
+                    $threadLink = \App\Modules\Billing\AccountDocumentService::link(
+                        (string) $threadMessage['attachment_type'],
+                        (string) $threadMessage['attachment_ref'],
+                        $threadViewer === 'resident'
+                    );
+                    ?>
+                    <a class="d-flex align-items-center gap-2 mt-2 p-2 rounded-2 border bg-body text-decoration-none" href="<?= $escape($basePath . $threadLink) ?>" target="_blank" rel="noopener">
+                        <i class="bi bi-file-earmark-text fs-4 text-primary" aria-hidden="true"></i>
+                        <span>
+                            <span class="d-block small text-secondary"><?= $escape(\App\Modules\Billing\AccountDocumentService::TYPE_LABELS[$threadMessage['attachment_type']] ?? 'Documento') ?></span>
+                            <span class="fw-semibold"><?= $escape((string) $threadMessage['attachment_label']) ?></span>
+                        </span>
+                        <i class="bi bi-box-arrow-up-right ms-auto small" aria-hidden="true"></i><span class="visually-hidden"> (se abre en una pestaña nueva)</span>
+                    </a>
+                <?php endif; ?>
             </div>
         </div>
     <?php endforeach; ?>

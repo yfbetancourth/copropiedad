@@ -1,5 +1,5 @@
--- Estructura completa de la base de datos Copropiedad (sin datos), con las migraciones 001 a 039 aplicadas.
--- Generado el 2026-11-25 13:01 desde la base local con mysqldump --no-data.
+-- Estructura completa de la base de datos Copropiedad (sin datos), con las migraciones 001 a 040 aplicadas.
+-- Generado el 2026-11-25 13:16 desde la base local con mysqldump --no-data.
 -- Uso en una base nueva y vacía:
 --   mysql -u root -e "CREATE DATABASE copropiedad CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 --   mysql -u root copropiedad < database/schema/copropiedad-schema.sql
@@ -166,6 +166,32 @@ CREATE TABLE `billing_bold_terminal_payments` (
   CONSTRAINT `fk_bold_terminal_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `fk_bold_terminal_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`),
   CONSTRAINT `chk_bold_terminal_amount` CHECK (`expected_amount` > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `billing_clearances`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `billing_clearances` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint(20) unsigned NOT NULL,
+  `unit_id` char(32) NOT NULL,
+  `unit_name` varchar(160) NOT NULL,
+  `statement_id` bigint(20) unsigned NOT NULL,
+  `code` char(12) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `issued_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `valid_until` date NOT NULL,
+  `issued_by` bigint(20) unsigned DEFAULT NULL,
+  `requested_by` bigint(20) unsigned DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_billing_clearance_code` (`code`),
+  KEY `idx_billing_clearances_unit` (`tenant_id`,`unit_id`,`issued_at`),
+  KEY `fk_billing_clearances_statement` (`statement_id`),
+  KEY `fk_billing_clearances_issued_by` (`issued_by`),
+  KEY `fk_billing_clearances_requested_by` (`requested_by`),
+  CONSTRAINT `fk_billing_clearances_issued_by` FOREIGN KEY (`issued_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_billing_clearances_requested_by` FOREIGN KEY (`requested_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_billing_clearances_statement` FOREIGN KEY (`statement_id`) REFERENCES `billing_statements` (`id`),
+  CONSTRAINT `fk_billing_clearances_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `billing_deposit_claims`;
@@ -918,6 +944,9 @@ CREATE TABLE `resident_conversation_messages` (
   `author_id` bigint(20) unsigned DEFAULT NULL,
   `author_side` enum('resident','staff') NOT NULL,
   `body` text NOT NULL,
+  `attachment_type` enum('receipt','statement','account','clearance') DEFAULT NULL,
+  `attachment_ref` varchar(40) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
+  `attachment_label` varchar(160) DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_resident_conversation_messages_thread` (`conversation_id`,`id`),

@@ -184,8 +184,15 @@ final class ConversationService
      * Agrega un mensaje. El residente solo responde en sus conversaciones abiertas o respondidas (la deja esperando
      * a la administración); la respuesta del equipo la marca como respondida y avisa al residente.
      */
-    public function reply(int $conversationId, int $authorId, bool $fromResident, string $body): void
+    /**
+     * @param array{type: string, ref: string, label: string}|null $attachment documento ya validado por
+     *        AccountDocumentService::resolveAttachment (solo en respuestas del equipo)
+     */
+    public function reply(int $conversationId, int $authorId, bool $fromResident, string $body, ?array $attachment = null): void
     {
+        if ($fromResident) {
+            $attachment = null;
+        }
         $body = $this->validBody($body);
         $conversation = $this->thread($conversationId, $fromResident ? $authorId : null);
         if ($conversation['status'] === 'closed') {
@@ -197,7 +204,7 @@ final class ConversationService
         $pdo = Database::connection();
         $pdo->beginTransaction();
         try {
-            $this->insertMessage($conversationId, $authorId, $fromResident ? 'resident' : 'staff', $body);
+            $this->insertMessage($conversationId, $authorId, $fromResident ? 'resident' : 'staff', $body, $attachment);
             $pdo->prepare(
                 'UPDATE resident_conversations
                  SET status = ?, last_message_at = CURRENT_TIMESTAMP, resident_unread = ?, staff_unread = ?
@@ -214,7 +221,15 @@ final class ConversationService
         if ($fromResident) {
             $this->tellAdministration($conversationId, 'Nuevo mensaje', $body);
         } else {
-            $this->tellResident($conversation, 'La administración respondió: ' . $conversation['subject'], $body);
+            $this->tellResident(
+                $conversation,
+                'La administración respondió: ' . $conversation['subject'],
+                $body . ($attachment === null ? '' : sprintf(
+                    "\n\nDocumento adjunto: %s\nÁbrelo en tu portal: %s",
+                    $attachment['label'],
+                    Tenant::absoluteUrl(\App\Modules\Billing\AccountDocumentService::link($attachment['type'], $attachment['ref'], true))
+                ))
+            );
         }
     }
 
@@ -243,11 +258,23 @@ final class ConversationService
 
     /* ------------------------------------ Apoyo ------------------------------------ */
 
-    private function insertMessage(int $conversationId, int $authorId, string $side, string $body): void
+    private function insertMessage(int $conversationId, int $authorId, string $side, string $body, ?array $attachment = null): void
     {
+        if ($attachment === null) {
+            Database::connection()->prepare(
+                'INSERT INTO resident_conversation_messages (conversation_id, author_id, author_side, body) VALUES (?, ?, ?, ?)'
+            )->execute([$conversationId, $authorId, $side, $body]);
+
+            return;
+        }
         Database::connection()->prepare(
-            'INSERT INTO resident_conversation_messages (conversation_id, author_id, author_side, body) VALUES (?, ?, ?, ?)'
-        )->execute([$conversationId, $authorId, $side, $body]);
+            'INSERT INTO resident_conversation_messages
+                (conversation_id, author_id, author_side, body, attachment_type, attachment_ref, attachment_label)
+             VALUES (?, ?, ?, ?, ?, ?, ?)'
+        )->execute([
+            $conversationId, $authorId, $side, $body,
+            $attachment['type'], $attachment['ref'], mb_substr($attachment['label'], 0, 160, 'UTF-8'),
+        ]);
     }
 
     private function validBody(string $body): string

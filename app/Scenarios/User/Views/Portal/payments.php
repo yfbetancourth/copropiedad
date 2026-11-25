@@ -123,6 +123,7 @@ $methodIcons = [
                                     <?php else: ?><span class="badge text-bg-secondary">Pendiente</span><?php endif; ?>
                                 </td>
                                 <td>
+                                    <a class="btn btn-link btn-sm px-0 d-block text-start" href="<?= $escape($basePath) ?>/usuario/pagos/nota?id=<?= (int) $document['id'] ?>" target="_blank" rel="noopener"><i class="bi bi-file-earmark-text me-1" aria-hidden="true"></i>Ver nota</a>
                                     <?php if ($payable && $onlinePaymentsReady): ?>
                                         <form method="post" action="<?= $escape($basePath) ?>/usuario/pagar" aria-label="Pagar nota <?= $escape((string) $document['number']) ?> en línea">
                                             <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
@@ -343,6 +344,46 @@ $methodIcons = [
                     </table>
                 </div>
             <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if (($accountUnits ?? []) !== []): ?>
+    <div class="card card-primary card-outline mt-4" id="documentos">
+        <div class="card-header">
+            <h2 class="card-title">Documentos</h2>
+        </div>
+        <div class="card-body">
+            <p class="text-secondary">Descarga el estado de cuenta de tu inmueble o expide tu paz y salvo cuando estés al día. El paz y salvo vence el último día del mes y trae un código que el comprador, arrendatario o inmobiliaria puede verificar en <a href="<?= $escape($basePath) ?>/verificar-paz-y-salvo" target="_blank" rel="noopener">la página de verificación</a>.</p>
+            <ul class="list-group">
+                <?php foreach ($accountUnits as $accountUnit): ?>
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <strong><?= $escape($accountUnit['unit_name']) ?></strong>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <a class="btn btn-sm btn-outline-secondary" href="<?= $escape($basePath) ?>/usuario/pagos/estado-de-cuenta?inmueble=<?= $escape($accountUnit['unit_id']) ?>" target="_blank" rel="noopener"><i class="bi bi-list-columns-reverse me-1" aria-hidden="true"></i>Estado de cuenta</a>
+                                <?php if ($accountUnit['clearance']['available']): ?>
+                                    <form method="post" action="<?= $escape($basePath) ?>/usuario/pagos/paz-y-salvo/solicitar">
+                                        <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
+                                        <input type="hidden" name="unit_id" value="<?= $escape($accountUnit['unit_id']) ?>">
+                                        <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-patch-check me-1" aria-hidden="true"></i>Expedir paz y salvo</button>
+                                    </form>
+                                <?php else: ?>
+                                    <span class="small text-secondary align-self-center">Paz y salvo disponible cuando estés al día. <?= $escape($accountUnit['clearance']['reason']) ?></span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <?php if ($accountUnit['clearances'] !== []): ?>
+                            <div class="small text-secondary mt-1">
+                                Expedidos:
+                                <?php foreach ($accountUnit['clearances'] as $index => $issued): ?>
+                                    <?= $index > 0 ? ' · ' : '' ?><a href="<?= $escape($basePath) ?>/usuario/pagos/paz-y-salvo?id=<?= (int) $issued['id'] ?>" target="_blank" rel="noopener"><?= $escape(date('d/m/Y', strtotime((string) $issued['issued_at']) ?: 0)) ?></a><?= $issued['expired'] ? ' (vencido)' : '' ?>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
         </div>
     </div>
     <?php endif; ?>

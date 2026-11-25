@@ -130,6 +130,31 @@ final class PaymentNotificationService
      * Datos del comprobante. Con $userId solo se entrega si la cuenta es destinataria de la nota
      * o tiene asignado hoy el inmueble.
      */
+    /** Reenvía por correo el comprobante a las cuentas del inmueble. Devuelve a cuántas cuentas se envió. */
+    public function resendReceipt(int $paymentId): int
+    {
+        $receipt = $this->receipt($paymentId);
+        if ($receipt['voided']) {
+            throw new RuntimeException('El pago está anulado: su comprobante no tiene validez.');
+        }
+        $sent = 0;
+        foreach ($this->statementAccounts($receipt['statement_id']) as $account) {
+            if (!filter_var((string) $account['email'], FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+            $this->notifier->mail(
+                (string) $account['email'],
+                (string) $account['username'],
+                sprintf('Comprobante de pago %s · %s', $receipt['number'], $receipt['property_name']),
+                $this->receiptText($receipt, 'Reenvío del comprobante'),
+                $this->receiptHtml($receipt)
+            );
+            $sent++;
+        }
+
+        return $sent;
+    }
+
     public function receipt(int $paymentId, ?int $userId = null): array
     {
         $query = Database::connection()->prepare(
@@ -243,7 +268,7 @@ final class PaymentNotificationService
         return $query->fetchAll();
     }
 
-    private function userCanSeeStatement(array $statement, int $userId): bool
+    public function userCanSeeStatement(array $statement, int $userId): bool
     {
         if (BillingService::isRecipient($statement, $userId)) {
             return true;

@@ -51,6 +51,22 @@ $conversationId = (int) $conversation['id'];
                     <input type="hidden" name="conversation_id" value="<?= $conversationId ?>">
                     <label class="form-label" for="staff-reply">Respuesta al residente</label>
                     <textarea class="form-control mb-2" id="staff-reply" name="body" rows="4" minlength="2" maxlength="5000" required></textarea>
+                    <?php if (($documentGroups ?? []) !== []): ?>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1" for="reply-attachment"><i class="bi bi-paperclip me-1" aria-hidden="true"></i>Adjuntar un documento de cartera <span class="text-secondary">(opcional)</span></label>
+                            <select class="form-select form-select-sm" id="reply-attachment" name="attachment" aria-describedby="reply-attachment-help">
+                                <option value="">Sin documento</option>
+                                <?php foreach ($documentGroups as $documentGroup): ?>
+                                    <optgroup label="<?= $escape($documentGroup['unit_name']) ?>">
+                                        <?php foreach ($documentGroup['options'] as $documentOption): ?>
+                                            <option value="<?= $escape($documentOption['value']) ?>"<?= !empty($documentOption['disabled']) ? ' disabled' : '' ?>><?= $escape($documentOption['label']) ?></option>
+                                        <?php endforeach; ?>
+                                    </optgroup>
+                                <?php endforeach; ?>
+                            </select>
+                            <div class="form-text" id="reply-attachment-help">Solo aparecen los inmuebles de este residente. El residente abre el documento desde su portal y el enlace llega también en el correo.</div>
+                        </div>
+                    <?php endif; ?>
                     <div class="d-flex flex-wrap gap-3 align-items-center">
                         <button class="btn btn-primary" type="submit"><i class="bi bi-send me-1" aria-hidden="true"></i>Enviar respuesta</button>
                         <div class="form-check mb-0">

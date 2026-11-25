@@ -57,6 +57,7 @@ final class ResidentPaymentController
             'notifications' => (new PortalNotificationService())->unreadForUser((int) $user['id']),
             'paymentReports' => $this->paymentReportsFor((int) $user['id']),
             'publicDeposits' => (new DepositClaimService())->publicDeposits(),
+            'accountUnits' => $this->accountUnitsFor((int) $user['id']),
             'depositClaims' => (new DepositClaimService())->forUser((int) $user['id']),
             'paymentQr' => $paymentQr,
             'bankDetails' => (new SettingsService())->current(),
@@ -179,6 +180,88 @@ final class ResidentPaymentController
         Http::redirect('/usuario/pagos#consignaciones');
     }
 
+    /** Nota de cobro (documento imprimible), solo de los inmuebles del residente. */
+    public function statement(): void
+    {
+        $user = $this->requireResident();
+        try {
+            $statement = (new BillingService())->statement(Http::id($_GET['id'] ?? null));
+            if (!(new PaymentNotificationService())->userCanSeeStatement($statement, (int) $user['id'])) {
+                throw new RuntimeException('La nota de cobro no existe.');
+            }
+        } catch (RuntimeException) {
+            http_response_code(404);
+            echo 'La nota de cobro no existe.';
+            return;
+        }
+        header('Content-Type: text/html; charset=UTF-8');
+        header('Cache-Control: no-store, private');
+        echo (new BillingService())->statementHtml($statement);
+    }
+
+    public function account(): void
+    {
+        $user = $this->requireResident();
+        $unitId = Http::string($_GET['inmueble'] ?? null);
+        $documents = new AccountDocumentService();
+        if (preg_match('/^[a-f0-9]{32}$/D', $unitId) !== 1 || !$documents->userHasUnit((int) $user['id'], $unitId)) {
+            http_response_code(404);
+            echo 'El estado de cuenta no existe.';
+            return;
+        }
+        try {
+            $html = $documents->accountHtml($documents->account($unitId));
+        } catch (RuntimeException $exception) {
+            http_response_code(404);
+            echo htmlspecialchars($exception->getMessage(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            return;
+        }
+        header('Content-Type: text/html; charset=UTF-8');
+        header('Cache-Control: no-store, private');
+        echo $html;
+    }
+
+    public function clearance(): void
+    {
+        $user = $this->requireResident();
+        $documents = new AccountDocumentService();
+        try {
+            $clearance = $documents->clearance(Http::id($_GET['id'] ?? null));
+            if (!$documents->userHasUnit((int) $user['id'], (string) $clearance['unit_id'])) {
+                throw new RuntimeException('El paz y salvo no existe.');
+            }
+        } catch (RuntimeException) {
+            http_response_code(404);
+            echo 'El paz y salvo no existe.';
+            return;
+        }
+        header('Content-Type: text/html; charset=UTF-8');
+        header('Cache-Control: no-store, private');
+        echo $documents->clearanceHtml($clearance);
+    }
+
+    /** El residente expide su propio paz y salvo cuando el inmueble está al día. */
+    public function requestClearance(): void
+    {
+        $user = $this->requireResident();
+        Http::requireCsrf();
+        $unitId = Http::string($_POST['unit_id'] ?? null);
+        $documents = new AccountDocumentService();
+        try {
+            if (preg_match('/^[a-f0-9]{32}$/D', $unitId) !== 1 || !$documents->userHasUnit((int) $user['id'], $unitId)) {
+                throw new RuntimeException('Selecciona uno de tus inmuebles.');
+            }
+            $clearance = $documents->issueClearance($unitId, null, (int) $user['id']);
+            Http::redirect('/usuario/pagos/paz-y-salvo?id=' . $clearance['id']);
+        } catch (PDOException $exception) {
+            error_log('No se pudo expedir un paz y salvo: ' . $exception->getMessage());
+            Http::flash(self::FLASH, 'error', 'No fue posible expedir el paz y salvo en este momento. Intenta más tarde.');
+        } catch (RuntimeException $exception) {
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
+        }
+        Http::redirect('/usuario/pagos#documentos');
+    }
+
     public function claimProof(): void
     {
         $user = $this->requireResident();
@@ -187,6 +270,34 @@ final class ResidentPaymentController
         );
     }
 
+
+    /**
+     * Inmuebles del residente con lo necesario para la tarjeta Documentos: saldo, si puede expedir paz y salvo y
+     * los últimos que expidió. Vacío si aún no se aplicó la migración 040.
+     *
+     * @return list<array{unit_id: string, unit_name: string, clearance: array{available: bool, reason: string}, clearances: list<array<string, mixed>>}>
+     */
+    private function accountUnitsFor(int $userId): array
+    {
+        $documents = new AccountDocumentService();
+        try {
+            $units = [];
+            foreach ($documents->unitsForUser($userId) as $unitId => $unitName) {
+                $units[] = [
+                    'unit_id' => $unitId,
+                    'unit_name' => $unitName,
+                    'clearance' => $documents->clearanceStatus($unitId),
+                    'clearances' => $documents->clearancesForUnit($unitId),
+                ];
+            }
+
+            return $units;
+        } catch (PDOException $exception) {
+            error_log('No se pudieron consultar los documentos del residente: ' . $exception->getMessage());
+
+            return [];
+        }
+    }
 
     /** Pagos que el residente reportó; null si aún no se aplicó la migración 025. */
     private function paymentReportsFor(int $userId): ?array

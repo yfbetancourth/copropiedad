@@ -6,8 +6,10 @@ namespace App\Modules\Messaging;
 
 use App\Core\Authorization;
 use App\Core\Http;
+use App\Core\ModuleCatalog;
 use App\Core\Session;
 use App\Core\View;
+use App\Modules\Billing\AccountDocumentService;
 use RuntimeException;
 
 /** Panel: el equipo de la administración atiende las conversaciones que abren los residentes. */
@@ -44,9 +46,13 @@ final class ConversationAdminController
             Http::flash(self::FLASH, 'error', $exception->getMessage());
             Http::redirect('/comunicacion/atencion');
         }
+        $canAttach = $this->canAttachDocuments($actor);
         $this->render('conversation', $conversation['subject'], [
             'conversation' => $conversation,
             'canWrite' => Authorization::hasPermission($actor, self::PERMISSION, 2),
+            'documentGroups' => $canAttach && $conversation['status'] !== 'closed'
+                ? (new AccountDocumentService())->documentsForResident((int) $conversation['resident_id'])
+                : [],
         ]);
     }
 
@@ -56,7 +62,19 @@ final class ConversationAdminController
         Http::requireCsrf();
         $conversationId = Http::id($_POST['conversation_id'] ?? null);
         try {
-            $this->service->reply($conversationId, (int) $actor['id'], false, Http::string($_POST['body'] ?? null));
+            $attachment = null;
+            $selected = Http::string($_POST['attachment'] ?? null);
+            if ($selected !== '') {
+                if (!$this->canAttachDocuments($actor)) {
+                    throw new RuntimeException('Necesitas acceso a Cartera para adjuntar documentos de cobro.');
+                }
+                $conversation = $this->service->thread($conversationId);
+                if ($conversation['status'] === 'closed') {
+                    throw new RuntimeException('La conversación está cerrada: reábrela para responder.');
+                }
+                $attachment = (new AccountDocumentService())->resolveAttachment((int) $conversation['resident_id'], $selected, (int) $actor['id']);
+            }
+            $this->service->reply($conversationId, (int) $actor['id'], false, Http::string($_POST['body'] ?? null), $attachment);
             if (($_POST['close'] ?? '') === '1') {
                 $this->service->setClosed($conversationId, true, (int) $actor['id']);
             }
@@ -80,6 +98,12 @@ final class ConversationAdminController
             Http::flash(self::FLASH, 'error', $exception->getMessage());
         }
         Http::redirect('/comunicacion/atencion/ver?id=' . $conversationId);
+    }
+
+    /** Adjuntar documentos de cobro exige que Cartera esté habilitada y acceso de lectura a ella. */
+    private function canAttachDocuments(array $actor): bool
+    {
+        return ModuleCatalog::enabled('cartera') && Authorization::hasPermission($actor, 'cartera.cobros', 1);
     }
 
     private function require(string $level): array

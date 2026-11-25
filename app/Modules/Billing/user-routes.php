@@ -16,3 +16,7 @@ $router->get('/usuario/pagos/soporte', [$residentPayments, 'proof']);
 $router->get('/usuario/pagos/comprobante', [$residentPayments, 'receipt']);
 $router->post('/usuario/pagos/consignacion', [$residentPayments, 'claimDeposit']);
 $router->get('/usuario/pagos/consignacion/soporte', [$residentPayments, 'claimProof']);
+$router->get('/usuario/pagos/nota', [$residentPayments, 'statement']);
+$router->get('/usuario/pagos/estado-de-cuenta', [$residentPayments, 'account']);
+$router->get('/usuario/pagos/paz-y-salvo', [$residentPayments, 'clearance']);
+$router->post('/usuario/pagos/paz-y-salvo/solicitar', [$residentPayments, 'requestClearance']);

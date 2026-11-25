@@ -39,6 +39,12 @@ $router->post('/cartera/consignaciones/publicar', [$deposits, 'setPublished']);
 $router->post('/cartera/consignaciones/reclamo/aprobar', [$deposits, 'approveClaim']);
 $router->post('/cartera/consignaciones/reclamo/rechazar', [$deposits, 'rejectClaim']);
 $router->get('/cartera/consignaciones/reclamo/soporte', [$deposits, 'claimProof']);
+$accountDocuments = new \App\Modules\Billing\AccountDocumentController();
+$router->get('/cartera/documentos', [$accountDocuments, 'index']);
+$router->get('/cartera/documentos/estado-de-cuenta', [$accountDocuments, 'account']);
+$router->get('/cartera/documentos/paz-y-salvo', [$accountDocuments, 'clearance']);
+$router->post('/cartera/documentos/paz-y-salvo/expedir', [$accountDocuments, 'issueClearance']);
+$router->post('/cartera/cobros/comprobante/reenviar', [$accountDocuments, 'resendReceipt']);
 
 $paymentLinks = new \App\Modules\Billing\PaymentLinkController();
 $router->get('/cartera/cobros/enlaces', [$paymentLinks, 'index']);

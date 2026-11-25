@@ -453,3 +453,16 @@ de 2026; la reforma a la Ley 1581 (PL 274/2025C) seguía en trámite.
   la reclama eligiendo su nota y adjuntando el soporte; la administración aprueba (se identifica y se registra el pago)
   o rechaza con motivo desde la misma tarjeta de la consignación. Cada consignación se puede ocultar del portal. Si se
   identifica o descarta por otra vía, los reclamos abiertos se cierran y se avisa a cada residente.
+
+## Documentos de cartera (migración 040)
+
+- **Cartera › Estados de cuenta y paz y salvo**: por inmueble, estado de cuenta imprimible (últimos 12 períodos con
+  pagos y saldo) y paz y salvo, que solo se expide si el inmueble está al día, vence el último día del mes y lleva un
+  código de verificación. Cualquiera lo comprueba en la página pública `/verificar-paz-y-salvo` (no muestra datos
+  personales, solo el inmueble, las fechas y si está vigente).
+- **Portal › Pagos › Documentos**: el residente descarga su estado de cuenta, expide su paz y salvo cuando está al día
+  y ve cada nota de cobro («Ver nota»).
+- **Atención a residentes**: al responder, la administración puede adjuntar un comprobante, una nota de cobro, el
+  estado de cuenta o un paz y salvo (que se expide al enviar). Solo se ofrecen los documentos de los inmuebles del
+  residente, se exige acceso a Cartera y el enlace llega también en el correo.
+- **Cartera › Cobros › Pagos**: botón «Reenviar» para enviar otra vez el comprobante por correo a las cuentas del inmueble.

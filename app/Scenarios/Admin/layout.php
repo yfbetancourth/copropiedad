@@ -42,6 +42,7 @@ $menu = [
         ['cartera.cobros', '/cartera/buscar', 'bi-search', 'Buscar en cartera', ['/cartera/buscar']],
         ['cartera.cobros', '/cartera/pagos-reportados', 'bi-inbox', 'Pagos reportados', ['/cartera/pagos-reportados*']],
         ['cartera.cobros', '/cartera/consignaciones', 'bi-question-diamond', 'Consignaciones por identificar', ['/cartera/consignaciones*']],
+        ['cartera.cobros', '/cartera/documentos', 'bi-file-earmark-text', 'Estados de cuenta y paz y salvo', ['/cartera/documentos*']],
     ]],
     ['Pagos', [
         ['configuracion.pagos', '/configuracion/metodos-pago', 'bi-credit-card', 'Métodos de pago', ['/configuracion/metodos-pago']],

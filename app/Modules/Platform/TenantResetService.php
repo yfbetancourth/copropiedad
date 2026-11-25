@@ -28,7 +28,7 @@ final class TenantResetService
     public const CATEGORIES = [
         'billing' => [
             'label' => 'Cartera y pagos',
-            'detail' => 'Notas de cobro, conceptos mensuales, pagos, pagos reportados con sus soportes, pagos en línea, enlaces de pago y consignaciones por identificar.',
+            'detail' => 'Notas de cobro, conceptos mensuales, pagos, pagos reportados con sus soportes, pagos en línea, enlaces de pago, consignaciones por identificar y paz y salvo expedidos.',
             'requires' => [],
             'counts' => ['billing_statements' => 'notas', 'billing_payments' => 'pagos', 'billing_payment_reports' => 'reportados'],
         ],
@@ -134,6 +134,7 @@ final class TenantResetService
      * Pasos de borrado en orden seguro para las llaves foráneas: [categoría, tabla que debe existir, SQL].
      */
     private const STEPS = [
+        ['billing', 'billing_clearances', 'DELETE FROM billing_clearances WHERE tenant_id = ?'],
         ['billing', 'billing_unidentified_deposits', 'DELETE FROM billing_unidentified_deposits WHERE tenant_id = ?'],
         ['billing', 'billing_payment_links', 'DELETE FROM billing_payment_links WHERE tenant_id = ?'],
         ['billing', 'billing_payment_reports', 'DELETE FROM billing_payment_reports WHERE tenant_id = ?'],

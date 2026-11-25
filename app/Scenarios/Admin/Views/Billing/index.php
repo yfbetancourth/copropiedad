@@ -578,6 +578,12 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                                         <span class="d-block small"><?= $escape($payment['void_reason']) ?> · <?= $escape($payment['voided_by_name'] ?? '') ?></span>
                                     <?php elseif ($canVoid): ?>
                                         <span class="badge text-bg-success">Vigente</span>
+                                        <form method="post" action="<?= $escape($basePath) ?>/cartera/cobros/comprobante/reenviar" class="d-inline">
+                                            <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
+                                            <input type="hidden" name="period" value="<?= $escape($period) ?>">
+                                            <input type="hidden" name="payment_id" value="<?= (int) $payment['id'] ?>">
+                                            <button class="btn btn-link btn-sm p-0 ms-1" type="submit" title="Reenviar el comprobante por correo a las cuentas del inmueble">Reenviar</button>
+                                        </form>
                                         <button class="btn btn-link btn-sm text-danger p-0 ms-1" type="button" data-bs-toggle="collapse" data-bs-target="#void-<?= (int) $payment['id'] ?>">Anular…</button>
                                         <form method="post" action="<?= $escape($basePath) ?>/cartera/cobros/pago/anular" class="collapse mt-1" id="void-<?= (int) $payment['id'] ?>"
                                               data-confirm="¿Anular el pago de <?= $escape($short($amount)) ?> de <?= $escape($payment['unit_name']) ?>? El saldo de la nota aumentará en ese valor.">
@@ -591,6 +597,14 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                                         </form>
                                     <?php else: ?>
                                         <span class="badge text-bg-success">Vigente</span>
+                                        <?php if ($canWrite): ?>
+                                            <form method="post" action="<?= $escape($basePath) ?>/cartera/cobros/comprobante/reenviar" class="d-inline">
+                                                <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
+                                                <input type="hidden" name="period" value="<?= $escape($period) ?>">
+                                                <input type="hidden" name="payment_id" value="<?= (int) $payment['id'] ?>">
+                                                <button class="btn btn-link btn-sm p-0 ms-1" type="submit" title="Reenviar el comprobante por correo a las cuentas del inmueble">Reenviar</button>
+                                            </form>
+                                        <?php endif; ?>
                                     <?php endif; ?>
                                 </td>
                             </tr>
