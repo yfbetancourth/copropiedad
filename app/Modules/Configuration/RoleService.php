@@ -29,6 +29,7 @@ final class RoleService
         'mensajes' => 'Mensajes internos',
         'comunidad.residentes' => 'Comunidad / Residentes',
         'zonas.comunes' => 'Zonas comunes / Espacios y reservas',
+        'clasificados' => 'Clasificados / Revisión y publicación',
     ];
 
     public const LEVELS = [

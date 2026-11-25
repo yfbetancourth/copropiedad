@@ -37,7 +37,7 @@ final class ClassifiedsController
 
         try {
             $this->service->createListing((int) $user['id'], $_POST, $_FILES['images'] ?? []);
-            Http::flash(self::FLASH, 'success', 'Tu clasificado se publicó en la página pública.');
+            Http::flash(self::FLASH, 'success', 'Tu clasificado se envió a revisión. Te avisaremos cuando la administración lo publique.');
         } catch (PDOException $exception) {
             throw $exception;
         } catch (RuntimeException $exception) {
@@ -69,7 +69,7 @@ final class ClassifiedsController
             if (!$this->service->updateListing($listingId, (int) $user['id'], $_POST, $_FILES['images'] ?? [], $removeImages)) {
                 Http::flash(self::FLASH, 'error', 'No se encontró un clasificado tuyo para editar.');
             } else {
-                Http::flash(self::FLASH, 'success', 'Los cambios del clasificado quedaron guardados.');
+                Http::flash(self::FLASH, 'success', 'Los cambios quedaron guardados y el clasificado pasó a revisión: no se verá en la página pública hasta que la administración lo apruebe.');
             }
         } catch (RuntimeException $exception) {
             Http::flash(self::FLASH, 'error', $exception->getMessage());
@@ -85,18 +85,21 @@ final class ClassifiedsController
         Http::requireCsrf();
 
         $listingId = filter_var($_POST['listing_id'] ?? null, FILTER_VALIDATE_INT);
-        $status = is_string($_POST['status'] ?? null) ? $_POST['status'] : '';
-        if (!is_int($listingId) || $listingId < 1 || !in_array($status, ['published', 'closed'], true)) {
+        $action = is_string($_POST['status'] ?? null) ? $_POST['status'] : '';
+        if (!is_int($listingId) || $listingId < 1 || !in_array($action, ['open', 'closed'], true)) {
             Http::flash(self::FLASH, 'error', 'El clasificado seleccionado no es válido.');
             Http::redirect('/usuario#clasificados');
         }
 
-        if (!$this->service->setStatus($listingId, (int) $user['id'], $status)) {
-            Http::flash(self::FLASH, 'error', 'No se encontró un clasificado tuyo para actualizar.');
+        $status = $this->service->setStatus($listingId, (int) $user['id'], $action);
+        if ($status === null) {
+            Http::flash(self::FLASH, 'error', 'No se encontró un clasificado tuyo que admita ese cambio.');
         } else {
-            Http::flash(self::FLASH, 'success', $status === 'published'
-                ? 'El clasificado volvió a publicarse.'
-                : 'El clasificado se cerró y ya no aparece al público.');
+            Http::flash(self::FLASH, 'success', match ($status) {
+                'published' => 'El clasificado volvió a publicarse.',
+                'pending' => 'El clasificado se envió de nuevo a revisión.',
+                default => 'El clasificado se cerró y ya no aparece al público.',
+            });
         }
 
         Http::redirect('/usuario#clasificados');
@@ -136,9 +139,12 @@ final class ClassifiedsController
             $this->notFound();
         }
 
+        // Sin publicar: solo la ve su autor o quien revisa clasificados en el panel.
         if ($image['status'] !== 'published') {
             $user = Authorization::currentUser();
-            if ($user === null || (int) $user['id'] !== (int) $image['user_id']) {
+            if ($user === null || ((int) $user['id'] !== (int) $image['user_id']
+                && !Authorization::hasPermission($user, 'clasificados', 1))
+            ) {
                 $this->notFound();
             }
         }

@@ -39,6 +39,12 @@ if ($classifiedsEnabled) {
     $navLinks[] = ['Clasificados', $isHomePage ? '#clasificados' : $basePath . '/clasificados', !$isHomePage];
 }
 $loginUrl = $basePath . '/login?destino=usuario';
+// Textos editables (Configuración / Sitio público). Las páginas que no los pasan usan los publicados.
+$sitePreview = ($sitePreview ?? false) === true;
+$siteTexts = is_array($siteTexts ?? null) ? $siteTexts : (new \App\Modules\Configuration\PublicSiteService())->published();
+$siteText = static fn (string $key): string => $escape(
+    \App\Modules\Configuration\PublicSiteService::fill((string) ($siteTexts[$key] ?? ''), $propertyName)
+);
 $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 6l13 8.5V29H5Z"/><path d="M12 29V18h12v11M9.5 15h17"/></svg>';
 ?>
 <!doctype html>
@@ -48,7 +54,7 @@ $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= $escape($pageTitle) ?> | <?= $escape($propertyName) ?></title>
     <meta name="description" content="<?= $escape($metaDescription) ?>">
-    <meta name="robots" content="index,follow,max-image-preview:large">
+    <meta name="robots" content="<?= $sitePreview ? 'noindex,nofollow' : 'index,follow,max-image-preview:large' ?>">
     <?php if ($canonicalUrl !== ''): ?><link rel="canonical" href="<?= $escape($canonicalUrl) ?>"><?php endif; ?>
     <meta name="theme-color" content="#f6f4ee">
     <meta property="og:type" content="website">
@@ -71,11 +77,17 @@ $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 
 </head>
 <body class="<?= $isHomePage ? 'home-page' : 'classifieds-page' ?>">
 <a class="skip-link" href="#main-content">Saltar al contenido</a>
+<?php if ($sitePreview): ?>
+    <div role="status" style="position:sticky;top:0;z-index:1000;display:flex;flex-wrap:wrap;gap:.5rem 1rem;align-items:center;justify-content:center;padding:.6rem 1rem;background:#1f2a44;color:#fff;font:600 14px/1.4 Inter,system-ui,sans-serif;text-align:center">
+        <span>Vista previa del borrador · el público aún no ve estos cambios</span>
+        <a href="<?= $escape($basePath) ?>/admin/configuracion/sitio-publico" style="color:#fff;text-decoration:underline">Volver al editor</a>
+    </div>
+<?php endif; ?>
 <header class="site-header">
     <div class="site-header-inner">
         <a class="site-brand" href="<?= $escape($basePath) ?>/" aria-label="Inicio: <?= $escape($propertyName) ?>">
             <span class="brand-mark" aria-hidden="true"><?= $brandIcon ?></span>
-            <span class="brand-text"><?= $escape($propertyName) ?><small>Vivir en comunidad</small></span>
+            <span class="brand-text"><?= $escape($propertyName) ?><small><?= $siteText('brand_tagline') ?></small></span>
         </a>
         <nav class="site-nav" aria-label="Navegación principal">
             <?php foreach ($navLinks as [$label, $href, $current]): ?>
@@ -96,9 +108,9 @@ $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 
         <div class="footer-about">
             <a class="site-brand footer-brand" href="<?= $escape($basePath) ?>/">
                 <span class="brand-mark" aria-hidden="true"><?= $brandIcon ?></span>
-                <span class="brand-text"><?= $escape($propertyName) ?><small>Vivir en comunidad</small></span>
+                <span class="brand-text"><?= $escape($propertyName) ?><small><?= $siteText('brand_tagline') ?></small></span>
             </a>
-            <p>Un buen lugar se construye entre todos.</p>
+            <p><?= $siteText('footer_text') ?></p>
         </div>
         <nav class="footer-links" aria-label="Enlaces del pie de página">
             <h2>Explora</h2>

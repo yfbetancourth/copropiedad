@@ -50,6 +50,7 @@ $menu = [
         ['comunidad.residentes', '/comunidad/tipos-residente', 'bi-tags', 'Tipos de residente', ['/comunidad/tipos-residente']],
         ['zonas.comunes', '/zonas-comunes', 'bi-calendar2-check', 'Reservas de zonas comunes', ['/zonas-comunes']],
         ['zonas.comunes', '/zonas-comunes/espacios', 'bi-building', 'Espacios comunes', ['/zonas-comunes/espacios']],
+        ['clasificados', '/clasificados', 'bi-megaphone', 'Clasificados', ['/clasificados']],
     ]],
     ['Comunicación', [
         ['mensajes', '/comunicacion/atencion', 'bi-chat-dots', 'Atención a residentes', ['/comunicacion/atencion*']],
@@ -69,6 +70,7 @@ $menu = [
         ['configuracion.roles', '/configuracion/roles', 'bi-shield-lock', 'Roles y permisos', ['/configuracion/roles']],
     ]],
     ['Personalización', [
+        ['configuracion.parametrizacion', '/configuracion/sitio-publico', 'bi-window', 'Sitio público', ['/configuracion/sitio-publico*']],
         ['configuracion.parametrizacion', '/configuracion/galeria-publica', 'bi-images', 'Galería pública', ['/configuracion/galeria-publica']],
     ]],
 ];
@@ -100,6 +102,9 @@ if (!$isPlatform && $can('mensajes')) {
 }
 if (!$isPlatform && $can('zonas.comunes')) {
     $menuBadges['/zonas-comunes'] = (new \App\Modules\CommonAreas\CommonAreaService())->pendingCount();
+}
+if (!$isPlatform && $can('clasificados')) {
+    $menuBadges['/clasificados'] = (new \App\Modules\Classifieds\ClassifiedsService())->pendingCount();
 }
 $sidebarSections = [];
 foreach ($menu as [$menuTitle, $menuEntries]) {

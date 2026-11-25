@@ -7,14 +7,32 @@ namespace App\Modules\Classifieds;
 use App\Core\Database;
 use App\Core\Storage;
 use App\Core\Tenant;
+use App\Modules\Auth\UserNotifier;
+use PDOException;
 use RuntimeException;
 use Throwable;
 
+/**
+ * Clasificados de inmuebles de los residentes, con moderación (migración 036): todo clasificado nuevo o editado
+ * queda «pending» y solo se ve en el sitio público cuando la administración lo aprueba («published»). Si no lo
+ * publica queda «rejected» con un motivo que el residente ve en su portal.
+ */
 final class ClassifiedsService
 {
     private const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
     private const MAX_IMAGES = 5;
     private const MAX_IMAGE_PIXELS = 25_000_000;
+
+    public const STATUS_LABELS = [
+        'pending' => 'En revisión',
+        'published' => 'Publicado',
+        'rejected' => 'No publicado',
+        'closed' => 'Cerrado',
+    ];
+
+    public function __construct(private readonly UserNotifier $notifier = new UserNotifier())
+    {
+    }
 
     public function publicListings(int $limit = 50): array
     {
@@ -39,7 +57,7 @@ final class ClassifiedsService
                     (tenant_id, user_id, operation, title, property_type, location, description, price, status,
                      contact_name, contact_email, contact_phone, contact_authorized, contact_authorized_at)
                  VALUES
-                    (:tenant_id, :user_id, :operation, :title, :property_type, :location, :description, :price, \'published\',
+                    (:tenant_id, :user_id, :operation, :title, :property_type, :location, :description, :price, \'pending\',
                      :contact_name, :contact_email, :contact_phone, :contact_authorized,
                      IF(:contact_authorized_at = 1, UTC_TIMESTAMP(), NULL))'
             );
@@ -70,6 +88,8 @@ final class ClassifiedsService
 
             throw $exception;
         }
+
+        $this->notifyAdministration($userId, $listing['title'], false);
     }
 
     /**
@@ -88,7 +108,7 @@ final class ClassifiedsService
         $pdo->beginTransaction();
         try {
             $lookup = $pdo->prepare(
-                'SELECT id, contact_authorized FROM property_classifieds
+                'SELECT id, status, contact_authorized FROM property_classifieds
                  WHERE id = ? AND tenant_id = ? AND user_id = ? FOR UPDATE'
             );
             $lookup->execute([$listingId, Tenant::id(), $userId]);
@@ -120,7 +140,9 @@ final class ClassifiedsService
                      description = :description, price = :price,
                      contact_name = :contact_name, contact_email = :contact_email, contact_phone = :contact_phone,
                      contact_authorized = :contact_authorized,
-                     contact_authorized_at = IF(:authorized_now = 0, NULL, COALESCE(contact_authorized_at, UTC_TIMESTAMP()))
+                     contact_authorized_at = IF(:authorized_now = 0, NULL, COALESCE(contact_authorized_at, UTC_TIMESTAMP())),
+                     -- Todo cambio vuelve a revisión (uno cerrado sigue cerrado, pero ya sin aprobación vigente).
+                     status = IF(status = \'closed\', \'closed\', \'pending\'), approved_at = NULL, review_note = NULL
                  WHERE id = :id AND tenant_id = :tenant_id AND user_id = :user_id'
             );
             $update->execute([
@@ -164,6 +186,9 @@ final class ClassifiedsService
         }
 
         $this->discardFiles(array_map($this->pathForStorageName(...), $removedNames));
+        if ($current['status'] !== 'closed') {
+            $this->notifyAdministration($userId, $listing['title'], true);
+        }
 
         return true;
     }
@@ -196,27 +221,186 @@ final class ClassifiedsService
         return $listings;
     }
 
-    public function setStatus(int $listingId, int $userId, string $status): bool
+    /**
+     * El residente cierra su clasificado (publicado o en revisión) o lo reabre. Al reabrir vuelve a publicarse si
+     * conserva la aprobación (no se editó desde entonces); si no, pasa a revisión.
+     *
+     * @param 'open'|'closed' $action
+     * @return ?string el estado resultante, o null si el clasificado no es del residente o no admite el cambio
+     */
+    public function setStatus(int $listingId, int $userId, string $action): ?string
     {
-        if (!in_array($status, ['published', 'closed'], true)) {
+        if (!in_array($action, ['open', 'closed'], true)) {
             throw new RuntimeException('El estado solicitado no es válido.');
         }
 
         $pdo = Database::connection();
         $lookup = $pdo->prepare(
-            'SELECT id FROM property_classifieds WHERE id = ? AND tenant_id = ? AND user_id = ? LIMIT 1'
+            'SELECT title, status, approved_at FROM property_classifieds WHERE id = ? AND tenant_id = ? AND user_id = ? LIMIT 1'
         );
         $lookup->execute([$listingId, Tenant::id(), $userId]);
-        if ($lookup->fetchColumn() === false) {
-            return false;
+        $current = $lookup->fetch();
+        if (!is_array($current)) {
+            return null;
         }
 
-        $statement = $pdo->prepare(
-            'UPDATE property_classifieds SET status = ? WHERE id = ? AND tenant_id = ? AND user_id = ?'
-        );
-        $statement->execute([$status, $listingId, Tenant::id(), $userId]);
+        if ($action === 'closed') {
+            if (!in_array($current['status'], ['published', 'pending'], true)) {
+                return null;
+            }
+            $status = 'closed';
+        } else {
+            if ($current['status'] !== 'closed') {
+                return null;
+            }
+            $status = $current['approved_at'] !== null ? 'published' : 'pending';
+        }
 
-        return true;
+        $pdo->prepare('UPDATE property_classifieds SET status = ? WHERE id = ? AND tenant_id = ? AND user_id = ?')
+            ->execute([$status, $listingId, Tenant::id(), $userId]);
+        if ($status === 'pending') {
+            $this->notifyAdministration($userId, (string) $current['title'], true);
+        }
+
+        return $status;
+    }
+
+    /* ------------------------------ Revisión de la administración ------------------------------ */
+
+    /**
+     * Clasificados para revisar, con autor y datos de contacto completos (la administración ve todo para decidir).
+     *
+     * @param ?string $status null = todos
+     */
+    public function forReview(?string $status): array
+    {
+        $listings = $this->listings(
+            $status === null ? '1 = 1' : 'c.status = ?',
+            $status === null ? [] : [$status],
+            200,
+            true
+        );
+
+        return $listings;
+    }
+
+    /** @return array<string, int> cantidad por estado */
+    public function countsByStatus(): array
+    {
+        $counts = array_fill_keys(array_keys(self::STATUS_LABELS), 0);
+        $query = Database::connection()->prepare(
+            'SELECT status, COUNT(*) AS total FROM property_classifieds WHERE tenant_id = ? GROUP BY status'
+        );
+        $query->execute([Tenant::id()]);
+        foreach ($query->fetchAll() as $row) {
+            if (isset($counts[$row['status']])) {
+                $counts[$row['status']] = (int) $row['total'];
+            }
+        }
+
+        return $counts;
+    }
+
+    public function pendingCount(): int
+    {
+        try {
+            $query = Database::connection()->prepare(
+                "SELECT COUNT(*) FROM property_classifieds WHERE tenant_id = ? AND status = 'pending'"
+            );
+            $query->execute([Tenant::id()]);
+
+            return (int) $query->fetchColumn();
+        } catch (PDOException) {
+            return 0;
+        }
+    }
+
+    /** Publica un clasificado en revisión (o uno que antes no se publicó) y avisa al residente. */
+    public function approve(int $listingId, int $actorId): void
+    {
+        $listing = $this->reviewTarget($listingId);
+        $update = Database::connection()->prepare(
+            "UPDATE property_classifieds
+                SET status = 'published', approved_at = NOW(), review_note = NULL,
+                    reviewed_at = NOW(), reviewed_by = ?
+              WHERE id = ? AND tenant_id = ? AND status IN ('pending', 'rejected')"
+        );
+        $update->execute([$actorId, $listingId, Tenant::id()]);
+        if ($update->rowCount() !== 1) {
+            throw new RuntimeException('Solo se pueden publicar clasificados en revisión o no publicados.');
+        }
+        $this->notifyOwner($listing, true, '');
+    }
+
+    /** No publica (o despublica) un clasificado con un motivo para el residente. */
+    public function reject(int $listingId, string $reason, int $actorId): void
+    {
+        $reason = trim(preg_replace('/\s+/u', ' ', $reason) ?? '');
+        $length = mb_strlen($reason, 'UTF-8');
+        if ($length < 5 || $length > 255) {
+            throw new RuntimeException('Explica al residente por qué no se publica (entre 5 y 255 caracteres).');
+        }
+        $listing = $this->reviewTarget($listingId);
+        $update = Database::connection()->prepare(
+            "UPDATE property_classifieds
+                SET status = 'rejected', approved_at = NULL, review_note = ?,
+                    reviewed_at = NOW(), reviewed_by = ?
+              WHERE id = ? AND tenant_id = ? AND status IN ('pending', 'published')"
+        );
+        $update->execute([$reason, $actorId, $listingId, Tenant::id()]);
+        if ($update->rowCount() !== 1) {
+            throw new RuntimeException('Solo se pueden rechazar clasificados en revisión o publicados.');
+        }
+        $this->notifyOwner($listing, false, $reason);
+    }
+
+    private function reviewTarget(int $listingId): array
+    {
+        $query = Database::connection()->prepare(
+            'SELECT id, user_id, title, status FROM property_classifieds WHERE id = ? AND tenant_id = ?'
+        );
+        $query->execute([$listingId, Tenant::id()]);
+        $listing = $query->fetch();
+        if (!is_array($listing)) {
+            throw new RuntimeException('El clasificado no existe.');
+        }
+
+        return $listing;
+    }
+
+    /** Aviso en la campana del portal y correo al residente con la decisión. */
+    private function notifyOwner(array $listing, bool $approved, string $reason): void
+    {
+        $userId = (int) $listing['user_id'];
+        $listingId = (int) $listing['id'];
+        $title = ($approved ? 'Clasificado publicado: ' : 'Clasificado no publicado: ') . $listing['title'];
+        $body = $approved
+            ? 'Ya se ve en la página pública del conjunto.'
+            : 'Motivo: ' . $reason . ' Puedes editarlo y enviarlo de nuevo a revisión.';
+        UserNotifier::afterResponse(function () use ($userId, $listingId, $approved, $title, $body): void {
+            $this->notifier->notice($userId, $approved ? 'classified_approved' : 'classified_rejected', $title, $body, '/usuario#clasificado-' . $listingId);
+            $account = UserNotifier::account($userId);
+            if ($account !== null) {
+                $this->notifier->mail((string) $account['email'], (string) $account['username'], $title, $title . "\n\n" . $body);
+            }
+        });
+    }
+
+    /** Correo a la administración: hay un clasificado por revisar. */
+    private function notifyAdministration(int $userId, string $title, bool $edited): void
+    {
+        UserNotifier::afterResponse(function () use ($userId, $title, $edited): void {
+            $account = UserNotifier::account($userId);
+            $this->notifier->mailAdministration(
+                'Clasificado por revisar · ' . $title,
+                sprintf(
+                    "%s %s el clasificado «%s».\n\nRevísalo y decide si se publica en Comunidad > Clasificados del panel administrativo.",
+                    $account['username'] ?? 'Un residente',
+                    $edited ? 'envió cambios en' : 'envió',
+                    $title
+                )
+            );
+        });
     }
 
     public function deleteListing(int $listingId, int $userId): bool
@@ -268,17 +452,24 @@ final class ClassifiedsService
         return $image;
     }
 
-    private function listings(string $where, array $parameters, int $limit = 0): array
+    /** @param bool $forReview incluye autor y contacto completo (solo para el panel administrativo) */
+    private function listings(string $where, array $parameters, int $limit = 0, bool $forReview = false): array
     {
+        $contact = $forReview
+            ? 'c.contact_name, c.contact_email, c.contact_phone, c.contact_authorized,
+               c.reviewed_at, users.username AS author_username, users.email AS author_email,
+               reviewers.username AS reviewer_username'
+            : 'CASE WHEN c.contact_authorized = 1 THEN c.contact_name ELSE NULL END AS contact_name,
+               CASE WHEN c.contact_authorized = 1 THEN c.contact_email ELSE NULL END AS contact_email,
+               CASE WHEN c.contact_authorized = 1 THEN c.contact_phone ELSE NULL END AS contact_phone';
         $statement = Database::connection()->prepare(
             'SELECT c.id, c.user_id, c.operation, c.title, c.property_type, c.location,
-                    c.description, c.price, c.status, c.created_at,
-                    CASE WHEN c.contact_authorized = 1 THEN c.contact_name ELSE NULL END AS contact_name,
-                    CASE WHEN c.contact_authorized = 1 THEN c.contact_email ELSE NULL END AS contact_email,
-                    CASE WHEN c.contact_authorized = 1 THEN c.contact_phone ELSE NULL END AS contact_phone
-             FROM property_classifieds AS c
+                    c.description, c.price, c.status, c.review_note, c.created_at, c.updated_at, ' . $contact . '
+             FROM property_classifieds AS c'
+            . ($forReview ? ' LEFT JOIN admin_users AS users ON users.id = c.user_id
+                              LEFT JOIN admin_users AS reviewers ON reviewers.id = c.reviewed_by' : '') . '
              WHERE c.tenant_id = ? AND (' . $where . ')
-             ORDER BY c.created_at DESC, c.id DESC'
+             ORDER BY ' . ($forReview ? 'c.updated_at DESC, ' : '') . 'c.created_at DESC, c.id DESC'
             . ($limit > 0 ? ' LIMIT ' . $limit : '')
         );
         $statement->execute([Tenant::id(), ...$parameters]);

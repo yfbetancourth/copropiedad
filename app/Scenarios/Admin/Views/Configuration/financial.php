@@ -70,7 +70,8 @@ $coefficientSum = (float) ($coefficientSum ?? 0);
                         </div>
                         <div class="mb-3">
                             <label for="early_payment_discount" class="form-label">Descuento por pronto pago (COP)</label>
-                            <input id="early_payment_discount" name="early_payment_discount" type="number" class="form-control" min="0" max="9999999999999.99" step="0.01" required value="<?= $escape($settings['early_payment_discount'] ?? '') ?>" <?= $canWrite ? '' : 'readonly' ?>>
+                            <input id="early_payment_discount" name="early_payment_discount" type="number" class="form-control" min="0" max="9999999999999.99" step="0.01" required aria-describedby="early_payment_discount_help" value="<?= $escape($settings['early_payment_discount'] ?? '') ?>" <?= $canWrite ? '' : 'readonly' ?>>
+                            <small id="early_payment_discount_help" class="text-secondary">0 = no aplica descuento por pronto pago (igual que el día límite 0 en Parametrización).</small>
                         </div>
                     </div>
                 </div>

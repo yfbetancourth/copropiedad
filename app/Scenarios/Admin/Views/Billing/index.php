@@ -675,7 +675,7 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                             <li class="list-group-item d-flex justify-content-between"><span>Notas a emitir</span><strong id="issue-count" data-all="<?= (int) $preview['new_count'] ?>"><?= (int) $preview['new_count'] ?></strong></li>
                             <li class="list-group-item d-flex justify-content-between"><span>Valor total</span><strong id="issue-total" data-all="<?= $escape($short($summary['to_issue'])) ?>"><?= $short($summary['to_issue']) ?></strong></li>
                             <li class="list-group-item d-flex justify-content-between"><span>Conceptos adicionales incluidos</span><strong id="issue-items" data-all="<?= $itemCount ?>"><?= $itemCount ?></strong></li>
-                            <li class="list-group-item d-flex justify-content-between"><span>Pronto pago hasta el día</span><strong><?= (int) $preview['discount_day'] ?></strong></li>
+                            <li class="list-group-item d-flex justify-content-between"><span>Pronto pago hasta el día</span><strong><?= empty($preview['early_discount_applies']) ? 'No aplica' : (int) $preview['discount_day'] ?></strong></li>
                             <li class="list-group-item d-flex justify-content-between"><span>Vencimiento el día</span><strong><?= (int) $preview['due_day'] ?></strong></li>
                         </ul>
                         <div class="alert alert-warning small mb-3"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Las notas emitidas <strong>no se pueden editar ni eliminar</strong>, y se enviarán por correo a cada residente. Las correcciones se hacen con conceptos en el mes siguiente.</div>

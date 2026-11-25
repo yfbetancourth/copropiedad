@@ -29,6 +29,8 @@ $noticeIcons = [
     'booking_approved' => 'bi-calendar2-check text-success',
     'booking_rejected' => 'bi-calendar2-x text-danger',
     'conversation_reply' => 'bi-chat-dots text-primary',
+    'classified_approved' => 'bi-megaphone text-success',
+    'classified_rejected' => 'bi-megaphone text-danger',
 ];
 
 // Mismo menú por secciones que el panel administrativo, con las opciones del residente.

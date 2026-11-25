@@ -90,7 +90,8 @@ $canWrite = \App\Core\Authorization::hasPermission($actor, 'configuracion.parame
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="early_payment_day" class="form-label">Día límite para pronto pago</label>
-                                <input id="early_payment_day" name="early_payment_day" type="number" class="form-control" min="1" max="28" step="1" value="<?= $escape($settings['early_payment_day'] ?? '') ?>" <?= $canWrite ? '' : 'readonly' ?>>
+                                <input id="early_payment_day" name="early_payment_day" type="number" class="form-control" min="0" max="28" step="1" aria-describedby="early_payment_day_help" value="<?= $escape($settings['early_payment_day'] ?? '') ?>" <?= $canWrite ? '' : 'readonly' ?>>
+                                <small id="early_payment_day_help" class="text-secondary">0 = no aplica descuento por pronto pago.</small>
                             </div>
                             <div class="col-md-6">
                                 <label for="payment_due_day" class="form-label">Día de vencimiento ordinario</label>

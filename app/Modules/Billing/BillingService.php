@@ -56,11 +56,13 @@ final class BillingService
         $priorStatements = $this->latestStatementsBefore($period);
         $previousPayments = $this->paymentMap(array_values($priorStatements));
         $fee = self::cents($propertySettings['administration_fee'] ?? '0');
-        $configuredDiscount = self::cents($propertySettings['early_payment_discount'] ?? '0');
         $discountDay = (int) ($propertySettings['early_payment_day'] ?? 0);
         $dueDay = (int) ($propertySettings['payment_due_day'] ?? 0);
-        $dateSettingsReady = $discountDay >= 1 && $discountDay <= 28
-            && $dueDay >= $discountDay && $dueDay <= 28;
+        // Día de pronto pago 0 = el conjunto no aplica descuento por pronto pago.
+        $configuredDiscount = $discountDay === 0 ? 0 : self::cents($propertySettings['early_payment_discount'] ?? '0');
+        $dateSettingsReady = ($propertySettings['early_payment_day'] ?? null) !== null
+            && $discountDay >= 0 && $discountDay <= 28
+            && $dueDay >= 1 && $dueDay >= $discountDay && $dueDay <= 28;
         $bankSettingsReady = trim((string) ($propertySettings['account_holder'] ?? '')) !== ''
             && trim((string) ($propertySettings['bank_name'] ?? '')) !== ''
             && trim((string) ($propertySettings['account_type'] ?? '')) !== ''
@@ -227,6 +229,8 @@ final class BillingService
             'rows' => $rows,
             'settings' => $propertySettings,
             'discount_day' => $discountDay,
+            // Pronto pago solo aplica con día distinto de 0 y descuento mayor que 0.
+            'early_discount_applies' => $configuredDiscount > 0,
             'due_day' => $dueDay,
             'ready' => $blockingReasons === [],
             'blocking_reasons' => array_values(array_unique($blockingReasons)),
@@ -292,7 +296,8 @@ final class BillingService
             && ($settings['effective_date'] ?? '') !== '';
         $basis = ($settings['fee_basis'] ?? 'base') === 'budget' ? 'budget' : 'base';
         $fee = $configured ? self::cents($settings['administration_fee']) : 0;
-        $configuredDiscount = self::cents($settings['early_payment_discount'] ?? '0');
+        // Día de pronto pago 0 = sin descuento por pronto pago.
+        $configuredDiscount = (int) ($settings['early_payment_day'] ?? 0) === 0 ? 0 : self::cents($settings['early_payment_discount'] ?? '0');
         $compositionUnits = (new CompositionService())->current()['units'] ?? [];
         $coefficients = [];
         foreach (is_array($compositionUnits) ? $compositionUnits : [] as $unit) {
@@ -999,8 +1004,11 @@ final class BillingService
             ['Cuota extra', self::cents($statement['extra']), 'opt'],
             ['Otros cobros', self::cents($statement['other']), 'opt'],
             ['Total a pagar ' . $statement['period'], max(0, self::cents($statement['total_due'])), 'key'],
-            ['Pagando antes del ' . $this->formatDate($statement['early_payment_date']) . ' (pronto pago)', $earlyPayable, 'total'],
         ];
+        $hasEarlyDiscount = self::cents($statement['early_discount']) > 0;
+        if ($hasEarlyDiscount) {
+            $currentRows[] = ['Pagando antes del ' . $this->formatDate($statement['early_payment_date']) . ' (pronto pago)', $earlyPayable, 'total'];
+        }
         if (self::cents($statement['total_due']) < 0) {
             $currentRows[] = ['Saldo a favor', -self::cents($statement['total_due']), 'total'];
         }
@@ -1038,7 +1046,9 @@ final class BillingService
             . '<td style="padding:3px 6px 3px 0;vertical-align:top">' . $label('Inmueble') . '<strong>#' . $escape($statement['unit_name']) . '</strong></td>'
             . '<td style="padding:3px 6px;vertical-align:top">' . $label('Propietario o residente') . ($recipients !== '' ? $recipients : 'Usuario asignado') . '</td>'
             . '<td style="padding:3px 6px;vertical-align:top;white-space:nowrap">' . $label('Emisión') . $escape($this->formatDate($statement['issue_date'])) . '</td>'
-            . '<td style="padding:3px 6px;vertical-align:top;white-space:nowrap">' . $label('Pronto pago hasta') . '<strong>' . $escape($this->formatDate($statement['early_payment_date'])) . '</strong></td>'
+            . ($hasEarlyDiscount
+                ? '<td style="padding:3px 6px;vertical-align:top;white-space:nowrap">' . $label('Pronto pago hasta') . '<strong>' . $escape($this->formatDate($statement['early_payment_date'])) . '</strong></td>'
+                : '')
             . '<td style="padding:3px 0 3px 6px;vertical-align:top;white-space:nowrap">' . $label('Vence') . '<strong>' . $escape($this->formatDate($statement['payment_due_date'])) . '</strong></td>'
             . '</tr></table>'
             // Dos columnas. Izquierda: movimiento anterior y datos para el pago. Derecha: movimiento del período y
@@ -1094,11 +1104,14 @@ final class BillingService
             'Cuota extra' => $statement['extra'],
             'Otros cobros' => $statement['other'],
             'Total a pagar ' . $statement['period'] => self::decimal(max(0, self::cents($statement['total_due']))),
-            'A pagar antes del ' . $this->formatDate($statement['early_payment_date']) . ' (pronto pago)' => max(
+        ];
+        $hasEarlyDiscount = self::cents($statement['early_discount']) > 0;
+        if ($hasEarlyDiscount) {
+            $currentRows['A pagar antes del ' . $this->formatDate($statement['early_payment_date']) . ' (pronto pago)'] = self::decimal(max(
                 0,
                 self::cents($statement['total_due']) - self::cents($statement['early_discount'])
-            ),
-        ];
+            ));
+        }
         if (self::cents($statement['total_due']) < 0) {
             $currentRows['Saldo a favor'] = self::decimal(-self::cents($statement['total_due']));
         }
@@ -1125,7 +1138,7 @@ final class BillingService
             . 'Movimiento ' . $previousPeriod . ":\n" . $previousText . "\n\n"
             . "Movimiento {$statement['period']}:\n" . $currentText . "\n\n"
             . "Detalle de conceptos:\n{$lineText}\n\n"
-            . "Fecha límite de pronto pago: " . $this->formatDate($statement['early_payment_date']) . "\n"
+            . ($hasEarlyDiscount ? 'Fecha límite de pronto pago: ' . $this->formatDate($statement['early_payment_date']) . "\n" : '')
             . 'Vencimiento ordinario: ' . $this->formatDate($statement['payment_due_date']) . "\n"
             . "Datos bancarios: {$statement['bank_name']}, {$statement['account_type']}, "
             . "{$statement['account_number']}, titular {$statement['account_holder']}\n"
@@ -1161,15 +1174,16 @@ final class BillingService
         $previous = $row['previous'];
         $settings = $preview['settings'];
         $periodDate = self::periodDate($preview['period']);
-        $discountDate = $periodDate->setDate(
-            (int) $periodDate->format('Y'),
-            (int) $periodDate->format('m'),
-            $preview['discount_day']
-        );
         $dueDate = $periodDate->setDate(
             (int) $periodDate->format('Y'),
             (int) $periodDate->format('m'),
             $preview['due_day']
+        );
+        // Sin pronto pago (día 0) la columna obligatoria toma la fecha de vencimiento; el descuento queda en 0.
+        $discountDate = $preview['discount_day'] === 0 ? $dueDate : $periodDate->setDate(
+            (int) $periodDate->format('Y'),
+            (int) $periodDate->format('m'),
+            $preview['discount_day']
         );
         $mail = (new MailSettingsService())->current();
 

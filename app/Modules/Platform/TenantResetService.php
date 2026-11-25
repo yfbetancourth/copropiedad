@@ -99,10 +99,10 @@ final class TenantResetService
             'counts' => ['bold_payment_settings' => 'Bold', 'wompi_payment_settings' => 'Wompi'],
         ],
         'gallery' => [
-            'label' => 'Galería pública',
-            'detail' => 'Imágenes de la página pública del conjunto.',
+            'label' => 'Sitio público',
+            'detail' => 'Imágenes de la galería y textos personalizados (publicados y borrador) de la página pública.',
             'requires' => [],
-            'counts' => [':gallery' => 'imágenes'],
+            'counts' => [':gallery' => 'imágenes', 'public_site_content' => 'textos'],
         ],
         'residents' => [
             'label' => 'Cuentas de residentes',
@@ -153,6 +153,7 @@ final class TenantResetService
         ['mail', 'copropiedad_mail_settings', 'DELETE FROM copropiedad_mail_settings WHERE tenant_id = ?'],
         ['payment_settings', 'bold_payment_settings', 'DELETE FROM bold_payment_settings WHERE tenant_id = ?'],
         ['payment_settings', 'wompi_payment_settings', 'DELETE FROM wompi_payment_settings WHERE tenant_id = ?'],
+        ['gallery', 'public_site_content', 'DELETE FROM public_site_content WHERE tenant_id = ?'],
         ['settings', 'copropiedad_settings', 'DELETE FROM copropiedad_settings WHERE tenant_id = ?'],
         // Las cuentas arrastran fichas, tokens, correos personales, lecturas y bandejas (ON DELETE CASCADE).
         ['residents', 'admin_users', "DELETE users FROM admin_users AS users JOIN admin_roles AS roles ON roles.id = users.role_id

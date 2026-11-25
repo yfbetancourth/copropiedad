@@ -12,7 +12,12 @@ $router->post('/configuracion/parametrizacion/guardar', [$configuration, 'savePa
 $router->get('/configuracion/galeria-publica', [$configuration, 'propertyGallery']);
 $router->post('/configuracion/galeria-publica/agregar', [$configuration, 'addPropertyGalleryImages']);
 $router->post('/configuracion/galeria-publica/eliminar', [$configuration, 'deletePropertyGalleryImage']);
-$router->get('/configuracion/financiera', [$configuration, 'financial']);
+$router->get('/configuracion/sitio-publico', [$configuration, 'publicSite']);
+$router->post('/configuracion/sitio-publico/guardar', [$configuration, 'savePublicSite']);
+$router->get('/configuracion/sitio-publico/vista-previa', [$configuration, 'previewPublicSite']);
+$router->post('/configuracion/sitio-publico/publicar', [$configuration, 'publishPublicSite']);
+$router->post('/configuracion/sitio-publico/descartar', [$configuration, 'discardPublicSite']);
+$router->get('/configuracion/financiera',[$configuration, 'financial']);
 $router->post('/configuracion/financiera/guardar', [$configuration, 'saveFinancial']);
 $router->get('/configuracion/correo', [$configuration, 'mail']);
 $router->post('/configuracion/correo/guardar', [$configuration, 'saveMail']);

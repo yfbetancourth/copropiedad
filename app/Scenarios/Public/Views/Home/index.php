@@ -12,6 +12,11 @@ $address = trim((string) ($settings['address'] ?? ''));
 $mapsUrl = $address !== ''
     ? 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($address)
     : '';
+// Textos editables desde Configuración / Sitio público; siempre escapados, {nombre} = nombre del conjunto.
+$siteTexts = is_array($siteTexts ?? null) ? $siteTexts : \App\Modules\Configuration\PublicSiteService::defaults();
+$text = static fn (string $key): string => nl2br($escape(
+    \App\Modules\Configuration\PublicSiteService::fill((string) ($siteTexts[$key] ?? ''), $name)
+), false);
 $operationLabels = ['sale' => 'En venta', 'rent' => 'En arriendo', 'purchase' => 'Busca comprar'];
 $propertyTypeLabels = [
     'house' => 'Casa',
@@ -22,49 +27,49 @@ $propertyTypeLabels = [
 ?>
 <section class="hero-section" id="comunidad" aria-labelledby="home-title">
     <div class="hero-copy">
-        <p class="eyebrow"><span class="eyebrow-line"></span> Un lugar para vivir mejor</p>
-        <h1 id="home-title">La vida se siente distinta <em>cuando es en comunidad.</em></h1>
-        <p class="hero-lede"><?= $escape($name) ?> es más que un lugar para vivir. Es el espacio que compartimos, cuidamos y hacemos nuestro cada día.</p>
+        <p class="eyebrow"><span class="eyebrow-line"></span> <?= $text('hero_eyebrow') ?></p>
+        <h1 id="home-title"><?= $text('hero_title') ?> <em><?= $text('hero_title_em') ?></em></h1>
+        <p class="hero-lede"><?= $text('hero_lede') ?></p>
         <?php if ($address !== ''): ?>
             <p class="hero-address"><span class="pin-icon" aria-hidden="true">⌖</span><?= $escape($address) ?></p>
         <?php endif; ?>
         <div class="hero-actions">
-            <a class="button button-dark" href="<?= $escape($basePath) ?>/login?destino=usuario">Entrar a mi portal <span aria-hidden="true">↗</span></a>
+            <a class="button button-dark" href="<?= $escape($basePath) ?>/login?destino=usuario"><?= $text('hero_button') ?> <span aria-hidden="true">↗</span></a>
             <?php if ($classifiedsEnabled ?? true): ?><a class="text-link" href="#clasificados">Explorar clasificados <span aria-hidden="true">↓</span></a><?php endif; ?>
         </div>
-        <div class="hero-footnote"><span class="avatar-stack" aria-hidden="true"><i></i><i></i><i></i></span><span>Un espacio compartido. Muchas formas de sentirse en casa.</span></div>
+        <div class="hero-footnote"><span class="avatar-stack" aria-hidden="true"><i></i><i></i><i></i></span><span><?= $text('hero_footnote') ?></span></div>
     </div>
     <div class="hero-visual" aria-label="Espacios de <?= $escape($name) ?>">
         <?php if ($galleryImages !== []): ?>
             <img class="hero-photo" src="<?= $escape($basePath . $galleryImages[0]['url']) ?>" alt="Espacio de <?= $escape($name) ?>" width="1100" height="900" fetchpriority="high" decoding="async">
-            <div class="photo-note"><span class="photo-note-dot"></span> Nuestro lugar, todos los días</div>
+            <div class="photo-note"><span class="photo-note-dot"></span> <?= $text('hero_photo_note') ?></div>
             <?php if (isset($galleryImages[1])): ?>
-                <div class="hero-inset"><img src="<?= $escape($basePath . $galleryImages[1]['url']) ?>" alt="Otro espacio de <?= $escape($name) ?>" width="400" height="300" loading="lazy" decoding="async"><span>Hecho para compartir</span></div>
+                <div class="hero-inset"><img src="<?= $escape($basePath . $galleryImages[1]['url']) ?>" alt="Otro espacio de <?= $escape($name) ?>" width="400" height="300" loading="lazy" decoding="async"><span><?= $text('hero_inset_caption') ?></span></div>
             <?php endif; ?>
         <?php else: ?>
             <img class="hero-photo placeholder-photo" src="<?= $escape($basePath) ?>/assets/portada/images/community-placeholder.svg" alt="Ilustración de espacios de vivienda en comunidad" width="900" height="760" fetchpriority="high" decoding="async">
-            <div class="photo-note"><span class="photo-note-dot"></span> Nuestro lugar, todos los días</div>
+            <div class="photo-note"><span class="photo-note-dot"></span> <?= $text('hero_photo_note') ?></div>
         <?php endif; ?>
-        <div class="hero-stamp"><span>HOGAR</span><b>+</b><span>COMUNIDAD</span></div>
+        <div class="hero-stamp"><span><?= $text('hero_stamp_1') ?></span><b>+</b><span><?= $text('hero_stamp_2') ?></span></div>
     </div>
     <a class="scroll-cue" href="#espacios" aria-label="Descubre los espacios">DESLIZA <span aria-hidden="true">↓</span></a>
 </section>
 
 <section class="intro-strip" aria-label="Nuestra comunidad">
-    <span>Un buen vecino</span><i></i><span>Un espacio cuidado</span><i></i><span>Una comunidad que crece</span><b aria-hidden="true">✳</b>
+    <span><?= $text('strip_1') ?></span><i></i><span><?= $text('strip_2') ?></span><i></i><span><?= $text('strip_3') ?></span><b aria-hidden="true">✳</b>
 </section>
 
 <?php if ($galleryImages !== []): ?>
 <section class="section-block spaces-section" id="espacios" aria-labelledby="spaces-title">
     <div class="section-heading">
-        <div><p class="eyebrow"><span class="eyebrow-line"></span> Nuestro entorno</p><h2 id="spaces-title">Un lugar que <em>se siente propio.</em></h2></div>
-        <p>Los pequeños momentos también hacen hogar: compartir, descansar, encontrarse y disfrutar los espacios que son de todos.</p>
+        <div><p class="eyebrow"><span class="eyebrow-line"></span> <?= $text('spaces_eyebrow') ?></p><h2 id="spaces-title"><?= $text('spaces_title') ?> <em><?= $text('spaces_title_em') ?></em></h2></div>
+        <p><?= $text('spaces_text') ?></p>
     </div>
     <div class="gallery-grid gallery-count-<?= min(4, count($galleryImages)) ?>">
         <?php foreach (array_slice($galleryImages, 0, 4) as $index => $image): ?>
             <figure class="gallery-tile gallery-tile-<?= $index + 1 ?>">
                 <img src="<?= $escape($basePath . $image['url']) ?>" alt="Espacio <?= $index + 1 ?> de <?= $escape($name) ?>" width="<?= $index === 0 ? '1000' : '700' ?>" height="<?= $index === 0 ? '700' : '520' ?>" loading="lazy" decoding="async">
-                <figcaption><span><?= sprintf('%02d', $index + 1) ?></span> <?= ['Momentos para compartir', 'Un respiro en casa', 'La vida en común', 'Cada rincón cuenta'][$index] ?></figcaption>
+                <figcaption><span><?= sprintf('%02d', $index + 1) ?></span> <?= $text('caption_' . ($index + 1)) ?></figcaption>
             </figure>
         <?php endforeach; ?>
     </div>
@@ -72,21 +77,21 @@ $propertyTypeLabels = [
 <?php else: ?>
 <section class="section-block spaces-section" id="espacios" aria-labelledby="spaces-title">
     <div class="section-heading">
-        <div><p class="eyebrow"><span class="eyebrow-line"></span> Nuestro entorno</p><h2 id="spaces-title">La comunidad se construye <em>en cada detalle.</em></h2></div>
-        <p>Esta es una invitación a encontrarnos, cuidar lo que compartimos y hacer de este lugar un hogar para todos.</p>
+        <div><p class="eyebrow"><span class="eyebrow-line"></span> <?= $text('values_eyebrow') ?></p><h2 id="spaces-title"><?= $text('values_title') ?> <em><?= $text('values_title_em') ?></em></h2></div>
+        <p><?= $text('values_text') ?></p>
     </div>
     <div class="values-grid">
         <article>
             <span class="value-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5M10.5 19c.8-3 3-4.5 5.5-4.5s4.7 1.5 5.5 4.5"/></svg></span>
-            <span class="value-number" aria-hidden="true">01</span><h3>Compartir</h3><p>Los buenos momentos crecen cuando se viven en compañía.</p>
+            <span class="value-number" aria-hidden="true">01</span><h3><?= $text('value_1_title') ?></h3><p><?= $text('value_1_text') ?></p>
         </article>
         <article>
             <span class="value-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/></svg></span>
-            <span class="value-number" aria-hidden="true">02</span><h3>Cuidar</h3><p>Un espacio común se siente mejor cuando todos lo hacemos nuestro.</p>
+            <span class="value-number" aria-hidden="true">02</span><h3><?= $text('value_2_title') ?></h3><p><?= $text('value_2_text') ?></p>
         </article>
         <article>
             <span class="value-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M9 15 15 9M8 12l-2 2a3.5 3.5 0 0 0 5 5l2-2M16 12l2-2a3.5 3.5 0 0 0-5-5l-2 2"/></svg></span>
-            <span class="value-number" aria-hidden="true">03</span><h3>Conectar</h3><p>Pequeños encuentros que hacen más cercana la vida de cada día.</p>
+            <span class="value-number" aria-hidden="true">03</span><h3><?= $text('value_3_title') ?></h3><p><?= $text('value_3_text') ?></p>
         </article>
     </div>
 </section>
@@ -94,19 +99,19 @@ $propertyTypeLabels = [
 
 <section class="community-band">
     <div class="community-mark" aria-hidden="true">✳</div>
-    <div><p class="eyebrow">Una comunidad, muchas historias</p><h2>Lo mejor de vivir aquí<br><em>lo hacemos entre todos.</em></h2></div>
-    <a class="button button-light" href="<?= $escape($basePath) ?>/login?destino=usuario">Conoce tu portal <span aria-hidden="true">↗</span></a>
+    <div><p class="eyebrow"><?= $text('band_eyebrow') ?></p><h2><?= $text('band_title') ?><br><em><?= $text('band_title_em') ?></em></h2></div>
+    <a class="button button-light" href="<?= $escape($basePath) ?>/login?destino=usuario"><?= $text('band_button') ?> <span aria-hidden="true">↗</span></a>
 </section>
 
 <section class="location-section section-block" id="ubicacion" aria-labelledby="location-title">
     <div class="location-art" aria-hidden="true"><div class="map-orbit orbit-one"></div><div class="map-orbit orbit-two"></div><span class="map-pin">⌖</span><span class="map-label label-one">TU LUGAR</span><span class="map-label label-two">TU COMUNIDAD</span><div class="map-path"></div></div>
     <div class="location-copy">
-        <p class="eyebrow"><span class="eyebrow-line"></span> Cerca de lo que importa</p>
-        <h2 id="location-title">Aquí empieza <em>tu lugar.</em></h2>
+        <p class="eyebrow"><span class="eyebrow-line"></span> <?= $text('location_eyebrow') ?></p>
+        <h2 id="location-title"><?= $text('location_title') ?> <em><?= $text('location_title_em') ?></em></h2>
         <?php if ($address !== ''): ?>
             <p class="location-address"><?= $escape($address) ?></p>
-            <p class="location-help">Encuéntranos fácilmente y descubre cómo llegar.</p>
-            <a class="button button-dark" href="<?= $escape($mapsUrl) ?>" target="_blank" rel="noopener noreferrer">Ver ubicación en Google Maps <span aria-hidden="true">↗</span></a>
+            <p class="location-help"><?= $text('location_text') ?></p>
+            <a class="button button-dark" href="<?= $escape($mapsUrl) ?>" target="_blank" rel="noopener noreferrer"><?= $text('location_button') ?> <span aria-hidden="true">↗</span><span class="visually-hidden"> (se abre en una pestaña nueva)</span></a>
         <?php else: ?>
             <p class="location-help">La dirección de la copropiedad aparecerá aquí cuando esté configurada en el panel administrativo.</p>
         <?php endif; ?>
@@ -116,7 +121,7 @@ $propertyTypeLabels = [
 <?php if ($classifiedsEnabled ?? true): ?>
 <section class="classifieds-section section-block" id="clasificados" aria-labelledby="classifieds-title">
     <div class="section-heading">
-        <div><p class="eyebrow"><span class="eyebrow-line"></span> Oportunidades de la comunidad</p><h2 id="classifieds-title">Algo bueno puede <em>estar más cerca.</em></h2></div>
+        <div><p class="eyebrow"><span class="eyebrow-line"></span> <?= $text('classifieds_eyebrow') ?></p><h2 id="classifieds-title"><?= $text('classifieds_title') ?> <em><?= $text('classifieds_title_em') ?></em></h2></div>
         <a class="text-link" href="<?= $escape($basePath) ?>/clasificados">Ver todos los clasificados <span aria-hidden="true">↗</span></a>
     </div>
     <?php if ($listings !== []): ?>
@@ -142,8 +147,8 @@ $propertyTypeLabels = [
             <?php endforeach; ?>
         </div>
     <?php else: ?>
-        <div class="classifieds-empty"><span class="empty-spark" aria-hidden="true">✳</span><div><h3>Las buenas oportunidades empiezan cerca.</h3><p>Pronto podrás descubrir publicaciones de venta y búsqueda compartidas por los residentes.</p></div><a class="button button-outline" href="<?= $escape($basePath) ?>/login?destino=usuario">Publicar desde mi portal <span aria-hidden="true">↗</span></a></div>
+        <div class="classifieds-empty"><span class="empty-spark" aria-hidden="true">✳</span><div><h3><?= $text('classifieds_empty_title') ?></h3><p><?= $text('classifieds_empty_text') ?></p></div><a class="button button-outline" href="<?= $escape($basePath) ?>/login?destino=usuario">Publicar desde mi portal <span aria-hidden="true">↗</span></a></div>
     <?php endif; ?>
-    <div class="resident-cta"><div><p class="eyebrow">¿Ya haces parte de <?= $escape($name) ?>?</p><h3>Tu comunidad también está en línea.</h3><p>Consulta tu inmueble, revisa tus mensajes y comparte un clasificado desde tu panel.</p></div><a class="button button-dark" href="<?= $escape($basePath) ?>/login?destino=usuario">Entrar al panel de usuario <span aria-hidden="true">↗</span></a></div>
+    <div class="resident-cta"><div><p class="eyebrow"><?= $text('resident_cta_eyebrow') ?></p><h3><?= $text('resident_cta_title') ?></h3><p><?= $text('resident_cta_text') ?></p></div><a class="button button-dark" href="<?= $escape($basePath) ?>/login?destino=usuario"><?= $text('resident_cta_button') ?> <span aria-hidden="true">↗</span></a></div>
 </section>
 <?php endif; ?>

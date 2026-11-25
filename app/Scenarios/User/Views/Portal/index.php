@@ -176,7 +176,7 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
             <span class="badge text-bg-primary"><?= count($classifieds) ?></span>
         </div>
         <div class="card-body">
-            <p class="text-secondary">Publica un inmueble en venta o en arriendo, o una búsqueda de compra. Las publicaciones activas son visibles en la página pública.</p>
+            <p class="text-secondary">Publica un inmueble en venta o en arriendo, o una búsqueda de compra. La administración revisa cada clasificado (también cuando lo editas) antes de mostrarlo en la página pública; te avisaremos cuando lo publique.</p>
             <form method="post" enctype="multipart/form-data" action="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/clasificados/guardar">
                 <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
                 <div class="row g-3">
@@ -243,7 +243,7 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                         <label for="classified-contact-consent" class="form-check-label">Autorizo publicar en la página pública los datos de contacto ingresados arriba.</label>
                     </div>
                 </fieldset>
-                <button class="btn btn-primary mt-3" type="submit"><i class="bi bi-cloud-upload me-1" aria-hidden="true"></i>Publicar clasificado</button>
+                <button class="btn btn-primary mt-3" type="submit"><i class="bi bi-cloud-upload me-1" aria-hidden="true"></i>Enviar a revisión</button>
             </form>
         </div>
         <?php if ($classifieds !== []): ?>
@@ -256,9 +256,15 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                                 <p class="small text-secondary mb-2">
                                     <?= $classifiedOperationLabels[$classified['operation']] ?? 'Clasificado' ?>
                                     · <?= htmlspecialchars($classified['location'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
-                                    · <?= $classified['status'] === 'published' ? 'Publicado' : 'Cerrado' ?>
                                     · <?= count($classified['images']) ?> imagen(es)
+                                    <?php $classifiedBadge = ['pending' => 'text-bg-warning', 'published' => 'text-bg-success', 'rejected' => 'text-bg-danger', 'closed' => 'text-bg-secondary'][$classified['status']] ?? 'text-bg-light'; ?>
+                                    <span class="badge <?= $classifiedBadge ?> ms-1"><?= htmlspecialchars(\App\Modules\Classifieds\ClassifiedsService::STATUS_LABELS[$classified['status']] ?? (string) $classified['status'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span>
                                 </p>
+                                <?php if ($classified['status'] === 'pending'): ?>
+                                    <p class="small text-secondary mb-2"><i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>La administración lo está revisando; aún no se ve en la página pública.</p>
+                                <?php elseif ($classified['status'] === 'rejected'): ?>
+                                    <div class="alert alert-danger py-2 small mb-2"><strong>No se publicó:</strong> <?= htmlspecialchars((string) ($classified['review_note'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?><br>Corrígelo con <strong>Editar</strong> y se enviará de nuevo a revisión.</div>
+                                <?php endif; ?>
                                 <div class="d-flex flex-wrap gap-2">
                                     <?php foreach ($classified['images'] as $image): ?>
                                         <img src="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/clasificados/imagen?id=<?= (int) $image['id'] ?>"
@@ -268,14 +274,16 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                                 </div>
                             </div>
                             <div class="d-flex flex-wrap gap-2">
+                                <?php if ($classified['status'] !== 'rejected'): ?>
                                 <form method="post" action="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/clasificados/estado">
                                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
                                     <input type="hidden" name="listing_id" value="<?= (int) $classified['id'] ?>">
-                                    <input type="hidden" name="status" value="<?= $classified['status'] === 'published' ? 'closed' : 'published' ?>">
+                                    <input type="hidden" name="status" value="<?= $classified['status'] === 'closed' ? 'open' : 'closed' ?>">
                                     <button class="btn btn-outline-secondary btn-sm" type="submit">
-                                        <?= $classified['status'] === 'published' ? 'Cerrar publicación' : 'Volver a publicar' ?>
+                                        <?= match ($classified['status']) { 'closed' => 'Volver a publicar', 'pending' => 'Retirar de revisión', default => 'Cerrar publicación' } ?>
                                     </button>
                                 </form>
+                                <?php endif; ?>
                                 <form method="post" action="<?= htmlspecialchars($basePath, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/usuario/clasificados/eliminar" onsubmit="return confirm('¿Eliminar este clasificado y sus imágenes?');">
                                     <input type="hidden" name="_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
                                     <input type="hidden" name="listing_id" value="<?= (int) $classified['id'] ?>">
@@ -359,7 +367,8 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                                     </div>
                                 </div>
                             </div>
-                            <button class="btn btn-primary btn-sm mt-3" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>Guardar cambios</button>
+                            <button class="btn btn-primary btn-sm mt-3" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>Guardar y enviar a revisión</button>
+                            <div class="form-text">Al guardar, el clasificado deja de verse en la página pública hasta que la administración apruebe los cambios.</div>
                         </form>
                     </article>
                 <?php endforeach; ?>

@@ -329,12 +329,13 @@ final class ConfigurationController
             || (($accountHolder === '') !== ($accountType === ''))
             || (($accountHolder === '') !== ($accountNumber === ''))
             || $earlyPaymentDay === false || $paymentDueDay === false
-            || ($earlyPaymentDay !== null && ($earlyPaymentDay < 1 || $earlyPaymentDay > 28))
+            // 0 = el conjunto no aplica descuento por pronto pago.
+            || ($earlyPaymentDay !== null && ($earlyPaymentDay < 0 || $earlyPaymentDay > 28))
             || ($paymentDueDay !== null && ($paymentDueDay < 1 || $paymentDueDay > 28))
             || (($earlyPaymentDay === null) !== ($paymentDueDay === null))
             || ($earlyPaymentDay !== null && $paymentDueDay !== null && $earlyPaymentDay > $paymentDueDay)
         ) {
-            Http::flash(self::FLASH, 'error', 'Verifica los datos de la copropiedad, completa juntos los datos bancarios y revisa los dias de pronto pago y vencimiento (1 a 28).');
+            Http::flash(self::FLASH, 'error', 'Verifica los datos de la copropiedad, completa juntos los datos bancarios y revisa los dias de pronto pago (0 a 28; 0 = sin descuento) y vencimiento (1 a 28).');
             Http::redirect('/configuracion/parametrizacion');
         }
 
@@ -398,6 +399,108 @@ final class ConfigurationController
         }
 
         Http::redirect('/configuracion/galeria-publica');
+    }
+
+    /** Personalización / Sitio público: textos de la portada con borrador, vista previa y publicación. */
+    public function publicSite(): void
+    {
+        $actor = Authorization::requirePermission('configuracion.parametrizacion', 'read');
+        if ($actor === null) {
+            return;
+        }
+
+        Session::start();
+        $errors = $_SESSION['public_site_errors'] ?? [];
+        $old = $_SESSION['public_site_old'] ?? null;
+        unset($_SESSION['public_site_errors'], $_SESSION['public_site_old']);
+        $service = new PublicSiteService();
+        $this->render('public-site', 'Configuracion / Sitio publico', [
+            'actor' => $actor,
+            'values' => is_array($old) ? $old : $service->draftOverrides(),
+            'status' => $service->status(),
+            'errors' => is_array($errors) ? $errors : [],
+            'galleryCount' => count((new PropertyGalleryService())->images()),
+        ]);
+    }
+
+    public function savePublicSite(): void
+    {
+        $actor = $this->requireAction('configuracion.parametrizacion', 'write');
+        if ($actor === null) {
+            return;
+        }
+        Http::requireCsrf();
+
+        $input = $_POST['site'] ?? [];
+        $input = is_array($input) ? $input : [];
+        try {
+            $errors = (new PublicSiteService())->saveDraft($input, (int) $actor['id']);
+        } catch (RuntimeException $exception) {
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
+            Http::redirect('/configuracion/sitio-publico');
+        }
+        if ($errors !== []) {
+            Session::start();
+            $_SESSION['public_site_errors'] = $errors;
+            $_SESSION['public_site_old'] = array_map(
+                static fn (mixed $value): string => is_string($value) ? $value : '',
+                array_intersect_key($input, PublicSiteService::fields())
+            );
+            Http::flash(self::FLASH, 'error', 'Revisa los campos marcados; el borrador no se guardó.');
+            Http::redirect('/configuracion/sitio-publico');
+        }
+
+        if (Http::string($_POST['after'] ?? null) === 'preview') {
+            Http::redirect('/configuracion/sitio-publico/vista-previa');
+        }
+        Http::flash(self::FLASH, 'success', 'Borrador guardado. Revísalo en la vista previa y publícalo cuando esté listo.');
+        Http::redirect('/configuracion/sitio-publico');
+    }
+
+    public function previewPublicSite(): void
+    {
+        if (Authorization::requirePermission('configuracion.parametrizacion', 'read') === null) {
+            return;
+        }
+
+        (new \App\Modules\Home\HomeController())->render((new PublicSiteService())->draft(), true);
+    }
+
+    public function publishPublicSite(): void
+    {
+        $actor = $this->requireAction('configuracion.parametrizacion', 'write');
+        if ($actor === null) {
+            return;
+        }
+        Http::requireCsrf();
+
+        try {
+            $published = (new PublicSiteService())->publish((int) $actor['id']);
+            Http::flash(self::FLASH, $published ? 'success' : 'error', $published
+                ? 'Los cambios ya se ven en el sitio público.'
+                : 'No hay un borrador para publicar.');
+        } catch (RuntimeException $exception) {
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
+        }
+        Http::redirect('/configuracion/sitio-publico');
+    }
+
+    public function discardPublicSite(): void
+    {
+        if ($this->requireAction('configuracion.parametrizacion', 'write') === null) {
+            return;
+        }
+        Http::requireCsrf();
+
+        try {
+            $discarded = (new PublicSiteService())->discardDraft();
+            Http::flash(self::FLASH, $discarded ? 'success' : 'error', $discarded
+                ? 'Se descartó el borrador; el formulario muestra de nuevo lo publicado.'
+                : 'No hay un borrador para descartar.');
+        } catch (RuntimeException $exception) {
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
+        }
+        Http::redirect('/configuracion/sitio-publico');
     }
 
     public function financial(): void

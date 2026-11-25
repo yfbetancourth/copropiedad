@@ -57,9 +57,9 @@ final class ModuleCatalog
         ],
         'clasificados' => [
             'label' => 'Clasificados',
-            'description' => 'Avisos públicos de compra y venta de inmuebles publicados por los residentes.',
+            'description' => 'Avisos públicos de compra, venta y arriendo de inmuebles enviados por los residentes; la administración aprueba cada uno antes de publicarlo.',
             'icon' => 'bi-megaphone',
-            'permissions' => [],
+            'permissions' => ['clasificados'],
             'requires' => [],
         ],
     ];
