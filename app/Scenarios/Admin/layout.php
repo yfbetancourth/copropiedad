@@ -41,6 +41,7 @@ $menu = [
         ['cartera.cobros', '/cartera/reportes', 'bi-graph-up', 'Reportes de cartera', ['/cartera/reportes*']],
         ['cartera.cobros', '/cartera/buscar', 'bi-search', 'Buscar en cartera', ['/cartera/buscar']],
         ['cartera.cobros', '/cartera/pagos-reportados', 'bi-inbox', 'Pagos reportados', ['/cartera/pagos-reportados*']],
+        ['cartera.cobros', '/cartera/consignaciones', 'bi-question-diamond', 'Consignaciones por identificar', ['/cartera/consignaciones*']],
     ]],
     ['Pagos', [
         ['configuracion.pagos', '/configuracion/metodos-pago', 'bi-credit-card', 'Métodos de pago', ['/configuracion/metodos-pago']],
@@ -99,6 +100,7 @@ $isActivePath = static function (array $patterns) use ($currentPath): bool {
 $menuBadges = [];
 if (!$isPlatform && $can('cartera.cobros')) {
     $menuBadges['/cartera/pagos-reportados'] = (new \App\Modules\Billing\PaymentReportService())->pendingCount();
+    $menuBadges['/cartera/consignaciones'] = (new \App\Modules\Billing\UnidentifiedDepositService())->pendingCount();
 }
 if (!$isPlatform && $can('mensajes')) {
     $menuBadges['/comunicacion/atencion'] = (new \App\Modules\Messaging\ConversationService())->pendingForStaff();

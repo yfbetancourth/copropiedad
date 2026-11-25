@@ -1024,6 +1024,7 @@ final class BillingService
         $bank = trim((string) $statement['bank_name']) . ' · '
             . ($statement['account_type'] === 'corriente' ? 'Cuenta corriente' : 'Cuenta de ahorros')
             . ' · ' . trim((string) $statement['account_number']);
+        $paymentReference = (new PaymentReferenceService())->forUnit((string) ($statement['unit_id'] ?? ''));
         $label = static fn (string $text): string => '<span style="display:block;font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#687386">' . $text . '</span>';
         $column = 'width:50%;vertical-align:top';
 
@@ -1058,7 +1059,12 @@ final class BillingService
             . $table('Movimiento ' . $escape($previousPeriod), $rows($previousRows))
             . '<div style="height:8px"></div>'
             . $table('Datos para el pago', '<tr><td style="padding:1px 6px;line-height:1.45">' . $escape($bank) . '<br>Titular: ' . $escape($statement['account_holder'])
-                . '<br>Correo: ' . $escape($statement['property_email']) . '</td></tr>')
+                . '<br>Correo: ' . $escape($statement['property_email'])
+                . ($paymentReference !== null
+                    ? '<br><span style="display:inline-block;margin-top:3px;padding:2px 6px;border:1px solid #315ea8;border-radius:3px">Referencia de pago: <strong style="font-size:12px;letter-spacing:.05em">'
+                        . $escape($paymentReference) . '</strong></span><br><span style="font-size:9.5px;color:#687386">Escríbela en la referencia o descripción de la consignación o transferencia para identificar tu pago.</span>'
+                    : '')
+                . '</td></tr>')
             . '</td><td style="' . $column . ';padding-left:10px">'
             . $table('Movimiento ' . $escape($statement['period']), $rows($currentRows))
             . '<div style="height:8px"></div>'
@@ -1142,6 +1148,9 @@ final class BillingService
             . 'Vencimiento ordinario: ' . $this->formatDate($statement['payment_due_date']) . "\n"
             . "Datos bancarios: {$statement['bank_name']}, {$statement['account_type']}, "
             . "{$statement['account_number']}, titular {$statement['account_holder']}\n"
+            . (($paymentReference = (new PaymentReferenceService())->forUnit((string) ($statement['unit_id'] ?? ''))) !== null
+                ? "Referencia de pago: {$paymentReference} (escríbela en la referencia o descripción de la consignación o transferencia)\n"
+                : '')
             . "Correo de la copropiedad: {$statement['property_email']}";
     }
 

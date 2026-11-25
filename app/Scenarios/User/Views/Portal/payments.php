@@ -106,7 +106,12 @@ $methodIcons = [
                             ?>
                             <tr>
                                 <td><?= $escape((string) $document['number']) ?></td>
-                                <td><?= $escape((string) $document['unit_name']) ?></td>
+                                <td>
+                                    <?= $escape((string) $document['unit_name']) ?>
+                                    <?php if (isset($paymentReferences[$document['unit_id']])): ?>
+                                        <div class="small text-secondary text-nowrap">Ref. de pago <strong class="text-body"><?= $escape($paymentReferences[$document['unit_id']]) ?></strong></div>
+                                    <?php endif; ?>
+                                </td>
                                 <td><?= $escape((string) $document['period']) ?></td>
                                 <td><?= $supersededPeriod !== null ? '<span class="text-secondary">Incluido en ' . $escape($supersededPeriod) . '</span>' : $escape($currency($balance / 100)) ?></td>
                                 <td>
@@ -235,6 +240,16 @@ $methodIcons = [
                     · N.º <?= $escape((string) $bankDetails['account_number']) ?>
                     <?= trim((string) ($bankDetails['account_holder'] ?? '')) !== '' ? '· Titular: ' . $escape((string) $bankDetails['account_holder']) : '' ?>
                     <?= trim((string) ($bankDetails['tax_id'] ?? '')) !== '' ? '· NIT ' . $escape((string) $bankDetails['tax_id']) : '' ?>
+                    <?php if ($paymentReferences !== []): ?>
+                        <br><i class="bi bi-hash" aria-hidden="true"></i>Al consignar o transferir escribe la <strong>referencia de pago</strong> de tu inmueble:
+                        <?= $escape(implode(' · ', array_map(
+                            static fn (array $document): string => $document['unit_name'] . ': ' . ($paymentReferences[$document['unit_id']] ?? ''),
+                            array_values(array_filter(
+                                array_column($billingDocuments, null, 'unit_id'),
+                                static fn (array $document): bool => isset($paymentReferences[$document['unit_id']])
+                            ))
+                        ))) ?>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
             <?php if ($reportableDocuments === []): ?>

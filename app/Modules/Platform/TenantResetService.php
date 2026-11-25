@@ -28,7 +28,7 @@ final class TenantResetService
     public const CATEGORIES = [
         'billing' => [
             'label' => 'Cartera y pagos',
-            'detail' => 'Notas de cobro, conceptos mensuales, pagos, pagos reportados con sus soportes, pagos en línea y enlaces de pago.',
+            'detail' => 'Notas de cobro, conceptos mensuales, pagos, pagos reportados con sus soportes, pagos en línea, enlaces de pago y consignaciones por identificar.',
             'requires' => [],
             'counts' => ['billing_statements' => 'notas', 'billing_payments' => 'pagos', 'billing_payment_reports' => 'reportados'],
         ],
@@ -134,6 +134,7 @@ final class TenantResetService
      * Pasos de borrado en orden seguro para las llaves foráneas: [categoría, tabla que debe existir, SQL].
      */
     private const STEPS = [
+        ['billing', 'billing_unidentified_deposits', 'DELETE FROM billing_unidentified_deposits WHERE tenant_id = ?'],
         ['billing', 'billing_payment_links', 'DELETE FROM billing_payment_links WHERE tenant_id = ?'],
         ['billing', 'billing_payment_reports', 'DELETE FROM billing_payment_reports WHERE tenant_id = ?'],
         ['billing', 'billing_payments', 'DELETE FROM billing_payments WHERE tenant_id = ?'],
@@ -157,6 +158,8 @@ final class TenantResetService
         ['assignments', 'property_unit_relationship_history', 'DELETE FROM property_unit_relationship_history WHERE tenant_id = ?'],
         ['assignments', 'property_unit_assignments', 'DELETE FROM property_unit_assignments WHERE tenant_id = ?'],
         ['composition', 'copropiedad_composition', 'DELETE FROM copropiedad_composition WHERE tenant_id = ?'],
+        // Los inmuebles nuevos reciben referencias nuevas; las anteriores ya no corresponden a ninguno.
+        ['composition', 'billing_unit_references', 'DELETE FROM billing_unit_references WHERE tenant_id = ?'],
         ['mail', 'copropiedad_mail_settings', 'DELETE FROM copropiedad_mail_settings WHERE tenant_id = ?'],
         ['payment_settings', 'bold_payment_settings', 'DELETE FROM bold_payment_settings WHERE tenant_id = ?'],
         ['payment_settings', 'wompi_payment_settings', 'DELETE FROM wompi_payment_settings WHERE tenant_id = ?'],
@@ -318,6 +321,12 @@ final class TenantResetService
             $collect(
                 'SELECT proof_storage_name FROM billing_payment_reports WHERE tenant_id = ?',
                 Storage::directory('payment-proofs', $tenantId)
+            );
+        }
+        if (isset($selected['billing'], $tables['billing_unidentified_deposits'])) {
+            $collect(
+                'SELECT proof_storage_name FROM billing_unidentified_deposits WHERE tenant_id = ? AND proof_storage_name IS NOT NULL',
+                Storage::directory('deposit-proofs', $tenantId)
             );
         }
         if (isset($selected['gallery'])) {

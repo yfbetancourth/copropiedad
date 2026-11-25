@@ -321,8 +321,13 @@ final class PaymentReportService
         return (int) $latest;
     }
 
-    /** @return array{temporary_name: string, mime_type: string, extension: string, byte_size: int} */
-    private function validateProof(array $file): array
+    /**
+     * Valida un soporte subido (imagen o PDF de máximo 5 MB, comprobando el contenido real). También lo usan las
+     * consignaciones por identificar.
+     *
+     * @return array{temporary_name: string, mime_type: string, extension: string, byte_size: int}
+     */
+    public static function validateProof(array $file): array
     {
         $error = $file['error'] ?? UPLOAD_ERR_NO_FILE;
         if ($error === UPLOAD_ERR_NO_FILE) {

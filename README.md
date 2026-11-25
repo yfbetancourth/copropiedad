@@ -435,3 +435,16 @@ de 2026; la reforma a la Ley 1581 (PL 274/2025C) seguía en trámite.
   aviso informativo de cookies (el sitio solo usa cookies necesarias) y formulario de contacto con casilla de
   autorización obligatoria y sin marcar. El formulario aparece cuando están publicadas la política y la autorización.
   Se protege sin cookies: token firmado con tiempo mínimo, campo trampa y máximo 5 mensajes por hora por IP.
+
+## Referencia de pago y consignaciones por identificar (migración 038)
+
+- **Referencia de pago por inmueble**: número corto y estable (secuencia del conjunto + dígito de verificación Luhn,
+  p. ej. `1016`) que aparece en la nota de cobro (HTML y correo) y en el portal del residente, con la instrucción de
+  escribirlo en la consignación o transferencia. Solo dígitos, porque muchos bancos no aceptan letras. Se asigna la
+  primera vez que se necesita; el reinicio de la conformación las borra junto con los inmuebles.
+- **Cartera › Consignaciones por identificar** (permiso `cartera.cobros`): registra el dinero que llegó sin saber de
+  qué inmueble es (valor, fecha, medio, referencia y descripción del banco, soporte opcional). Sugiere el inmueble por
+  referencia de pago escrita en los datos del banco, por un pago reportado con el mismo valor (±5 días) o por saldo
+  igual al valor (incluido el pronto pago). Al identificarla se registra como pago de la nota más reciente del
+  inmueble, con comprobante y aviso; si coincide con un pago reportado, aprueba ese reporte en lugar de duplicarlo.
+  Las descartadas quedan con su motivo.

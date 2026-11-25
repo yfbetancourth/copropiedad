@@ -8,6 +8,7 @@
 !/public/uploads/.htaccess
 /storage/classifieds/
 /storage/payment-proofs/
+/storage/deposit-proofs/
 /composer.phar
 /.phpunit.cache/
 /coverage/

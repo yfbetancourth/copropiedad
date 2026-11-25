@@ -1,5 +1,5 @@
--- Estructura completa de la base de datos Copropiedad (sin datos), con las migraciones 001 a 037 aplicadas.
--- Generado el 2026-11-25 12:31 desde la base local con mysqldump --no-data.
+-- Estructura completa de la base de datos Copropiedad (sin datos), con las migraciones 001 a 038 aplicadas.
+-- Generado el 2026-11-25 12:51 desde la base local con mysqldump --no-data.
 -- Uso en una base nueva y vacía:
 --   mysql -u root -e "CREATE DATABASE copropiedad CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 --   mysql -u root copropiedad < database/schema/copropiedad-schema.sql
@@ -433,6 +433,58 @@ CREATE TABLE `billing_statements` (
   CONSTRAINT `fk_billing_statement_previous` FOREIGN KEY (`previous_statement_id`) REFERENCES `billing_statements` (`id`),
   CONSTRAINT `fk_billing_statement_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `fk_billing_statement_user` FOREIGN KEY (`issued_by`) REFERENCES `admin_users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `billing_unidentified_deposits`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `billing_unidentified_deposits` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint(20) unsigned NOT NULL,
+  `amount` decimal(15,2) NOT NULL,
+  `deposited_on` date NOT NULL,
+  `channel` enum('consignacion','transferencia','otro') NOT NULL,
+  `bank_reference` varchar(80) NOT NULL DEFAULT '',
+  `payer_detail` varchar(160) NOT NULL DEFAULT '',
+  `notes` varchar(255) NOT NULL DEFAULT '',
+  `proof_storage_name` varchar(40) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
+  `proof_mime_type` varchar(32) DEFAULT NULL,
+  `proof_byte_size` int(10) unsigned DEFAULT NULL,
+  `status` enum('pending','processing','identified','discarded') NOT NULL DEFAULT 'pending',
+  `statement_id` bigint(20) unsigned DEFAULT NULL,
+  `payment_id` bigint(20) unsigned DEFAULT NULL,
+  `resolution_note` varchar(255) DEFAULT NULL,
+  `resolved_by` bigint(20) unsigned DEFAULT NULL,
+  `resolved_at` datetime DEFAULT NULL,
+  `created_by` bigint(20) unsigned DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_unidentified_deposits_status` (`tenant_id`,`status`,`deposited_on`),
+  KEY `fk_unidentified_deposits_statement` (`statement_id`),
+  KEY `fk_unidentified_deposits_payment` (`payment_id`),
+  KEY `fk_unidentified_deposits_resolved_by` (`resolved_by`),
+  KEY `fk_unidentified_deposits_created_by` (`created_by`),
+  CONSTRAINT `fk_unidentified_deposits_created_by` FOREIGN KEY (`created_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_unidentified_deposits_payment` FOREIGN KEY (`payment_id`) REFERENCES `billing_payments` (`id`),
+  CONSTRAINT `fk_unidentified_deposits_resolved_by` FOREIGN KEY (`resolved_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_unidentified_deposits_statement` FOREIGN KEY (`statement_id`) REFERENCES `billing_statements` (`id`),
+  CONSTRAINT `fk_unidentified_deposits_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `chk_unidentified_deposit_amount` CHECK (`amount` > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `billing_unit_references`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `billing_unit_references` (
+  `tenant_id` bigint(20) unsigned NOT NULL,
+  `unit_id` char(32) NOT NULL,
+  `sequence` int(10) unsigned NOT NULL,
+  `reference` varchar(12) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`tenant_id`,`unit_id`),
+  UNIQUE KEY `uq_billing_unit_reference` (`tenant_id`,`reference`),
+  UNIQUE KEY `uq_billing_unit_reference_sequence` (`tenant_id`,`sequence`),
+  CONSTRAINT `fk_billing_unit_references_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `billing_wompi_payments`;

@@ -29,6 +29,12 @@ $router->get('/cartera/pagos-reportados/soporte', [$paymentReports, 'proof']);
 $router->post('/cartera/pagos-reportados/aprobar', [$paymentReports, 'approve']);
 $router->post('/cartera/pagos-reportados/rechazar', [$paymentReports, 'reject']);
 $router->get('/cartera/cobros/comprobante', [$paymentReports, 'receipt']);
+$deposits = new \App\Modules\Billing\UnidentifiedDepositController();
+$router->get('/cartera/consignaciones', [$deposits, 'index']);
+$router->post('/cartera/consignaciones/registrar', [$deposits, 'store']);
+$router->post('/cartera/consignaciones/identificar', [$deposits, 'identify']);
+$router->post('/cartera/consignaciones/descartar', [$deposits, 'discard']);
+$router->get('/cartera/consignaciones/soporte', [$deposits, 'proof']);
 
 $paymentLinks = new \App\Modules\Billing\PaymentLinkController();
 $router->get('/cartera/cobros/enlaces', [$paymentLinks, 'index']);

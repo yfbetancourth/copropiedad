@@ -91,6 +91,8 @@ final class ReportService
                 'discount' => $settlement['discount'],
                 'balance' => $balance,
                 'payment_due_date' => (string) $row['payment_due_date'],
+                'early_discount' => BillingService::moneyToCents($row['early_discount']),
+                'early_payment_date' => $row['early_payment_date'] !== null ? (string) $row['early_payment_date'] : null,
                 'past_due' => $pastDue,
                 'overdue_months' => $overdueMonths,
                 'age' => self::ageBucket($balance, $overdueMonths),

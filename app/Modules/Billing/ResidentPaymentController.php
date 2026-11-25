@@ -42,10 +42,14 @@ final class ResidentPaymentController
         $paymentQr = $_SESSION[self::QR_SESSION] ?? null;
         unset($_SESSION[self::QR_SESSION]);
 
+        $billingDocuments = $online->payableStatements((int) $user['id']);
         View::renderPortal('Portal/payments', [
             'title' => 'Pagos',
             'user' => $user,
-            'billingDocuments' => $online->payableStatements((int) $user['id']),
+            'billingDocuments' => $billingDocuments,
+            'paymentReferences' => (new PaymentReferenceService())->forUnits(
+                array_map(static fn (array $document): string => (string) $document['unit_id'], $billingDocuments)
+            ),
             'paymentMethods' => $onlineReady ? $online->configuredMethods() : [],
             'onlinePaymentsReady' => $onlineReady,
             'wompiReady' => PaymentGateways::isReady('wompi'),
