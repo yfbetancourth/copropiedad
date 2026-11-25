@@ -93,9 +93,10 @@ $methodIcons = [
             <?php if ($billingDocuments === []): ?>
                 <p class="text-secondary mb-0">No tienes notas de cobro emitidas.</p>
             <?php else: ?>
-                <div class="table-responsive">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-portal-payments-1">
                     <table class="table table-striped align-middle mb-0">
-                        <thead><tr><th>Nota</th><th>Inmueble</th><th>Período</th><th>Saldo pendiente</th><th>Estado</th><th>Acción</th></tr></thead>
+                        <caption id="tbl-portal-payments-1" class="visually-hidden">Mis notas de cobro</caption>
+                        <thead><tr><th scope="col">Nota</th><th scope="col">Inmueble</th><th scope="col">Período</th><th scope="col">Saldo pendiente</th><th scope="col">Estado</th><th scope="col">Acción</th></tr></thead>
                         <tbody>
                         <?php foreach ($billingDocuments as $document): ?>
                             <?php
@@ -200,9 +201,10 @@ $methodIcons = [
             <?php if ($receipts === []): ?>
                 <p class="text-secondary mb-0">Aún no hay pagos registrados en tus notas de cobro.</p>
             <?php else: ?>
-                <div class="table-responsive">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-portal-payments-2">
                     <table class="table table-sm align-middle mb-0">
-                        <thead><tr><th>Fecha</th><th>Inmueble</th><th>Nota</th><th class="text-end">Valor</th><th>Referencia</th><th></th></tr></thead>
+                        <caption id="tbl-portal-payments-2" class="visually-hidden">Mis pagos y comprobantes</caption>
+                        <thead><tr><th scope="col">Fecha</th><th scope="col">Inmueble</th><th scope="col">Nota</th><th scope="col" class="text-end">Valor</th><th scope="col">Referencia</th><th scope="col"></th></tr></thead>
                         <tbody>
                         <?php foreach (array_slice($receipts, 0, 24) as $receipt): ?>
                             <tr>
@@ -315,9 +317,10 @@ $methodIcons = [
             <?php if ($paymentReports === []): ?>
                 <p class="text-secondary mb-0">No has reportado pagos.</p>
             <?php else: ?>
-                <div class="table-responsive">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-portal-payments-3">
                     <table class="table table-sm align-middle mb-0">
-                        <thead><tr><th>Reportado</th><th>Inmueble</th><th>Fecha de pago</th><th class="text-end">Valor</th><th>Medio</th><th>Estado</th><th></th></tr></thead>
+                        <caption id="tbl-portal-payments-3" class="visually-hidden">Mis pagos reportados</caption>
+                        <thead><tr><th scope="col">Reportado</th><th scope="col">Inmueble</th><th scope="col">Fecha de pago</th><th scope="col" class="text-end">Valor</th><th scope="col">Medio</th><th scope="col">Estado</th><th scope="col"></th></tr></thead>
                         <tbody>
                         <?php foreach ($paymentReports as $report): ?>
                             <tr>
@@ -404,8 +407,9 @@ $methodIcons = [
         <div class="card-body">
             <p class="text-secondary">La administración recibió estos pagos sin saber de qué inmueble son. Si alguno es tuyo, pulsa <strong>Es mía</strong> y adjunta el soporte para que lo apliquen a tu nota de cobro. Para evitarlo, escribe siempre la referencia de pago de tu inmueble al consignar.</p>
             <?php if ($publicDeposits !== []): ?>
-                <div class="table-responsive">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-portal-payments-4">
                     <table class="table table-sm align-middle">
+                        <caption id="tbl-portal-payments-4" class="visually-hidden">Consignaciones sin identificar</caption>
                         <thead><tr><th scope="col">Fecha</th><th scope="col">Valor</th><th scope="col">Medio</th><th scope="col"><span class="visually-hidden">Acción</span></th></tr></thead>
                         <tbody>
                         <?php foreach ($publicDeposits as $publicDeposit): ?>

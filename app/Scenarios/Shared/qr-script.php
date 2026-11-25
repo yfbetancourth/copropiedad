@@ -8,9 +8,8 @@ declare(strict_types=1);
  * Se incluye una sola vez por página, después de los elementos.
  */
 ?>
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"
-        integrity="sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k"
-        crossorigin="anonymous"></script>
+<script src="<?= htmlspecialchars(\App\Core\Url::publicBasePath(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>/assets/vendor/qrcode-generator@1.4.4/qrcode.js"
+        integrity="sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k"></script>
 <script>
 (() => {
     const build = (text) => { const qr = qrcode(0, 'M'); qr.addData(text); qr.make(); return qr; };

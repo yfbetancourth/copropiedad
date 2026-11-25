@@ -47,9 +47,10 @@ $columns = [
             <div class="col-lg-7">
                 <div class="card">
                     <div class="card-header"><h2 class="card-title">Estructura del archivo</h2></div>
-                    <div class="table-responsive">
+                    <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-community-import-1">
                         <table class="table table-sm mb-0">
-                            <thead><tr><th>Columna</th><th>Contenido</th></tr></thead>
+                            <caption id="tbl-community-import-1" class="visually-hidden">Estructura del archivo</caption>
+                            <thead><tr><th scope="col">Columna</th><th scope="col">Contenido</th></tr></thead>
                             <tbody>
                             <?php foreach ($columns as $name => [$description, $required]): ?>
                                 <tr>
@@ -99,18 +100,19 @@ $columns = [
                 </select>
                 <div id="import-grid-tools" class="d-flex gap-2"></div>
             </div>
-            <div class="table-responsive" style="max-height: 60vh">
+            <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-community-import-2" style="max-height: 60vh">
                 <table id="import-table" class="table table-sm table-hover align-middle mb-0">
+                    <caption id="tbl-community-import-2" class="visually-hidden">Filas del archivo para revisar</caption>
                     <thead class="table-light sticky-top">
                         <tr>
-                            <th data-column="line" data-label="Fila" data-sortable>Fila</th>
-                            <th data-column="status" data-label="Estado" data-sortable>Estado</th>
-                            <th data-column="name" data-label="Nombre y apellidos" data-hideable="false" data-sortable>Nombre y apellidos</th>
-                            <th data-column="document" data-label="Documento" data-sortable>Documento</th>
-                            <th data-column="email" data-label="Correo" data-sortable>Correo</th>
-                            <th data-column="type" data-label="Tipo de residente" data-sortable>Tipo</th>
-                            <th data-column="unit" data-label="Inmueble" data-sortable>Inmueble</th>
-                            <th data-column="detail" data-label="Observación">Observación</th>
+                            <th scope="col" data-column="line" data-label="Fila" data-sortable>Fila</th>
+                            <th scope="col" data-column="status" data-label="Estado" data-sortable>Estado</th>
+                            <th scope="col" data-column="name" data-label="Nombre y apellidos" data-hideable="false" data-sortable>Nombre y apellidos</th>
+                            <th scope="col" data-column="document" data-label="Documento" data-sortable>Documento</th>
+                            <th scope="col" data-column="email" data-label="Correo" data-sortable>Correo</th>
+                            <th scope="col" data-column="type" data-label="Tipo de residente" data-sortable>Tipo</th>
+                            <th scope="col" data-column="unit" data-label="Inmueble" data-sortable>Inmueble</th>
+                            <th scope="col" data-column="detail" data-label="Observación">Observación</th>
                         </tr>
                     </thead>
                     <tbody>

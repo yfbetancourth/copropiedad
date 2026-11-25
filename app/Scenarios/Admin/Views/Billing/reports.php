@@ -170,9 +170,10 @@ $maxCollection = max(1, ...array_map(static fn (array $row): int => $row['total'
             </select>
             <input id="portfolio-filter" type="search" class="form-control form-control-sm" style="max-width: 15rem" placeholder="Buscar inmueble o residente" aria-label="Buscar inmueble o residente">
         </div>
-        <div class="table-responsive">
+        <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-billing-reports-1">
             <table class="table table-hover align-middle mb-0" id="portfolio-table">
-                <thead class="table-light"><tr><th>Inmueble</th><th>Última nota</th><th class="text-end">Total</th><th class="text-end">Pagado</th><th class="text-end">Saldo</th><th>Vence</th><th>Antigüedad</th><th></th></tr></thead>
+                <caption id="tbl-billing-reports-1" class="visually-hidden">Recaudo de los últimos 12 meses</caption>
+                <thead class="table-light"><tr><th scope="col">Inmueble</th><th scope="col">Última nota</th><th scope="col" class="text-end">Total</th><th scope="col" class="text-end">Pagado</th><th scope="col" class="text-end">Saldo</th><th scope="col">Vence</th><th scope="col">Antigüedad</th><th scope="col"></th></tr></thead>
                 <tbody>
                 <?php $ageOrder = array_flip(array_keys(ReportService::AGE_LABELS)); ?>
                 <?php foreach ($portfolio as $row): ?>

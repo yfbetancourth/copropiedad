@@ -268,8 +268,9 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                     <div id="billing-grid-tools" class="d-flex flex-wrap gap-2"></div>
                 </div>
                 <div id="billing-grid-bulk" class="px-3 py-2 bg-primary-subtle border-bottom" hidden></div>
-                <div class="table-responsive" style="max-height: 60vh">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-billing-index-1" style="max-height: 60vh">
                     <table class="table table-hover align-middle mb-0" id="billing-preview-table">
+                        <caption id="tbl-billing-index-1" class="visually-hidden">Conceptos incluidos en las notas del período</caption>
                         <thead class="table-light sticky-top">
                         <tr>
                             <th scope="col" data-column="name" data-label="Inmueble" data-hideable="false" data-sortable>Inmueble</th>
@@ -423,8 +424,9 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                     <input class="form-control form-control-sm ms-auto" style="max-width: 18rem" type="search" placeholder="Buscar inmueble o NC-…" aria-label="Buscar nota" data-table-filter="notes-table">
                     <div id="notes-grid-tools" class="d-flex flex-wrap gap-2"></div>
                 </div>
-                <div class="table-responsive" style="max-height: 60vh">
+                <div class="table-responsive" style="max-height: 60vh" role="region" tabindex="0" aria-labelledby="tbl-billing-index-notes">
                     <table class="table table-hover align-middle mb-0" id="notes-table">
+                        <caption id="tbl-billing-index-notes" class="visually-hidden">Notas de cobro del período</caption>
                         <thead class="table-light sticky-top"><tr>
                             <th scope="col" data-column="number" data-label="Nota" data-sortable>Nota</th>
                             <th scope="col" data-column="name" data-label="Inmueble" data-hideable="false" data-sortable>Inmueble</th>
@@ -549,8 +551,9 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                     <input class="form-control form-control-sm ms-auto" style="max-width: 18rem" type="search" placeholder="Buscar inmueble, referencia o valor" aria-label="Buscar pago" data-table-filter="payments-table">
                     <div id="payments-grid-tools" class="d-flex flex-wrap gap-2"></div>
                 </div>
-                <div class="table-responsive" style="max-height: 60vh">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-billing-index-3" style="max-height: 60vh">
                     <table class="table table-sm table-hover align-middle mb-0" id="payments-table">
+                        <caption id="tbl-billing-index-3" class="visually-hidden">Pagos registrados en el período</caption>
                         <thead class="table-light sticky-top"><tr>
                             <th scope="col" data-column="date" data-label="Fecha" data-sortable>Fecha</th>
                             <th scope="col" data-column="name" data-label="Inmueble" data-hideable="false" data-sortable>Inmueble</th>

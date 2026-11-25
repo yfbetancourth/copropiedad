@@ -21,10 +21,11 @@ $brandIcon = '<svg viewBox="0 0 36 36" aria-hidden="true" focusable="false"><pat
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
     <title><?= $escape($pageTitle) ?> | <?= $escape($propertyName) ?></title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/inter@5.0.18/index.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/fraunces@5.0.21/wght-italic.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.2/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.10.2/dist/css/adminlte.min.css">
+    <?php $vendor = $escape(\App\Core\Url::publicBasePath()) . '/assets/vendor'; ?>
+    <link rel="stylesheet" href="<?= $vendor ?>/inter-variable@5.0.18/index.css">
+    <link rel="stylesheet" href="<?= $vendor ?>/fraunces-variable@5.0.21/wght-italic.css">
+    <link rel="stylesheet" href="<?= $vendor ?>/bootstrap-icons@1.13.2/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="<?= $vendor ?>/admin-lte@4.10.2/css/adminlte.min.css">
     <style>
         :root {
             --auth-green: #2f4637;

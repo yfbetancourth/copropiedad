@@ -77,10 +77,9 @@ $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 
     <?php if ($canonicalUrl !== ''): ?><meta property="og:url" content="<?= $escape($canonicalUrl) ?>"><?php endif; ?>
     <?php if ($ogImage !== ''): ?><meta property="og:image" content="<?= $escape($ogImage) ?>"><?php endif; ?>
     <?php if ($canonicalUrl !== ''): ?><meta name="twitter:card" content="<?= $ogImage !== '' ? 'summary_large_image' : 'summary' ?>"><?php endif; ?>
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/inter@5.0.18/index.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/fraunces@5.0.21/wght.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/fraunces@5.0.21/wght-italic.css">
+    <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/vendor/inter-variable@5.0.18/index.css">
+    <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/vendor/fraunces-variable@5.0.21/wght.css">
+    <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/vendor/fraunces-variable@5.0.21/wght-italic.css">
     <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/portada/css/public.css?v=4">
     <?php if ($isHomePage): ?>
         <link rel="preload" as="image" href="<?= $escape($basePath . ($galleryImages[0]['url'] ?? '/assets/portada/images/community-placeholder.svg')) ?>" fetchpriority="high">

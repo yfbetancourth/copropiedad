@@ -21,9 +21,10 @@ $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOT
                 <?php if ($types === []): ?>
                     <div class="card-body text-center text-secondary py-5">Aún no hay tipos de residente.<?= $canWrite ? ' Crea el primero con el formulario.' : '' ?></div>
                 <?php else: ?>
-                    <div class="table-responsive">
+                    <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-community-types-1">
                         <table class="table table-hover align-middle mb-0">
-                            <thead><tr><th>Tipo</th><th class="text-end">Residentes</th><th>Estado</th><?php if ($canWrite): ?><th class="text-end">Acciones</th><?php endif; ?></tr></thead>
+                            <caption id="tbl-community-types-1" class="visually-hidden">Tipos de residente</caption>
+                            <thead><tr><th scope="col">Tipo</th><th scope="col" class="text-end">Residentes</th><th scope="col">Estado</th><?php if ($canWrite): ?><th scope="col" class="text-end">Acciones</th><?php endif; ?></tr></thead>
                             <tbody>
                             <?php foreach ($types as $type): ?>
                                 <?php $id = (int) $type['id']; ?>

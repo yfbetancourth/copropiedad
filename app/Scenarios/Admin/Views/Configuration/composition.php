@@ -346,8 +346,9 @@ $currentStep = 2;
                         <?php endif; ?>
                     </span>
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-configuration-composition-1">
                     <table class="table table-sm align-middle mb-0">
+                        <caption id="tbl-configuration-composition-1" class="visually-hidden">Coeficiente por categoría</caption>
                         <thead class="table-light">
                             <tr>
                                 <th scope="col">Categoría</th>
@@ -540,8 +541,9 @@ $currentStep = 2;
                         <div id="unit-grid-tools" class="d-flex flex-wrap gap-2"></div>
                     </div>
                     <div id="unit-grid-bulk" class="px-3 py-2 bg-primary-subtle border-bottom" hidden></div>
-                    <div class="table-responsive" style="max-height: 62vh">
+                    <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-configuration-composition-2" style="max-height: 62vh">
                         <table id="composition-unit-table" class="table table-sm table-hover align-middle mb-0">
+                            <caption id="tbl-configuration-composition-2" class="visually-hidden">Lista de inmuebles</caption>
                             <thead class="table-light sticky-top">
                                 <tr>
                                     <th scope="col" class="text-secondary" style="width: 4rem" data-column="position" data-label="#" data-sortable>#</th>
@@ -1211,8 +1213,9 @@ $currentStep = 2;
                     <select id="unit-category-filter" class="form-select form-select-sm w-auto" aria-label="Filtrar por categoría"><option value="">Todas las categorías</option></select>
                     <div id="unit-grid-tools" class="d-flex flex-wrap gap-2"></div>
                 </div>
-                <div class="table-responsive" style="max-height: 70vh">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-configuration-composition-3" style="max-height: 70vh">
                     <table id="composition-unit-table" class="table table-sm table-striped mb-0">
+                        <caption id="tbl-configuration-composition-3" class="visually-hidden">Lista de inmuebles</caption>
                         <thead class="table-light sticky-top">
                             <tr>
                                 <th scope="col" data-column="position" data-label="#" data-sortable>#</th>

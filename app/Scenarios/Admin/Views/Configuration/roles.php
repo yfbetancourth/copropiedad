@@ -61,9 +61,10 @@ $canManage = \App\Core\Authorization::hasPermission($actor, 'configuracion.roles
         <div class="<?= $canManage ? 'col-lg-7' : 'col-12' ?>">
             <div class="card">
                 <div class="card-header"><h2 class="card-title">Roles registrados</h2></div>
-                <div class="table-responsive">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-configuration-roles-1">
                     <table class="table table-striped align-middle mb-0">
-                        <thead><tr><th>Rol</th><th>Usuarios</th><th>Permisos</th><?php if ($canWrite || $canManage): ?><th>Acciones</th><?php endif; ?></tr></thead>
+                        <caption id="tbl-configuration-roles-1" class="visually-hidden">Roles registrados</caption>
+                        <thead><tr><th scope="col">Rol</th><th scope="col">Usuarios</th><th scope="col">Permisos</th><?php if ($canWrite || $canManage): ?><th scope="col">Acciones</th><?php endif; ?></tr></thead>
                         <tbody>
                         <?php foreach ($roles as $role): ?>
                             <tr>

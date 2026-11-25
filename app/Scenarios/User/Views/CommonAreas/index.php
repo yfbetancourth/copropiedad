@@ -114,9 +114,10 @@ $now = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
         <?php if ($bookings === []): ?>
             <div class="card-body text-secondary">Aún no has solicitado zonas comunes.</div>
         <?php else: ?>
-            <div class="table-responsive">
+            <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-commonareas-index-1">
                 <table class="table table-sm align-middle mb-0">
-                    <thead><tr><th>Espacio</th><th>Horario</th><th>Estado</th><th></th></tr></thead>
+                    <caption id="tbl-commonareas-index-1" class="visually-hidden">Mis reservas</caption>
+                    <thead><tr><th scope="col">Espacio</th><th scope="col">Horario</th><th scope="col">Estado</th><th scope="col"></th></tr></thead>
                     <tbody>
                     <?php foreach ($bookings as $booking): ?>
                         <?php $cancellable = in_array($booking['status'], ['pending', 'approved'], true) && $booking['starts_at'] > $now; ?>

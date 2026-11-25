@@ -43,8 +43,9 @@ $dateTime = static fn (?string $value): string => $value ? date('d/m/Y h:i a', s
                     <?php if ($imports === []): ?>
                         <p class="text-secondary p-3 mb-0">Aún no se ha importado ningún extracto.</p>
                     <?php else: ?>
-                        <div class="table-responsive">
+                        <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-billing-bank-import-1">
                             <table class="table table-sm align-middle mb-0">
+                                <caption id="tbl-billing-bank-import-1" class="visually-hidden">Importaciones recientes</caption>
                                 <thead><tr><th scope="col">Archivo</th><th scope="col">Cargado</th><th scope="col" class="text-end">Ingresos</th><th scope="col">Resultado</th></tr></thead>
                                 <tbody>
                                 <?php foreach ($imports as $import): ?>

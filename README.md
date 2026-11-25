@@ -258,7 +258,7 @@ Get-Content .\database\migrations\025_add_payment_notifications_reports_and_rent
 - El enlace abre `/pagar?t=…` sin iniciar sesión: muestra la nota y el saldo vigente y lleva al checkout de Bold.
   Al volver, quien no tiene sesión ve `/pagar/resultado`. Requiere el módulo de pagos en línea y Bold configurado.
 - El token se guarda como hash (para buscarlo) y cifrado con `APP_KEY` (para volver a mostrar el enlace y su
-  QR). El QR se dibuja en el navegador con `qrcode-generator` 1.4.4 desde jsDelivr, con verificación SRI.
+  QR). El QR se dibuja en el navegador con `qrcode-generator` 1.4.4 servido localmente desde `public/assets/vendor/`, con verificación SRI.
 - La política CSP ahora permite `form-action https://checkout.bold.co`: sin eso, Chrome bloquea la redirección
   al checkout después de enviar el formulario de pago.
 
@@ -518,3 +518,17 @@ Dirección de retorno, la misma para todos los conjuntos (en producción, con el
 
 Después ejecuta `php bin/deploy-conjunto.php --all`: el script agrega a cada copia las variables nuevas que le falten
 (nunca cambia las que ya tiene). Los botones aparecen solo para los proveedores configurados.
+
+## Modernización: recursos locales y accesibilidad (fase 1)
+
+- **Sin CDN de terceros.** Bootstrap 5.3.9, AdminLTE 4.10.2, Bootstrap Icons 1.13.2, qrcode-generator 1.4.4 y las
+  fuentes (Source Sans 3, Inter, Fraunces) se sirven desde `public/assets/vendor/<paquete>@<versión>/`, con las mismas
+  versiones que antes se cargaban desde jsDelivr. La CSP quedó en `'self'` para scripts, estilos y fuentes; ya no
+  depende de `cdn.jsdelivr.net`. Para actualizar un paquete, se copia la nueva versión a una carpeta con su número y
+  se cambia la ruta en `app/Scenarios/Shared/panel-head.php`, `panel-scripts.php`, `auth-layout.php` y
+  `Public/layout.php`.
+- Se quitó OverlayScrollbars: se cargaba en cada página del panel pero nunca se inicializaba.
+- **Tablas accesibles.** Cada tabla de datos tiene un `<caption>` (oculto a la vista y leído por lectores de
+  pantalla), encabezados con `scope="col"` y su contenedor desplazable es una región con nombre y foco por teclado
+  (`role="region" tabindex="0" aria-labelledby`), para que quien navega con teclado pueda desplazarla.
+- Se añadió la cabecera `Cross-Origin-Opener-Policy: same-origin`.

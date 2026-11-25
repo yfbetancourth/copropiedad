@@ -151,9 +151,10 @@ $examples = ['Torre 2', 'Apartamento 01', 'NC-202611', '350.000', '@gmail.com'];
         <?php if ($results['statements'] !== []): ?>
             <div class="card border-0 shadow-sm mb-3" id="resultados-statements">
                 <div class="card-header bg-transparent"><h2 class="card-title h6 mb-0"><i class="bi bi-receipt me-1" aria-hidden="true"></i>Notas de cobro</h2></div>
-                <div class="table-responsive">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-billing-search-1">
                     <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light"><tr><th>Nota</th><th>Período</th><th>Inmueble</th><th>Residente(s)</th><th class="text-end">Total</th><th class="text-end">Pagado</th><th class="text-end">Saldo</th><th></th></tr></thead>
+                        <caption id="tbl-billing-search-1" class="visually-hidden">Notas de cobro</caption>
+                        <thead class="table-light"><tr><th scope="col">Nota</th><th scope="col">Período</th><th scope="col">Inmueble</th><th scope="col">Residente(s)</th><th scope="col" class="text-end">Total</th><th scope="col" class="text-end">Pagado</th><th scope="col" class="text-end">Saldo</th><th scope="col"></th></tr></thead>
                         <tbody>
                         <?php foreach ($results['statements'] as $statement): ?>
                             <tr>
@@ -190,9 +191,10 @@ $examples = ['Torre 2', 'Apartamento 01', 'NC-202611', '350.000', '@gmail.com'];
         <?php if ($results['payments'] !== []): ?>
             <div class="card border-0 shadow-sm mb-3" id="resultados-payments">
                 <div class="card-header bg-transparent"><h2 class="card-title h6 mb-0"><i class="bi bi-cash-coin me-1" aria-hidden="true"></i>Pagos</h2></div>
-                <div class="table-responsive">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-billing-search-2">
                     <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light"><tr><th>Fecha</th><th>Inmueble</th><th>Nota</th><th class="text-end">Valor</th><th>Referencia / notas</th><th>Registró</th><th>Estado</th></tr></thead>
+                        <caption id="tbl-billing-search-2" class="visually-hidden">Pagos</caption>
+                        <thead class="table-light"><tr><th scope="col">Fecha</th><th scope="col">Inmueble</th><th scope="col">Nota</th><th scope="col" class="text-end">Valor</th><th scope="col">Referencia / notas</th><th scope="col">Registró</th><th scope="col">Estado</th></tr></thead>
                         <tbody>
                         <?php foreach ($results['payments'] as $payment): ?>
                             <tr<?= $payment['voided'] ? ' class="text-secondary"' : '' ?>>
@@ -214,9 +216,10 @@ $examples = ['Torre 2', 'Apartamento 01', 'NC-202611', '350.000', '@gmail.com'];
         <?php if ($results['items'] !== []): ?>
             <div class="card border-0 shadow-sm mb-3" id="resultados-items">
                 <div class="card-header bg-transparent"><h2 class="card-title h6 mb-0"><i class="bi bi-tag me-1" aria-hidden="true"></i>Conceptos adicionales</h2></div>
-                <div class="table-responsive">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-billing-search-3">
                     <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light"><tr><th>Período</th><th>Inmueble</th><th>Tipo</th><th>Descripción</th><th class="text-end">Valor</th><th>Estado</th></tr></thead>
+                        <caption id="tbl-billing-search-3" class="visually-hidden">Conceptos adicionales</caption>
+                        <thead class="table-light"><tr><th scope="col">Período</th><th scope="col">Inmueble</th><th scope="col">Tipo</th><th scope="col">Descripción</th><th scope="col" class="text-end">Valor</th><th scope="col">Estado</th></tr></thead>
                         <tbody>
                         <?php foreach ($results['items'] as $item): ?>
                             <tr>

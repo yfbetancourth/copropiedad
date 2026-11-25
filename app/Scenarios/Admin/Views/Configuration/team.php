@@ -67,10 +67,11 @@ $canManage = \App\Core\Authorization::hasPermission($actor, 'configuracion.equip
         <div class="<?= $canWrite ? 'col-lg-8' : 'col-12' ?>">
             <div class="card">
                 <div class="card-header"><h2 class="card-title">Usuarios</h2></div>
-                <div class="table-responsive">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-configuration-team-1">
                     <table class="table table-striped align-middle mb-0">
+                        <caption id="tbl-configuration-team-1" class="visually-hidden">Usuarios</caption>
                         <thead>
-                        <tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Estado</th><?php if ($canWrite || $canManage): ?><th>Acciones</th><?php endif; ?></tr>
+                        <tr><th scope="col">Usuario</th><th scope="col">Correo</th><th scope="col">Rol</th><th scope="col">Estado</th><?php if ($canWrite || $canManage): ?><th scope="col">Acciones</th><?php endif; ?></tr>
                         </thead>
                         <tbody>
                         <?php foreach ($users as $user): ?>

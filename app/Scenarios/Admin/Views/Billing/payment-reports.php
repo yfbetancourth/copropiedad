@@ -129,9 +129,10 @@ $today = (new DateTimeImmutable('today'))->format('Y-m-d');
             <?php if ($recent === []): ?>
                 <div class="card-body text-secondary">Aún no se ha revisado ningún pago reportado.</div>
             <?php else: ?>
-                <div class="table-responsive">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-billing-payment-reports-1">
                     <table class="table table-sm align-middle mb-0">
-                        <thead><tr><th>Reportado</th><th>Residente</th><th>Inmueble · nota</th><th class="text-end">Valor</th><th>Medio</th><th>Estado</th><th>Revisó</th><th></th></tr></thead>
+                        <caption id="tbl-billing-payment-reports-1" class="visually-hidden">Últimos pagos reportados ya revisados</caption>
+                        <thead><tr><th scope="col">Reportado</th><th scope="col">Residente</th><th scope="col">Inmueble · nota</th><th scope="col" class="text-end">Valor</th><th scope="col">Medio</th><th scope="col">Estado</th><th scope="col">Revisó</th><th scope="col"></th></tr></thead>
                         <tbody>
                         <?php foreach ($recent as $report): ?>
                             <tr>

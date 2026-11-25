@@ -17,7 +17,14 @@ final class WebBootstrap
         header('X-Frame-Options: DENY');
         header('Referrer-Policy: no-referrer');
         header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
-        header("Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://checkout.bold.co https://checkout.wompi.co; img-src 'self' data:; font-src 'self' data: https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self'");
+        // Todos los recursos se sirven desde el propio sitio (public/assets/vendor): la CSP no admite terceros.
+        header("Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://checkout.bold.co https://checkout.wompi.co; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'");
+        // Aísla la ventana de las que abra (WhatsApp, Google Maps, pasarelas): ninguna puede manipularla.
+        header('Cross-Origin-Opener-Policy: same-origin');
+        if (Session::isHttps()) {
+            // Solo con HTTPS: el navegador no vuelve a intentar HTTP durante un año.
+            header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+        }
         header('Cache-Control: no-store, private');
 
         // El subdominio decide el conjunto residencial (o la plataforma) antes de registrar las rutas.

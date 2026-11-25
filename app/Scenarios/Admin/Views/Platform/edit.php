@@ -115,8 +115,9 @@ $tenantId = (int) $tenant['id'];
                     <div class="card-body pb-2">
                         <p class="mb-2">Marca lo que quieres borrar <strong>de forma definitiva</strong>. Lo que depende de otro dato se marca solo, para no dejar registros sueltos.</p>
                     </div>
-                    <div class="table-responsive">
+                    <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-platform-edit-1">
                         <table class="table table-sm table-hover align-middle mb-0" id="reset-table">
+                            <caption id="tbl-platform-edit-1" class="visually-hidden">Información del conjunto que se puede reiniciar</caption>
                             <thead class="table-light">
                                 <tr>
                                     <th scope="col" class="ps-3" style="width: 2.75rem"><input class="form-check-input" type="checkbox" id="reset-all" aria-label="Marcar todo (reinicio completo)"></th>

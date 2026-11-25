@@ -32,8 +32,9 @@ $publicBasePath = preg_replace('~/admin$~', '', $basePath) ?? $basePath;
                     <?php if ($units === []): ?>
                         <p class="text-secondary p-3 mb-0">Aún no hay notas de cobro emitidas.</p>
                     <?php else: ?>
-                        <div class="table-responsive">
+                        <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-billing-documents-1">
                             <table class="table table-sm align-middle mb-0">
+                                <caption id="tbl-billing-documents-1" class="visually-hidden">Inmuebles con notas de cobro</caption>
                                 <thead><tr><th scope="col">Inmueble</th><th scope="col">Ref. de pago</th><th scope="col">Última nota</th><th scope="col" class="text-end">Saldo</th><th scope="col"><span class="visually-hidden">Acciones</span></th></tr></thead>
                                 <tbody>
                                 <?php foreach ($units as $unit): ?>

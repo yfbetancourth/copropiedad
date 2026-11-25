@@ -10,8 +10,8 @@ declare(strict_types=1);
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= $escape($pageTitle) ?> | <?= $escape($propertyName) ?></title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.2/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/admin-lte@4.10.2/dist/css/adminlte.min.css">
+    <?php $vendor = $escape(\App\Core\Url::publicBasePath()) . '/assets/vendor'; // Servidos localmente: sin terceros. ?>
+    <link rel="stylesheet" href="<?= $vendor ?>/source-sans-3@5.0.12/index.css">
+    <link rel="stylesheet" href="<?= $vendor ?>/bootstrap-icons@1.13.2/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="<?= $vendor ?>/admin-lte@4.10.2/css/adminlte.min.css">
 </head>

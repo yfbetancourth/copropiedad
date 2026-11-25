@@ -208,9 +208,10 @@ $groupOf = static function (array $unit): string {
                         <?php if ($userHistory === []): ?>
                             <div class="card-body small text-secondary">Aún no tiene vínculos registrados.</div>
                         <?php else: ?>
-                            <div class="table-responsive">
+                            <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-propertyassignment-index-1">
                                 <table class="table table-sm align-middle mb-0">
-                                    <thead><tr><th>Inmueble</th><th>Vínculo</th><th>Desde</th><th>Hasta</th></tr></thead>
+                                    <caption id="tbl-propertyassignment-index-1" class="visually-hidden">Historial de vínculos del inmueble</caption>
+                                    <thead><tr><th scope="col">Inmueble</th><th scope="col">Vínculo</th><th scope="col">Desde</th><th scope="col">Hasta</th></tr></thead>
                                     <tbody>
                                     <?php foreach ($userHistory as $entry): ?>
                                         <tr>

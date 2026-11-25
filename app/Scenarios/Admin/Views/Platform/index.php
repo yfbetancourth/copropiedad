@@ -50,8 +50,9 @@ $activeCount = count(array_filter($tenants, static fn (array $tenant): bool => $
                     Aún no hay conjuntos. Crea el primero para asignarle su administrador.
                 </div>
             <?php else: ?>
-                <div class="table-responsive">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-platform-index-1">
                     <table class="table table-hover align-middle mb-0">
+                        <caption id="tbl-platform-index-1" class="visually-hidden">Conjuntos residenciales</caption>
                         <thead>
                         <tr>
                             <th scope="col">Conjunto</th>

@@ -69,8 +69,9 @@ $hasSelection = $canWrite || $canDelete;
                 <div id="resident-grid-tools" class="d-flex flex-wrap gap-2"></div>
             </div>
             <div id="resident-grid-bulk" class="px-3 py-2 bg-primary-subtle border-bottom" hidden></div>
-            <div class="table-responsive" style="max-height: 70vh">
+            <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-community-residents-1" style="max-height: 70vh">
                 <table id="resident-table" class="table table-hover align-middle mb-0">
+                    <caption id="tbl-community-residents-1" class="visually-hidden">Residentes</caption>
                     <thead class="table-light sticky-top">
                         <tr>
                             <th scope="col" data-column="name" data-label="Residente" data-hideable="false" data-sortable>Residente</th>

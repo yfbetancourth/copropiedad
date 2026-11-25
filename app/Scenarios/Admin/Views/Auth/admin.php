@@ -194,8 +194,9 @@ $ageTone = ['al_dia' => 'success', 'corriente' => 'secondary', '1_30' => 'warnin
                             Sin saldos pendientes.
                         </div>
                     <?php else: ?>
-                        <div class="table-responsive">
+                        <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-auth-admin-1">
                             <table class="table table-hover align-middle mb-0">
+                                <caption id="tbl-auth-admin-1" class="visually-hidden">Mayores saldos pendientes</caption>
                                 <thead class="table-light"><tr><th scope="col">Inmueble</th><th scope="col">Antigüedad</th><th scope="col" class="text-end">Saldo</th></tr></thead>
                                 <tbody>
                                 <?php foreach ($dashboard['top_debtors'] as $debtor): ?>

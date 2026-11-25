@@ -51,9 +51,10 @@
             <?php if ($sentMessages === []): ?>
                 <p class="text-secondary p-3 mb-0">Todavía no has enviado mensajes.</p>
             <?php else: ?>
-                <div class="table-responsive">
+                <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-messaging-index-1">
                     <table class="table table-striped align-middle mb-0">
-                        <thead><tr><th>Asunto</th><th>Enviado</th><th>Destinatarios</th><th>Leídos</th></tr></thead>
+                        <caption id="tbl-messaging-index-1" class="visually-hidden">Mensajes enviados</caption>
+                        <thead><tr><th scope="col">Asunto</th><th scope="col">Enviado</th><th scope="col">Destinatarios</th><th scope="col">Leídos</th></tr></thead>
                         <tbody>
                         <?php foreach ($sentMessages as $message): ?>
                             <tr>

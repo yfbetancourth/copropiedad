@@ -106,10 +106,11 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                     <?php if ($units === []): ?>
                         <p class="text-secondary mb-0">Todavía no tienes inmuebles asignados. Comunícate con la administración si crees que esto es un error.</p>
                     <?php else: ?>
-                        <div class="table-responsive">
+                        <div class="table-responsive" role="region" tabindex="0" aria-labelledby="tbl-portal-index-1">
                             <table class="table table-striped align-middle mb-0">
+                                <caption id="tbl-portal-index-1" class="visually-hidden">Mis inmuebles asignados</caption>
                                 <thead>
-                                <tr><th>Inmueble</th><th>Categoría</th><th>Tu vínculo</th><?php if ($unitFees['configured']): ?><th class="text-end">Cuota mensual</th><?php endif; ?></tr>
+                                <tr><th scope="col">Inmueble</th><th scope="col">Categoría</th><th scope="col">Tu vínculo</th><?php if ($unitFees['configured']): ?><th scope="col" class="text-end">Cuota mensual</th><?php endif; ?></tr>
                                 </thead>
                                 <tbody>
                                 <?php foreach ($units as $unit): ?>
