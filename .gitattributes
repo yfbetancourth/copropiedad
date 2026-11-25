@@ -1,0 +1,3 @@
+
+# Archivos de terceros: se guardan byte a byte (el SRI de qrcode.js depende de los finales de línea).
+public/assets/vendor/** -text
