@@ -14,3 +14,5 @@ $router->post('/usuario/pagos/qr', [$residentPayments, 'qr']);
 $router->post('/usuario/pagos/reportar', [$residentPayments, 'report']);
 $router->get('/usuario/pagos/soporte', [$residentPayments, 'proof']);
 $router->get('/usuario/pagos/comprobante', [$residentPayments, 'receipt']);
+$router->post('/usuario/pagos/consignacion', [$residentPayments, 'claimDeposit']);
+$router->get('/usuario/pagos/consignacion/soporte', [$residentPayments, 'claimProof']);

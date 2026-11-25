@@ -1,5 +1,5 @@
--- Estructura completa de la base de datos Copropiedad (sin datos), con las migraciones 001 a 038 aplicadas.
--- Generado el 2026-11-25 12:51 desde la base local con mysqldump --no-data.
+-- Estructura completa de la base de datos Copropiedad (sin datos), con las migraciones 001 a 039 aplicadas.
+-- Generado el 2026-11-25 13:01 desde la base local con mysqldump --no-data.
 -- Uso en una base nueva y vacía:
 --   mysql -u root -e "CREATE DATABASE copropiedad CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 --   mysql -u root copropiedad < database/schema/copropiedad-schema.sql
@@ -166,6 +166,38 @@ CREATE TABLE `billing_bold_terminal_payments` (
   CONSTRAINT `fk_bold_terminal_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `fk_bold_terminal_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`),
   CONSTRAINT `chk_bold_terminal_amount` CHECK (`expected_amount` > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `billing_deposit_claims`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `billing_deposit_claims` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint(20) unsigned NOT NULL,
+  `deposit_id` bigint(20) unsigned NOT NULL,
+  `user_id` bigint(20) unsigned NOT NULL,
+  `statement_id` bigint(20) unsigned NOT NULL,
+  `notes` varchar(255) NOT NULL DEFAULT '',
+  `proof_storage_name` varchar(40) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `proof_mime_type` varchar(32) NOT NULL,
+  `proof_byte_size` int(10) unsigned NOT NULL,
+  `status` enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  `review_note` varchar(255) DEFAULT NULL,
+  `reviewed_by` bigint(20) unsigned DEFAULT NULL,
+  `reviewed_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_deposit_claim_user` (`deposit_id`,`user_id`),
+  KEY `idx_deposit_claims_status` (`tenant_id`,`status`),
+  KEY `idx_deposit_claims_user` (`tenant_id`,`user_id`,`created_at`),
+  KEY `fk_deposit_claims_user` (`user_id`),
+  KEY `fk_deposit_claims_statement` (`statement_id`),
+  KEY `fk_deposit_claims_reviewed_by` (`reviewed_by`),
+  CONSTRAINT `fk_deposit_claims_deposit` FOREIGN KEY (`deposit_id`) REFERENCES `billing_unidentified_deposits` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_deposit_claims_reviewed_by` FOREIGN KEY (`reviewed_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_deposit_claims_statement` FOREIGN KEY (`statement_id`) REFERENCES `billing_statements` (`id`),
+  CONSTRAINT `fk_deposit_claims_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `fk_deposit_claims_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `billing_monthly_items`;
@@ -447,6 +479,7 @@ CREATE TABLE `billing_unidentified_deposits` (
   `bank_reference` varchar(80) NOT NULL DEFAULT '',
   `payer_detail` varchar(160) NOT NULL DEFAULT '',
   `notes` varchar(255) NOT NULL DEFAULT '',
+  `published_to_residents` tinyint(1) NOT NULL DEFAULT 1,
   `proof_storage_name` varchar(40) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
   `proof_mime_type` varchar(32) DEFAULT NULL,
   `proof_byte_size` int(10) unsigned DEFAULT NULL,

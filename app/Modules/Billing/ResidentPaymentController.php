@@ -56,6 +56,8 @@ final class ResidentPaymentController
             'terminalPaymentsReady' => (new BoldTerminalService())->isReady(),
             'notifications' => (new PortalNotificationService())->unreadForUser((int) $user['id']),
             'paymentReports' => $this->paymentReportsFor((int) $user['id']),
+            'publicDeposits' => (new DepositClaimService())->publicDeposits(),
+            'depositClaims' => (new DepositClaimService())->forUser((int) $user['id']),
             'paymentQr' => $paymentQr,
             'bankDetails' => (new SettingsService())->current(),
             'flash' => Http::pullFlash(self::FLASH),
@@ -152,6 +154,37 @@ final class ResidentPaymentController
     {
         $user = $this->requireResident();
         PaymentReportController::renderReceipt(Http::id($_GET['id'] ?? null), (int) $user['id']);
+    }
+
+    /** «Es mía»: reclama una consignación por identificar con su soporte. */
+    public function claimDeposit(): void
+    {
+        $user = $this->requireResident();
+        Http::requireCsrf();
+        try {
+            (new DepositClaimService())->create(
+                (int) $user['id'],
+                Http::id($_POST['deposit_id'] ?? null),
+                Http::id($_POST['statement_id'] ?? null),
+                Http::string($_POST['notes'] ?? null),
+                $_FILES['proof'] ?? []
+            );
+            Http::flash(self::FLASH, 'success', 'Recibimos tu reclamo. La administración revisará tu soporte y te avisaremos cuando quede aplicado.');
+        } catch (PDOException $exception) {
+            error_log('No se pudo guardar un reclamo de consignación: ' . $exception->getMessage());
+            Http::flash(self::FLASH, 'error', 'No fue posible guardar el reclamo en este momento. Intenta más tarde.');
+        } catch (RuntimeException $exception) {
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
+        }
+        Http::redirect('/usuario/pagos#consignaciones');
+    }
+
+    public function claimProof(): void
+    {
+        $user = $this->requireResident();
+        PaymentReportController::streamProof(
+            (new DepositClaimService())->proof(Http::id($_GET['id'] ?? null), (int) $user['id'])
+        );
     }
 
 

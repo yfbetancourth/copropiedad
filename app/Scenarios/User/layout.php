@@ -26,6 +26,7 @@ $noticeIcons = [
     'payment_received' => 'bi-check-circle text-success',
     'payment_report_approved' => 'bi-check-circle text-success',
     'payment_report_rejected' => 'bi-x-circle text-danger',
+    'deposit_claim_rejected' => 'bi-x-circle text-danger',
     'booking_approved' => 'bi-calendar2-check text-success',
     'booking_rejected' => 'bi-calendar2-x text-danger',
     'conversation_reply' => 'bi-chat-dots text-primary',

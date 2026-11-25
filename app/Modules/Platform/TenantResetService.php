@@ -329,6 +329,18 @@ final class TenantResetService
                 Storage::directory('deposit-proofs', $tenantId)
             );
         }
+        // Los reclamos se borran en cascada con su consignación (billing) o con la cuenta del residente (residents).
+        if ((isset($selected['billing']) || isset($selected['residents'])) && isset($tables['billing_deposit_claims'])) {
+            $collect(
+                isset($selected['billing'])
+                    ? 'SELECT proof_storage_name FROM billing_deposit_claims WHERE tenant_id = ?'
+                    : "SELECT claims.proof_storage_name FROM billing_deposit_claims AS claims
+                       JOIN admin_users AS users ON users.id = claims.user_id
+                       JOIN admin_roles AS roles ON roles.id = users.role_id
+                       WHERE claims.tenant_id = ? AND roles.kind = 'resident'",
+                Storage::directory('deposit-claims', $tenantId)
+            );
+        }
         if (isset($selected['gallery'])) {
             array_push($files, ...$this->galleryFiles($tenantId));
         }

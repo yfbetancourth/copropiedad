@@ -9,6 +9,7 @@
 /storage/classifieds/
 /storage/payment-proofs/
 /storage/deposit-proofs/
+/storage/deposit-claims/
 /composer.phar
 /.phpunit.cache/
 /coverage/

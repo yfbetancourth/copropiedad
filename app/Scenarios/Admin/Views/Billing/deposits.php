@@ -132,6 +132,59 @@ $emptyMessages = [
                         <?php elseif ($deposit['status'] === 'processing'): ?>
                             <div class="alert alert-info small mb-0">Se está aplicando en este momento. Recarga la página en unos segundos.</div>
                         <?php else: ?>
+                            <?php if ($canWrite): ?>
+                                <form method="post" action="<?= $escape($basePath) ?>/cartera/consignaciones/publicar" class="d-flex align-items-center gap-2 small mb-2">
+                                    <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
+                                    <input type="hidden" name="deposit_id" value="<?= $depositId ?>">
+                                    <input type="hidden" name="published" value="<?= (int) $deposit['published_to_residents'] === 1 ? '0' : '1' ?>">
+                                    <?php if ((int) $deposit['published_to_residents'] === 1): ?>
+                                        <span class="text-success"><i class="bi bi-eye me-1" aria-hidden="true"></i>Visible en el portal para que su dueño la reclame</span>
+                                        <button class="btn btn-link btn-sm p-0" type="submit">Ocultar</button>
+                                    <?php else: ?>
+                                        <span class="text-secondary"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>Oculta en el portal</span>
+                                        <button class="btn btn-link btn-sm p-0" type="submit">Mostrar</button>
+                                    <?php endif; ?>
+                                </form>
+                            <?php endif; ?>
+
+                            <?php if (($deposit['claims'] ?? []) !== []): ?>
+                                <h3 class="h6 mt-2"><i class="bi bi-person-raised-hand me-1" aria-hidden="true"></i>Reclamada por residentes</h3>
+                                <ul class="list-group mb-3">
+                                    <?php foreach ($deposit['claims'] as $claim): ?>
+                                        <?php $claimId = (int) $claim['id']; ?>
+                                        <li class="list-group-item list-group-item-warning">
+                                            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                                                <div class="small">
+                                                    <strong><?= $escape($claim['unit_name']) ?></strong> · <?= $escape($claim['username']) ?>
+                                                    <span class="text-secondary">· <?= $escape($dateTime($claim['created_at'])) ?></span>
+                                                    <?php if ($claim['notes'] !== ''): ?><div><?= $escape($claim['notes']) ?></div><?php endif; ?>
+                                                    <a href="<?= $escape($basePath) ?>/cartera/consignaciones/reclamo/soporte?id=<?= $claimId ?>" target="_blank" rel="noopener"><i class="bi bi-paperclip" aria-hidden="true"></i> Ver soporte del residente</a>
+                                                </div>
+                                                <?php if ($canWrite): ?>
+                                                    <form method="post" action="<?= $escape($basePath) ?>/cartera/consignaciones/reclamo/aprobar" onsubmit="return confirm(<?= $escape(json_encode('¿Aprobar el reclamo y registrar ' . $money((int) $deposit['amount_cents']) . ' como pago de ' . $claim['unit_name'] . '?', JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)) ?>);">
+                                                        <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
+                                                        <input type="hidden" name="claim_id" value="<?= $claimId ?>">
+                                                        <button class="btn btn-sm btn-success" type="submit">Aprobar reclamo</button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            </div>
+                                            <?php if ($canWrite): ?>
+                                                <details class="mt-1">
+                                                    <summary class="small text-danger">Rechazar reclamo</summary>
+                                                    <form method="post" action="<?= $escape($basePath) ?>/cartera/consignaciones/reclamo/rechazar" class="d-flex gap-2 mt-2">
+                                                        <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
+                                                        <input type="hidden" name="claim_id" value="<?= $claimId ?>">
+                                                        <label class="visually-hidden" for="reject-claim-<?= $claimId ?>">Motivo para el residente</label>
+                                                        <input class="form-control form-control-sm" type="text" id="reject-claim-<?= $claimId ?>" name="reason" maxlength="255" required placeholder="Motivo para el residente">
+                                                        <button class="btn btn-sm btn-outline-danger text-nowrap" type="submit">Rechazar</button>
+                                                    </form>
+                                                </details>
+                                            <?php endif; ?>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php endif; ?>
+
                             <h3 class="h6 mt-2">Sugerencias</h3>
                             <?php if ($deposit['suggestions'] === []): ?>
                                 <p class="small text-secondary">No hay coincidencias por referencia, pago reportado ni valor. Asígnala a mano cuando sepas de qué inmueble es.</p>

@@ -269,7 +269,7 @@ final class UnidentifiedDepositService
      * Identifica la consignación: registra el pago en la nota (la más reciente del inmueble) y, si viene de un pago
      * reportado por el residente, lo aprueba en lugar de duplicarlo. Devuelve el id del pago.
      */
-    public function identify(int $depositId, int $statementId, ?int $reportId, int $actorId): int
+    public function identify(int $depositId, int $statementId, ?int $reportId, int $actorId, ?string $resolutionNote = null): int
     {
         $pdo = Database::connection();
         $claim = $pdo->prepare(
@@ -308,17 +308,43 @@ final class UnidentifiedDepositService
                  WHERE id = ? AND tenant_id = ?"
             )->execute([
                 (int) $paymentStatement->fetchColumn(), $paymentId, $actorId,
-                $reportId !== null ? 'Coincide con el pago reportado #' . $reportId : null,
+                $reportId !== null ? 'Coincide con el pago reportado #' . $reportId : $resolutionNote,
                 $depositId, Tenant::id(),
             ]);
-
-            return $paymentId;
         } catch (Throwable $exception) {
             $pdo->prepare(
                 "UPDATE billing_unidentified_deposits SET status = 'pending' WHERE id = ? AND tenant_id = ? AND status = 'processing'"
             )->execute([$depositId, Tenant::id()]);
             throw $exception;
         }
+
+        // El pago ya quedó registrado: los reclamos que sigan en revisión eran de otro inmueble.
+        (new DepositClaimService())->closePending($depositId, 'La consignación se identificó con otro inmueble.', $actorId);
+
+        return $paymentId;
+    }
+
+    /** Muestra u oculta la consignación en el portal de residentes (allí solo se ven fecha, valor y medio). */
+    public function setPublished(int $depositId, bool $published): void
+    {
+        $statement = Database::connection()->prepare(
+            "UPDATE billing_unidentified_deposits SET published_to_residents = ?
+             WHERE id = ? AND tenant_id = ? AND status = 'pending'"
+        );
+        $statement->execute([$published ? 1 : 0, $depositId, Tenant::id()]);
+        if ($statement->rowCount() === 0 && !$this->isPending($depositId)) {
+            throw new RuntimeException('La consignación ya fue identificada, descartada o no existe.');
+        }
+    }
+
+    private function isPending(int $depositId): bool
+    {
+        $statement = Database::connection()->prepare(
+            "SELECT 1 FROM billing_unidentified_deposits WHERE id = ? AND tenant_id = ? AND status = 'pending'"
+        );
+        $statement->execute([$depositId, Tenant::id()]);
+
+        return $statement->fetchColumn() !== false;
     }
 
     /** Descarta una consignación registrada por error, duplicada o devuelta por el banco. Queda con el motivo. */
@@ -337,6 +363,7 @@ final class UnidentifiedDepositService
         if ($statement->rowCount() !== 1) {
             throw new RuntimeException('La consignación ya fue identificada, descartada o no existe.');
         }
+        (new DepositClaimService())->closePending($depositId, 'La administración descartó esta consignación: ' . $reason, $actorId);
     }
 
     /** @return array{path: string, mime_type: string, byte_size: int, download_name: string}|null */

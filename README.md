@@ -448,3 +448,8 @@ de 2026; la reforma a la Ley 1581 (PL 274/2025C) seguía en trámite.
   igual al valor (incluido el pronto pago). Al identificarla se registra como pago de la nota más reciente del
   inmueble, con comprobante y aviso; si coincide con un pago reportado, aprueba ese reporte en lugar de duplicarlo.
   Las descartadas quedan con su motivo.
+- **«Es mía» en el portal (migración 039)**: las consignaciones por identificar se muestran a los residentes en
+  *Pagos › Consignaciones sin identificar* solo con fecha, valor y medio (nunca la descripción del banco). El residente
+  la reclama eligiendo su nota y adjuntando el soporte; la administración aprueba (se identifica y se registra el pago)
+  o rechaza con motivo desde la misma tarjeta de la consignación. Cada consignación se puede ocultar del portal. Si se
+  identifica o descarta por otra vía, los reclamos abiertos se cierran y se avisa a cada residente.

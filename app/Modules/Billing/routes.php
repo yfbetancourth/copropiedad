@@ -35,6 +35,10 @@ $router->post('/cartera/consignaciones/registrar', [$deposits, 'store']);
 $router->post('/cartera/consignaciones/identificar', [$deposits, 'identify']);
 $router->post('/cartera/consignaciones/descartar', [$deposits, 'discard']);
 $router->get('/cartera/consignaciones/soporte', [$deposits, 'proof']);
+$router->post('/cartera/consignaciones/publicar', [$deposits, 'setPublished']);
+$router->post('/cartera/consignaciones/reclamo/aprobar', [$deposits, 'approveClaim']);
+$router->post('/cartera/consignaciones/reclamo/rechazar', [$deposits, 'rejectClaim']);
+$router->get('/cartera/consignaciones/reclamo/soporte', [$deposits, 'claimProof']);
 
 $paymentLinks = new \App\Modules\Billing\PaymentLinkController();
 $router->get('/cartera/cobros/enlaces', [$paymentLinks, 'index']);

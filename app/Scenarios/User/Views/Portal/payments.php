@@ -346,4 +346,89 @@ $methodIcons = [
         </div>
     </div>
     <?php endif; ?>
+
+    <?php
+    $publicDeposits = $publicDeposits ?? [];
+    $depositClaims = $depositClaims ?? [];
+    $claimedDepositIds = array_column($depositClaims, 'deposit_id');
+    $depositChannels = \App\Modules\Billing\UnidentifiedDepositService::CHANNEL_LABELS;
+    $claimStatusLabels = \App\Modules\Billing\DepositClaimService::STATUS_LABELS;
+    $claimBadges = ['pending' => 'warning', 'approved' => 'success', 'rejected' => 'danger'];
+    ?>
+    <?php if ($publicDeposits !== [] || $depositClaims !== []): ?>
+    <div class="card card-info card-outline mt-4" id="consignaciones">
+        <div class="card-header">
+            <h2 class="card-title">Consignaciones sin identificar</h2>
+        </div>
+        <div class="card-body">
+            <p class="text-secondary">La administración recibió estos pagos sin saber de qué inmueble son. Si alguno es tuyo, pulsa <strong>Es mía</strong> y adjunta el soporte para que lo apliquen a tu nota de cobro. Para evitarlo, escribe siempre la referencia de pago de tu inmueble al consignar.</p>
+            <?php if ($publicDeposits !== []): ?>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead><tr><th scope="col">Fecha</th><th scope="col">Valor</th><th scope="col">Medio</th><th scope="col"><span class="visually-hidden">Acción</span></th></tr></thead>
+                        <tbody>
+                        <?php foreach ($publicDeposits as $publicDeposit): ?>
+                            <?php $publicId = (int) $publicDeposit['id']; ?>
+                            <tr>
+                                <td><?= $escape(date('d/m/Y', strtotime($publicDeposit['deposited_on']) ?: 0)) ?></td>
+                                <td><strong><?= $escape($currency($publicDeposit['amount_cents'] / 100)) ?></strong></td>
+                                <td><?= $escape($depositChannels[$publicDeposit['channel']] ?? '') ?></td>
+                                <td class="text-end">
+                                    <?php if (in_array($publicId, array_map('intval', $claimedDepositIds), true)): ?>
+                                        <span class="badge text-bg-light border">Ya la reclamaste</span>
+                                    <?php elseif ($reportableDocuments === [] && $billingDocuments === []): ?>
+                                        <span class="small text-secondary">Sin notas de cobro</span>
+                                    <?php else: ?>
+                                        <details>
+                                            <summary class="btn btn-sm btn-outline-primary">Es mía</summary>
+                                            <form method="post" action="<?= $escape($basePath) ?>/usuario/pagos/consignacion" enctype="multipart/form-data" class="text-start mt-2" style="min-width: 260px">
+                                                <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
+                                                <input type="hidden" name="deposit_id" value="<?= $publicId ?>">
+                                                <label class="form-label small" for="claim-statement-<?= $publicId ?>">Aplicar a la nota</label>
+                                                <select class="form-select form-select-sm" id="claim-statement-<?= $publicId ?>" name="statement_id" required>
+                                                    <?php foreach ($reportableDocuments !== [] ? $reportableDocuments : $billingDocuments as $document): ?>
+                                                        <option value="<?= (int) $document['id'] ?>"><?= $escape($document['unit_name'] . ' · ' . $document['period']) ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <label class="form-label small mt-2" for="claim-proof-<?= $publicId ?>">Soporte (imagen o PDF, máx. 5 MB)</label>
+                                                <input class="form-control form-control-sm" type="file" id="claim-proof-<?= $publicId ?>" name="proof" accept="image/jpeg,image/png,image/webp,application/pdf" required>
+                                                <label class="form-label small mt-2" for="claim-notes-<?= $publicId ?>">Nota <span class="text-secondary">(opcional)</span></label>
+                                                <input class="form-control form-control-sm" type="text" id="claim-notes-<?= $publicId ?>" name="notes" maxlength="255" placeholder="Ej.: la hice desde la cuenta de mi esposa">
+                                                <button class="btn btn-sm btn-primary mt-2" type="submit">Enviar reclamo</button>
+                                            </form>
+                                        </details>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($depositClaims !== []): ?>
+                <h3 class="h6 mt-3">Mis reclamos</h3>
+                <ul class="list-group">
+                    <?php foreach ($depositClaims as $claim): ?>
+                        <li class="list-group-item d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                            <div class="small">
+                                Consignación del <?= $escape(date('d/m/Y', strtotime((string) $claim['deposited_on']) ?: 0)) ?> por <strong><?= $escape($currency($claim['amount_cents'] / 100)) ?></strong> · <?= $escape((string) $claim['unit_name']) ?>
+                                <?php if ($claim['status'] === 'rejected' && (string) $claim['review_note'] !== ''): ?>
+                                    <div class="text-danger"><?= $escape((string) $claim['review_note']) ?></div>
+                                <?php endif; ?>
+                            </div>
+                            <div class="text-nowrap">
+                                <span class="badge text-bg-<?= $escape($claimBadges[$claim['status']] ?? 'secondary') ?>"><?= $escape($claimStatusLabels[$claim['status']] ?? '') ?></span>
+                                <a class="btn btn-link btn-sm" target="_blank" rel="noopener" href="<?= $escape($basePath) ?>/usuario/pagos/consignacion/soporte?id=<?= (int) $claim['id'] ?>">Soporte</a>
+                                <?php if ($claim['status'] === 'approved' && $claim['payment_id'] !== null): ?>
+                                    <a class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener" href="<?= $escape($basePath) ?>/usuario/pagos/comprobante?id=<?= (int) $claim['payment_id'] ?>">Comprobante</a>
+                                <?php endif; ?>
+                            </div>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
 </section>

@@ -36,8 +36,10 @@ final class UnidentifiedDepositController
         $service = new UnidentifiedDepositService();
         $deposits = $service->list($filter);
         if ($filter === 'pending') {
+            $claims = (new DepositClaimService())->pendingForDeposits(array_column($deposits, 'id'));
             foreach ($deposits as &$deposit) {
                 $deposit['suggestions'] = $service->suggestions($deposit);
+                $deposit['claims'] = $claims[$deposit['id']] ?? [];
             }
             unset($deposit);
         }
@@ -122,6 +124,59 @@ final class UnidentifiedDepositController
             return;
         }
         PaymentReportController::streamProof((new UnidentifiedDepositService())->proof(Http::id($_GET['id'] ?? null)));
+    }
+
+    public function setPublished(): void
+    {
+        $this->requireWrite();
+        $published = ($_POST['published'] ?? '') === '1';
+        try {
+            (new UnidentifiedDepositService())->setPublished(Http::id($_POST['deposit_id'] ?? null), $published);
+            Http::flash(self::FLASH, 'success', $published
+                ? 'La consignación se muestra en el portal (solo fecha, valor y medio) para que su dueño la reclame.'
+                : 'La consignación ya no se muestra en el portal.');
+        } catch (PDOException $exception) {
+            throw $exception;
+        } catch (RuntimeException $exception) {
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
+        }
+        Http::redirect('/cartera/consignaciones');
+    }
+
+    public function approveClaim(): void
+    {
+        $actor = $this->requireWrite();
+        try {
+            $paymentId = (new DepositClaimService())->approve(Http::id($_POST['claim_id'] ?? null), (int) $actor['id']);
+            Http::flash(self::FLASH, 'success', 'Reclamo aprobado: la consignación quedó registrada como pago (comprobante ' . BillingService::receiptNumber($paymentId) . ') y se avisó al residente.');
+        } catch (PDOException $exception) {
+            throw $exception;
+        } catch (RuntimeException $exception) {
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
+        }
+        Http::redirect('/cartera/consignaciones');
+    }
+
+    public function rejectClaim(): void
+    {
+        $actor = $this->requireWrite();
+        try {
+            (new DepositClaimService())->reject(Http::id($_POST['claim_id'] ?? null), Http::string($_POST['reason'] ?? null), (int) $actor['id']);
+            Http::flash(self::FLASH, 'success', 'Reclamo rechazado; el residente recibió el motivo. La consignación sigue por identificar.');
+        } catch (PDOException $exception) {
+            throw $exception;
+        } catch (RuntimeException $exception) {
+            Http::flash(self::FLASH, 'error', $exception->getMessage());
+        }
+        Http::redirect('/cartera/consignaciones');
+    }
+
+    public function claimProof(): void
+    {
+        if (Authorization::requirePermission(self::PERMISSION, 'read') === null) {
+            return;
+        }
+        PaymentReportController::streamProof((new DepositClaimService())->proof(Http::id($_GET['id'] ?? null)));
     }
 
     private function requireWrite(): array
