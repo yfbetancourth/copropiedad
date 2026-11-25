@@ -290,8 +290,8 @@ $welcomePending = (int) ($notifications['message_count'] ?? 0) + (int) ($notific
                                     <input type="hidden" name="listing_id" value="<?= (int) $classified['id'] ?>">
                                     <button class="btn btn-outline-danger btn-sm" type="submit">Eliminar</button>
                                 </form>
-                                <button class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse"
-                                        data-bs-target="#edit-classified-<?= (int) $classified['id'] ?>" aria-expanded="false"
+                                <button class="btn btn-outline-primary btn-sm" type="button" data-collapse
+                                        aria-controls="edit-classified-<?= (int) $classified['id'] ?>" aria-expanded="false"
                                         aria-controls="edit-classified-<?= (int) $classified['id'] ?>"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Editar</button>
                             </div>
                         </div>

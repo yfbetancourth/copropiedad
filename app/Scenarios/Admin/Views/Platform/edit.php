@@ -68,7 +68,7 @@ $tenantId = (int) $tenant['id'];
                         <input type="hidden" name="tenant_id" value="<?= $tenantId ?>">
                         <?php foreach ($modules as $moduleKey => $module): ?>
                             <div class="form-check form-switch mb-3">
-                                <input class="form-check-input" type="checkbox" role="switch" name="modules[]" value="<?= $escape($moduleKey) ?>" id="module-<?= $escape($moduleKey) ?>" <?= ($tenant['modules'][$moduleKey] ?? false) ? 'checked' : '' ?>>
+                                <input class="form-check-input" type="checkbox" switch role="switch" name="modules[]" value="<?= $escape($moduleKey) ?>" id="module-<?= $escape($moduleKey) ?>" <?= ($tenant['modules'][$moduleKey] ?? false) ? 'checked' : '' ?>>
                                 <label class="form-check-label" for="module-<?= $escape($moduleKey) ?>">
                                     <i class="bi <?= $escape($module['icon']) ?> me-1" aria-hidden="true"></i><strong><?= $escape($module['label']) ?></strong>
                                     <span class="d-block small text-secondary"><?= $escape($module['description']) ?>
@@ -217,9 +217,7 @@ $tenantId = (int) $tenant['id'];
                     });
                     form.addEventListener('submit', (event) => {
                         const selected = boxes.filter((box) => box.checked).map((box) => `• ${box.dataset.label}`);
-                        if (!window.confirm(`Última confirmación: en «${tenantName}» se borrará de forma definitiva:\n${selected.join('\n')}\n\n¿Continuar?`)) {
-                            event.preventDefault();
-                        }
+                        appConfirm.submit(event, `Última confirmación: en «${tenantName}» se borrará de forma definitiva:\n${selected.join('\n')}`, { accept: 'Borrar definitivamente', danger: true });
                     });
                     refresh();
                 })();
@@ -245,7 +243,7 @@ $tenantId = (int) $tenant['id'];
                                             <div class="small text-secondary"><?= $escape((string) $admin['email']) ?></div>
                                         </div>
                                         <div class="d-flex gap-2">
-                                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#password-<?= $adminId ?>" aria-expanded="false" aria-controls="password-<?= $adminId ?>">Cambiar contraseña</button>
+                                            <button class="btn btn-sm btn-outline-secondary" type="button" data-collapse aria-controls="password-<?= $adminId ?>" aria-expanded="false" aria-controls="password-<?= $adminId ?>">Cambiar contraseña</button>
                                             <form method="post" action="<?= $escape($basePath) ?>/clientes/administrador/estado">
                                                 <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                                 <input type="hidden" name="tenant_id" value="<?= $tenantId ?>">

@@ -24,8 +24,9 @@ $brandIcon = '<svg viewBox="0 0 36 36" aria-hidden="true" focusable="false"><pat
     <?php $vendor = $escape(\App\Core\Url::publicBasePath()) . '/assets/vendor'; ?>
     <link rel="stylesheet" href="<?= $vendor ?>/inter-variable@5.0.18/index.css">
     <link rel="stylesheet" href="<?= $vendor ?>/fraunces-variable@5.0.21/wght-italic.css">
-    <link rel="stylesheet" href="<?= $vendor ?>/bootstrap-icons@1.13.2/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/css/icons.css?v=1">
     <link rel="stylesheet" href="<?= $vendor ?>/admin-lte@4.10.2/css/adminlte.min.css">
+    <link rel="stylesheet" href="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/css/app.css?v=1">
     <style>
         :root {
             --auth-green: #2f4637;

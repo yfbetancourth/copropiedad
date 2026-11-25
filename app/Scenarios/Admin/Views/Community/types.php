@@ -62,7 +62,7 @@ $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOT
                                     <?php if ($canWrite): ?>
                                         <td class="text-end">
                                             <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
-                                                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#edit-type-<?= $id ?>" aria-expanded="false" aria-controls="edit-type-<?= $id ?>">Editar</button>
+                                                <button class="btn btn-sm btn-outline-primary" type="button" data-collapse aria-controls="edit-type-<?= $id ?>" aria-expanded="false" aria-controls="edit-type-<?= $id ?>">Editar</button>
                                                 <form method="post" action="<?= $escape($basePath) ?>/comunidad/tipos-residente/estado">
                                                     <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                                     <input type="hidden" name="type_id" value="<?= $id ?>">

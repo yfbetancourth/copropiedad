@@ -131,9 +131,7 @@ $ageTone = ['al_dia' => 'success', 'corriente' => 'secondary', '1_30' => 'warnin
                             <i class="bi bi-exclamation-octagon fs-5 text-danger" aria-hidden="true"></i>
                         </div>
                         <p class="h4 mb-1"><?= (int) $dashboard['units_in_arrears'] ?> <small class="fs-6 text-secondary fw-normal">de <?= (int) $dashboard['units_billed'] ?></small></p>
-                        <div class="progress mt-2" style="height: .375rem" role="progressbar" aria-label="Porcentaje de inmuebles en mora" aria-valuenow="<?= $arrearsShare ?>" aria-valuemin="0" aria-valuemax="100">
-                            <div class="progress-bar bg-danger" style="width: <?= $arrearsShare ?>%"></div>
-                        </div>
+                        <progress class="app-progress is-danger mt-2" style="--progress-height: .375rem" aria-label="Porcentaje de inmuebles en mora" value="<?= $arrearsShare ?>" max="100"></progress>
                     </div>
                     <a class="card-footer small text-decoration-none bg-transparent" href="<?= $escape($basePath) ?>/cartera/reportes">Ver morosos <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
                 </div>
@@ -146,9 +144,7 @@ $ageTone = ['al_dia' => 'success', 'corriente' => 'secondary', '1_30' => 'warnin
                             <i class="bi bi-receipt fs-5 text-secondary" aria-hidden="true"></i>
                         </div>
                         <p class="h4 mb-1"><?= (int) $dashboard['issued_this_period'] ?> <small class="fs-6 text-secondary fw-normal">de <?= $issuedTarget ?></small></p>
-                        <div class="progress mt-2" style="height: .375rem" role="progressbar" aria-label="Avance de emisión del período" aria-valuenow="<?= $issuedProgress ?>" aria-valuemin="0" aria-valuemax="100">
-                            <div class="progress-bar" style="width: <?= $issuedProgress ?>%"></div>
-                        </div>
+                        <progress class="app-progress mt-2" style="--progress-height: .375rem" aria-label="Avance de emisión del período" value="<?= $issuedProgress ?>" max="100"></progress>
                     </div>
                     <a class="card-footer small text-decoration-none bg-transparent" href="<?= $escape($basePath) ?>/cartera/cobros">Ir a cobros <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
                 </div>

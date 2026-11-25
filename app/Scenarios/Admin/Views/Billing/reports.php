@@ -44,8 +44,8 @@ $maxCollection = max(1, ...array_map(static fn (array $row): int => $row['total'
             </div>
         </form>
         <div class="dropdown">
-            <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-download me-1" aria-hidden="true"></i>Exportar</button>
-            <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 17rem">
+            <button popovertarget="export-menu" class="btn btn-outline-primary dropdown-toggle" type="button"><i class="bi bi-download me-1" aria-hidden="true"></i>Exportar</button>
+            <div id="export-menu" popover class="dropdown-menu dropdown-menu-end p-3" style="min-width: 17rem">
                 <a class="btn btn-sm btn-outline-secondary w-100 mb-3" href="<?= $escape($basePath) ?>/cartera/reportes/exportar?tipo=cartera"><i class="bi bi-filetype-csv me-1" aria-hidden="true"></i>Cartera por inmueble (CSV)</a>
                 <form method="get" action="<?= $escape($basePath) ?>/cartera/reportes/exportar">
                     <input type="hidden" name="tipo" value="pagos">
@@ -160,7 +160,7 @@ $maxCollection = max(1, ...array_map(static fn (array $row): int => $row['total'
                 <?php endif; ?>
             </h2>
             <div class="form-check form-switch mb-0">
-                <input class="form-check-input" type="checkbox" role="switch" id="only-debt">
+                <input class="form-check-input" type="checkbox" switch role="switch" id="only-debt">
                 <label class="form-check-label small" for="only-debt">Solo con saldo</label>
             </div>
             <select id="portfolio-sort" class="form-select form-select-sm" style="width: auto" aria-label="Ordenar">

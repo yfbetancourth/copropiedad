@@ -42,13 +42,13 @@ $currentStep = 2;
     ?>
     <?php if ($conformationResetTarget !== null): ?>
         <?php $isSuperadmin = \App\Core\Authorization::isSuperadmin($actor); ?>
-        <div class="modal fade" id="reset-composition-modal" tabindex="-1" aria-labelledby="reset-composition-title" aria-hidden="true">
+        <dialog class="modal" id="reset-composition-modal" aria-labelledby="reset-composition-title">
             <div class="modal-dialog">
                 <form class="modal-content" method="post" action="<?= $escape($basePath) ?>/configuracion/conformacion/reiniciar">
                     <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                     <div class="modal-header">
                         <h2 class="modal-title h5" id="reset-composition-title">Reiniciar la conformación</h2>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        <button type="button" class="btn-close" command="close" commandfor="reset-composition-modal" aria-label="Cerrar"></button>
                     </div>
                     <div class="modal-body">
                         <?php if ($billingLocked): ?>
@@ -80,14 +80,14 @@ $currentStep = 2;
                         <?php endif; ?>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-outline-secondary" command="close" commandfor="reset-composition-modal">Cancelar</button>
                         <?php if ($isSuperadmin && !$billingLocked): ?>
                             <button type="submit" class="btn btn-danger"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reiniciar conformación</button>
                         <?php endif; ?>
                     </div>
                 </form>
             </div>
-        </div>
+        </dialog>
     <?php endif; ?>
 
     <?php if (is_array($flash)): ?>
@@ -109,9 +109,7 @@ $currentStep = 2;
                         <span class="small text-secondary">Pregunta <?= $stepIndex + 1 ?> de <?= count($steps) ?></span>
                     </div>
                     <div class="card-body">
-                        <div class="progress mb-4" style="height: .5rem" role="progressbar" aria-label="Progreso del asistente" aria-valuenow="<?= $progress ?>" aria-valuemin="0" aria-valuemax="100">
-                            <div class="progress-bar" style="width: <?= $progress ?>%"></div>
-                        </div>
+                        <progress class="app-progress mb-4" style="--progress-height: .5rem" aria-label="Progreso del asistente" value="<?= $progress ?>" max="100"></progress>
                         <?php if ($editingExisting && $billingLocked): ?>
                             <div class="alert alert-info mb-0">
                                 <i class="bi bi-lock-fill me-1" aria-hidden="true"></i>
@@ -407,9 +405,14 @@ $currentStep = 2;
                         const tr = document.createElement('tr');
                         const share = total > 0 ? (group.sum / total) * 100 : 0;
                         const shareCell = document.createElement('td');
-                        shareCell.innerHTML = '<div class="d-flex align-items-center gap-2"><div class="progress flex-grow-1" style="height: .45rem"><div class="progress-bar"></div></div><span class="small text-secondary text-nowrap"></span></div>';
-                        shareCell.querySelector('.progress-bar').style.width = `${share.toFixed(2)}%`;
-                        shareCell.querySelector('span').textContent = `${share.toLocaleString('es-CO', { maximumFractionDigits: 2 })} %`;
+                        const shareText = `${share.toLocaleString('es-CO', { maximumFractionDigits: 2 })} %`;
+                        const shareBar = Object.assign(document.createElement('progress'), { className: 'app-progress flex-grow-1', max: 100, value: share });
+                        shareBar.style.setProperty('--progress-height', '.45rem');
+                        shareBar.setAttribute('aria-label', `Participación: ${shareText}`);
+                        const shareLabel = Object.assign(document.createElement('span'), { className: 'small text-secondary text-nowrap', textContent: shareText });
+                        const shareWrap = Object.assign(document.createElement('div'), { className: 'd-flex align-items-center gap-2' });
+                        shareWrap.append(shareBar, shareLabel);
+                        shareCell.append(shareWrap);
                         const perUnit = group.min === null ? '—'
                             : group.min === group.max ? `${percent(group.min)} % c/u` : `${percent(group.min)} – ${percent(group.max)} %`;
                         const perUnitCell = cell(perUnit, 'text-end text-nowrap');
@@ -468,7 +471,7 @@ $currentStep = 2;
                         <div class="card border-0 shadow-sm h-100"><div class="card-body">
                             <div class="d-flex justify-content-between"><span class="small text-secondary">Suma de coeficientes</span><span id="coefficient-badge" class="badge"></span></div>
                             <div class="h4 mb-1"><span id="coefficient-total">0</span> %</div>
-                            <div class="progress" style="height: .4rem" role="progressbar" aria-label="Suma de coeficientes"><div id="coefficient-bar" class="progress-bar" style="width: 0%"></div></div>
+                            <progress id="coefficient-bar" class="app-progress" aria-label="Suma de coeficientes" value="0" max="100"></progress>
                             <div class="small text-secondary mt-1" id="coefficient-hint">Deben sumar 100 %.</div>
                         </div></div>
                     </div>
@@ -511,11 +514,11 @@ $currentStep = 2;
                             </li>
                         <?php }; ?>
                         <div class="dropdown" id="magic-menu">
-                            <button class="btn btn-sm btn-primary dropdown-toggle d-inline-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" data-bs-auto-close="true" aria-expanded="false" id="magic-button">
+                            <button popovertarget="magic-menu-list" class="btn btn-sm btn-primary dropdown-toggle d-inline-flex align-items-center gap-1" type="button" id="magic-button">
                                 <i class="bi bi-magic" aria-hidden="true"></i>Coeficientes
                                 <span class="badge rounded-pill text-bg-light" id="magic-badge" title="Inmuebles a los que se aplica"></span>
                             </button>
-                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-0 overflow-hidden" style="width: min(25rem, 92vw); z-index: 1030" aria-labelledby="magic-button">
+                            <ul id="magic-menu-list" popover class="dropdown-menu dropdown-menu-end shadow border-0 p-0 overflow-hidden" style="width: min(25rem, 92vw); z-index: 1030" aria-labelledby="magic-button">
                                 <li class="px-3 py-2 bg-primary-subtle border-bottom">
                                     <div class="d-flex align-items-center gap-2">
                                         <i class="bi bi-bullseye text-primary" aria-hidden="true"></i>
@@ -530,7 +533,7 @@ $currentStep = 2;
                                 <?php $magicItem('magic-assign', 'bi-123', 'primary', 'Mismo coeficiente a cada uno', 'magic-assign-text'); ?>
                                 <?php $magicItem('magic-distribute', 'bi-distribute-vertical', 'primary', 'Repartir un total en partes iguales', 'magic-distribute-text'); ?>
                                 <?php $magicItem('magic-fill', 'bi-puzzle', 'success', 'Completar lo que falta', 'magic-fill-text'); ?>
-                                <?php $magicItem('magic-paste', 'bi-clipboard', 'secondary', 'Pegar una columna desde Excel', 'magic-paste-text', 'data-bs-toggle="modal" data-bs-target="#paste-modal"'); ?>
+                                <?php $magicItem('magic-paste', 'bi-clipboard', 'secondary', 'Pegar una columna desde Excel', 'magic-paste-text', 'command="show-modal" commandfor="paste-modal"'); ?>
                                 <li><hr class="dropdown-divider my-0"></li>
                                 <?php $magicItem('clear-coefficients', 'bi-eraser', 'danger', 'Borrar coeficientes', 'magic-clear-text'); ?>
                                 <li class="px-3 py-2 bg-body-tertiary border-top small text-secondary">
@@ -585,12 +588,12 @@ $currentStep = 2;
                 </datalist>
             </form>
 
-            <div class="modal fade" id="paste-modal" tabindex="-1" aria-labelledby="paste-modal-title" aria-hidden="true">
+            <dialog class="modal" id="paste-modal" aria-labelledby="paste-modal-title">
                 <div class="modal-dialog modal-dialog-scrollable">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h2 class="modal-title h5" id="paste-modal-title">Pegar coeficientes desde Excel</h2>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                            <button type="button" class="btn-close" command="close" commandfor="paste-modal" aria-label="Cerrar"></button>
                         </div>
                         <div class="modal-body">
                             <p class="small">Copia la columna de coeficientes del reglamento o de Excel (un valor por línea) y pégala aquí. Se aplicarán <strong>en orden a las filas filtradas</strong> (todas las páginas, en el orden en que se ven); filtra primero si quieres llenar solo una torre.</p>
@@ -599,19 +602,19 @@ $currentStep = 2;
                             <div id="paste-status" class="small mt-2" aria-live="polite"></div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-outline-secondary" command="close" commandfor="paste-modal">Cancelar</button>
                             <button type="button" class="btn btn-primary" id="apply-paste" disabled>Aplicar coeficientes</button>
                         </div>
                     </div>
                 </div>
-            </div>
+            </dialog>
 
-            <div class="modal fade" id="bulk-value-modal" tabindex="-1" aria-labelledby="bulk-value-title" aria-hidden="true">
+            <dialog class="modal" id="bulk-value-modal" aria-labelledby="bulk-value-title">
                 <div class="modal-dialog">
                     <form class="modal-content" id="bulk-value-form" novalidate>
                         <div class="modal-header">
                             <h2 class="modal-title h5" id="bulk-value-title"></h2>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                            <button type="button" class="btn-close" command="close" commandfor="bulk-value-modal" aria-label="Cerrar"></button>
                         </div>
                         <div class="modal-body">
                             <label class="form-label" for="bulk-value-input" id="bulk-value-label"></label>
@@ -620,12 +623,12 @@ $currentStep = 2;
                             <div class="form-text" id="bulk-value-hint"></div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-outline-secondary" command="close" commandfor="bulk-value-modal">Cancelar</button>
                             <button type="submit" class="btn btn-primary">Aplicar</button>
                         </div>
                     </form>
                 </div>
-            </div>
+            </dialog>
 
             <script nonce="<?= \App\Core\Csp::nonce() ?>">
             (() => {
@@ -752,8 +755,8 @@ $currentStep = 2;
                     const badge = document.getElementById('coefficient-badge');
                     const bar = document.getElementById('coefficient-bar');
                     document.getElementById('coefficient-total').textContent = formatPercent(total);
-                    bar.style.width = `${Math.min(100, total / SCALE)}%`;
-                    bar.className = `progress-bar ${sumOk ? 'bg-success' : diff > 0 ? 'bg-danger' : 'bg-warning'}`;
+                    bar.value = Math.min(100, total / SCALE);
+                    bar.className = `app-progress ${sumOk ? 'is-success' : diff > 0 ? 'is-danger' : 'is-warning'}`;
                     badge.className = `badge ${sumOk ? 'text-bg-success' : 'text-bg-warning'}`;
                     badge.textContent = sumOk ? 'Correcto' : diff > 0 ? 'Sobra' : 'Falta';
                     document.getElementById('coefficient-hint').textContent = sumOk
@@ -855,12 +858,12 @@ $currentStep = 2;
                     applyFilter();
                 }));
 
-                list.addEventListener('click', (event) => {
+                list.addEventListener('click', async (event) => {
                     const button = event.target.closest('.remove-composition-unit');
                     if (!button) return;
                     const row = button.closest('.composition-unit');
                     const name = field(row, 'name').value.trim() || 'este inmueble';
-                    if (!window.confirm(`¿Quitar «${name}» de la estructura?${row.dataset.unitId ? ' Si tiene usuarios asignados, esa asignación también se eliminará al guardar.' : ''}`)) return;
+                    if (!(await appConfirm(`¿Quitar «${name}» de la estructura?${row.dataset.unitId ? ' Si tiene usuarios asignados, esa asignación también se eliminará al guardar.' : ''}`))) return;
                     row.remove();
                     markDirty();
                     validate();
@@ -943,7 +946,9 @@ $currentStep = 2;
                     setItem('magic-paste', n > 0, `Un valor por línea, aplicado en orden a los ${n} inmueble(s) como se ven.`);
                     setItem('clear-coefficients', n > 0 && missing.length < n, `Deja vacío el coeficiente de los ${n} inmueble(s).`);
                 };
-                document.getElementById('magic-menu').addEventListener('show.bs.dropdown', updateMagicMenu);
+                document.getElementById('magic-menu-list').addEventListener('beforetoggle', (event) => {
+                    if (event.newState === 'open') updateMagicMenu();
+                });
                 // Reparte total (diezmilésimas) en partes iguales; el residuo de 0,0001 va a los primeros.
                 const spread = (targets, total) => {
                     // Con 0 % permitido siempre alcanza: si el total es muy pequeño, algunos quedan en 0.
@@ -987,19 +992,19 @@ $currentStep = 2;
                         },
                     });
                 });
-                document.getElementById('magic-fill').addEventListener('click', () => {
+                document.getElementById('magic-fill').addEventListener('click', async () => {
                     const { missing, gap } = magicScope();
                     if (missing.length === 0 || gap <= 0) return;
-                    if (!window.confirm(`Se repartirán ${formatPercent(gap)} % en partes iguales entre los ${missing.length} inmueble(s) filtrados que no tienen coeficiente, para que la suma llegue a 100 %. Los que ya tienen valor no cambian. ¿Continuar?`)) return;
+                    if (!(await appConfirm(`Se repartirán ${formatPercent(gap)} % en partes iguales entre los ${missing.length} inmueble(s) filtrados que no tienen coeficiente, para que la suma llegue a 100 %. Los que ya tienen valor no cambian. ¿Continuar?`))) return;
                     const problem = spread(missing, gap);
                     if (problem) { window.alert(problem); return; }
                     markDirty();
                     validate();
                     grid.refresh();
                 });
-                document.getElementById('clear-coefficients').addEventListener('click', () => {
+                document.getElementById('clear-coefficients').addEventListener('click', async () => {
                     const { targets, filtered } = magicScope();
-                    if (targets.length === 0 || !window.confirm(`¿Borrar el coeficiente de ${targets.length} inmueble(s)${filtered ? ' filtrados (todas las páginas)' : ''}?`)) return;
+                    if (targets.length === 0 || !(await appConfirm(`¿Borrar el coeficiente de ${targets.length} inmueble(s)${filtered ? ' filtrados (todas las páginas)' : ''}?`))) return;
                     targets.forEach((row) => { field(row, 'coefficient').value = ''; row.dataset.touched = '1'; });
                     markDirty();
                     validate();
@@ -1028,11 +1033,11 @@ $currentStep = 2;
                     }
                     applyPaste.disabled = values.length === 0 || invalid.length > 0;
                 });
-                applyPaste.addEventListener('click', () => {
+                applyPaste.addEventListener('click', async () => {
                     const values = pastedValues();
                     const targets = filteredRows();
                     if (values.length !== targets.length
-                        && !window.confirm(`Pegaste ${values.length} valores pero hay ${targets.length} filas filtradas. Se llenarán ${Math.min(values.length, targets.length)} filas en orden. ¿Continuar?`)) {
+                        && !(await appConfirm(`Pegaste ${values.length} valores pero hay ${targets.length} filas filtradas. Se llenarán ${Math.min(values.length, targets.length)} filas en orden. ¿Continuar?`))) {
                         return;
                     }
                     targets.slice(0, values.length).forEach((row, i) => {
@@ -1040,7 +1045,7 @@ $currentStep = 2;
                     });
                     pasteArea.value = '';
                     pasteArea.dispatchEvent(new Event('input'));
-                    bootstrap.Modal.getInstance(document.getElementById('paste-modal'))?.hide();
+                    document.getElementById('paste-modal').close();
                     markDirty();
                     validate();
                 });
@@ -1087,9 +1092,9 @@ $currentStep = 2;
                     if (list) bulkInput.setAttribute('list', list); else bulkInput.removeAttribute('list');
                     bulkInput.classList.remove('is-invalid');
                     bulkApply = apply;
-                    bootstrap.Modal.getOrCreateInstance(bulkModal).show();
+                    bulkModal.showModal();
+                    bulkInput.focus();
                 };
-                bulkModal.addEventListener('shown.bs.modal', () => bulkInput.focus());
                 bulkForm.addEventListener('submit', (event) => {
                     event.preventDefault();
                     const problem = bulkApply ? bulkApply(bulkInput.value) : null;
@@ -1098,7 +1103,7 @@ $currentStep = 2;
                         bulkInput.classList.add('is-invalid');
                         return;
                     }
-                    bootstrap.Modal.getInstance(bulkModal)?.hide();
+                    bulkModal.close();
                     markDirty();
                     validate();
                     grid.refresh();
@@ -1169,8 +1174,8 @@ $currentStep = 2;
                         },
                         {
                             label: 'Borrar coeficiente', icon: 'bi-eraser', className: 'btn-outline-secondary',
-                            run: (selected) => {
-                                if (!window.confirm(`¿Borrar el coeficiente de ${selected.length} inmueble(s) seleccionados?`)) return;
+                            run: async (selected) => {
+                                if (!(await appConfirm(`¿Borrar el coeficiente de ${selected.length} inmueble(s) seleccionados?`))) return;
                                 selected.forEach((row) => { field(row, 'coefficient').value = ''; touch(row); });
                                 markDirty();
                                 validate();
@@ -1179,7 +1184,7 @@ $currentStep = 2;
                         },
                         {
                             label: 'Quitar', icon: 'bi-trash', className: 'btn-outline-danger',
-                            run: (selected) => {
+                            run: async (selected) => {
                                 const removable = selected.filter((row) => row.dataset.locked !== '1');
                                 const locked = selected.length - removable.length;
                                 if (removable.length === 0) {
@@ -1189,7 +1194,7 @@ $currentStep = 2;
                                 const message = `¿Quitar ${removable.length} inmueble(s) de la estructura?`
                                     + (locked > 0 ? `\n\n${locked} se conservarán porque tienen notas de cobro.` : '')
                                     + '\n\nSi tienen usuarios asignados, esas asignaciones también se eliminarán al guardar.';
-                                if (!window.confirm(message)) return;
+                                if (!(await appConfirm(message))) return;
                                 removable.forEach((row) => row.remove());
                                 markDirty();
                                 validate();

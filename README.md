@@ -546,3 +546,31 @@ Después ejecuta `php bin/deploy-conjunto.php --all`: el script agrega a cada co
   añade `app.js` solo a la versión web; el HTML que va por correo no lleva scripts.
 - Los textos que se pintan con JavaScript se insertan con `textContent` / `replaceChildren()` en lugar de
   `innerHTML`. `style-src` conserva `'unsafe-inline'` por los atributos `style` (no ejecutan código).
+
+## Modernización: componentes nativos sin Bootstrap JS ni AdminLTE JS (fase 3)
+
+Bootstrap y AdminLTE se usan solo como CSS. Su JavaScript (≈ 130 KB) se reemplazó por elementos nativos del
+navegador atendidos por `public/assets/js/app.js`, con estilos en `public/assets/css/app.css`:
+
+| Antes (Bootstrap/AdminLTE JS) | Ahora |
+| --- | --- |
+| `.modal` + `data-bs-toggle="modal"` | `<dialog class="modal">` (mismo marcado interior) abierto con `command="show-modal" commandfor="id"` o `dialog.showModal()`; se cierra con `command="close"`, Esc o clic en el fondo |
+| `window.confirm()` | Diálogo propio: `data-confirm="¿…?"` en formularios, `await appConfirm(msg)` y `appConfirm.submit(event, msg)` en scripts. El foco inicial queda en «Cancelar» |
+| `data-bs-toggle="dropdown"` | `popover` + `popovertarget`, ubicado con anchor positioning (respaldo en JS). Esc y clic fuera lo cierran |
+| `data-bs-toggle="collapse"` | `data-collapse aria-controls="id"` con `aria-expanded` |
+| `data-bs-toggle="tab"` | `data-tab` en `role="tab"`: flechas, Inicio y Fin; evento `tab:shown` |
+| `data-lte-toggle="sidebar"` | `data-sidebar-toggle` (contrae en escritorio, abre con fondo en móvil, Esc cierra) |
+| `div.progress[role=progressbar]` | `<progress class="app-progress">` con variantes `is-success`, `is-danger`, `is-warning`, `is-info` |
+| `role="switch"` | Además el atributo nativo `switch` (Safari); el resto de navegadores conserva `role="switch"` |
+
+**Iconos.** La fuente completa de Bootstrap Icons (2.078 iconos, 220 KB) se reemplazó por
+`public/assets/css/icons.css`, que contiene solo los iconos usados como máscaras CSS (≈ 21 KB comprimido). El marcado
+no cambia (`<i class="bi bi-house" aria-hidden="true">`). **Al usar un icono nuevo** hay que regenerarlo:
+
+```
+npm pack bootstrap-icons@1.13.2 && tar -xzf bootstrap-icons-1.13.2.tgz
+php bin/build-icons.php package/icons
+```
+
+Requisitos de navegador: `<dialog>`, popover y comandos de invocación (Baseline 2025). En navegadores sin comandos de
+invocación, `app.js` los emula; sin anchor positioning, ubica los menús por script.

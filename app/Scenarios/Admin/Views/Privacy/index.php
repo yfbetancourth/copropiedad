@@ -90,7 +90,7 @@ foreach (['data_policy', 'authorization'] as $required) {
                     </div>
                     <div class="col-12">
                         <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" role="switch" id="privacy-form" name="contact_form_enabled" value="1"<?= $settings['contact_form_enabled'] ? ' checked' : '' ?><?= $canWrite ? '' : ' disabled' ?>>
+                            <input class="form-check-input" type="checkbox" switch role="switch" id="privacy-form" name="contact_form_enabled" value="1"<?= $settings['contact_form_enabled'] ? ' checked' : '' ?><?= $canWrite ? '' : ' disabled' ?>>
                             <label class="form-check-label" for="privacy-form">Mostrar el formulario de contacto en la página pública</label>
                         </div>
                     </div>

@@ -61,9 +61,7 @@ $groupOf = static function (array $unit): string {
                 <div class="card border-0 shadow-sm mb-3">
                     <div class="card-body">
                         <div class="d-flex justify-content-between small"><span class="text-secondary">Inmuebles con usuario</span><strong><?= $coveredUnits ?> de <?= $totalUnits ?></strong></div>
-                        <div class="progress my-2" style="height: .4rem" role="progressbar" aria-label="Cobertura de asignación" aria-valuenow="<?= $coverage ?>" aria-valuemin="0" aria-valuemax="100">
-                            <div class="progress-bar <?= $coverage === 100 ? 'bg-success' : '' ?>" style="width: <?= $coverage ?>%"></div>
-                        </div>
+                        <progress class="app-progress my-2<?= $coverage === 100 ? ' is-success' : '' ?>" aria-label="Cobertura de asignación" value="<?= $coverage ?>" max="100"></progress>
                         <p class="small text-secondary mb-0">
                             <?= $totalUnits - $coveredUnits === 0
                                 ? 'Todos los inmuebles tienen al menos un usuario.'
@@ -331,9 +329,9 @@ $groupOf = static function (array $unit): string {
         checkbox.addEventListener('change', refresh);
         relationOf(checkbox).addEventListener('change', refresh);
     });
-    document.getElementById('select-visible-units').addEventListener('click', () => {
+    document.getElementById('select-visible-units').addEventListener('click', async () => {
         const targets = visibleChecks();
-        if (targets.length > 20 && !window.confirm(`¿Marcar ${targets.length} inmuebles para este usuario?`)) return;
+        if (targets.length > 20 && !(await appConfirm(`¿Marcar ${targets.length} inmuebles para este usuario?`))) return;
         targets.forEach((c) => { c.checked = true; });
         refresh();
     });
@@ -355,8 +353,7 @@ $groupOf = static function (array $unit): string {
             const message = `Vas a quitar ${removed.length} inmueble(s) a este usuario:\n${names}${removed.length > 5 ? '\n…' : ''}`
                 + (remaining === 0 ? '\n\nEl usuario quedará sin inmuebles y dejará de recibir notas de cobro.' : '')
                 + '\n\n¿Continuar?';
-            if (!window.confirm(message)) {
-                event.preventDefault();
+            if (appConfirm.submit(event, message, { accept: 'Quitar inmuebles', danger: true })) {
                 return;
             }
         }

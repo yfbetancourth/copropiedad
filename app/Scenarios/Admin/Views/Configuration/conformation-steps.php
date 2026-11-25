@@ -70,7 +70,7 @@ $stepVisuals = [
                         </span>
                     </span>
                     <?php if ($number === 2 && $isCurrent && is_string($conformationResetTarget)): ?>
-                        <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" data-bs-toggle="modal" data-bs-target="#<?= $escape($conformationResetTarget) ?>">
+                        <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" command="show-modal" commandfor="<?= $escape($conformationResetTarget) ?>">
                             <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>Reiniciar
                         </button>
                     <?php endif; ?>

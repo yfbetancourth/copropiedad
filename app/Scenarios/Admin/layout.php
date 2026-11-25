@@ -160,7 +160,7 @@ $csrfToken = Session::csrfToken();
             <?php if ($authUser !== null): ?>
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <button class="nav-link" type="button" data-lte-toggle="sidebar" aria-label="Alternar menú lateral">
+                        <button class="nav-link" type="button" data-sidebar-toggle aria-expanded="true" aria-label="Alternar menú lateral">
                             <i class="bi bi-list" aria-hidden="true"></i>
                         </button>
                     </li>

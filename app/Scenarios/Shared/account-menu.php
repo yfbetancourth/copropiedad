@@ -24,8 +24,8 @@ foreach ($sidebarSections ?? [] as $pendingSection) {
 $accountPendingTotal = array_sum(array_map(static fn (array $item): int => (int) $item['badge'], $accountPending));
 ?>
 <li class="nav-item dropdown">
-    <button class="btn btn-link nav-link d-flex align-items-center gap-2 px-2 dropdown-toggle text-body text-decoration-none"
-            type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false"
+    <button popovertarget="account-menu" class="btn btn-link nav-link d-flex align-items-center gap-2 px-2 dropdown-toggle text-body text-decoration-none"
+            type="button"
             aria-label="Menú de la cuenta de <?= $escape($account['name']) ?><?= $accountPendingTotal > 0 ? ': ' . $accountPendingTotal . ' pendiente(s)' : '' ?>">
         <?php $avatarInitial = $account['initial']; $avatarSize = '2.25rem'; $avatarBadge = $accountPendingTotal; $avatarClass = ''; ?>
         <?php require __DIR__ . '/avatar.php'; ?>
@@ -36,7 +36,7 @@ $accountPendingTotal = array_sum(array_map(static fn (array $item): int => (int)
             <?php endif; ?>
         </span>
     </button>
-    <div class="dropdown-menu dropdown-menu-end shadow border-0 p-0 overflow-hidden" style="min-width: 18rem">
+    <div id="account-menu" popover class="dropdown-menu dropdown-menu-end shadow border-0 p-0 overflow-hidden" style="min-width: 18rem">
         <div class="d-flex align-items-center gap-3 px-3 py-3 bg-body-tertiary border-bottom">
             <span class="rounded-circle bg-primary text-white fw-semibold fs-5 d-inline-flex align-items-center justify-content-center flex-shrink-0"
                   style="width: 3rem; height: 3rem" aria-hidden="true"><?= $escape($account['initial']) ?></span>

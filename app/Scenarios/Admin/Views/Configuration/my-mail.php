@@ -165,18 +165,6 @@ document.getElementById('toggle-password')?.addEventListener('click', (event) =>
     button.setAttribute('aria-pressed', String(show));
     button.querySelector('i').className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
 });
-document.querySelectorAll('form').forEach((form) => form.addEventListener('submit', (event) => {
-    if (form.dataset.confirm && !window.confirm(form.dataset.confirm)) {
-        event.preventDefault();
-        return;
-    }
-    const button = form.querySelector('[data-loading-label]');
-    if (button) setTimeout(() => {
-        button.disabled = true;
-        const spinner = document.createElement('span');
-        spinner.className = 'spinner-border spinner-border-sm me-1';
-        spinner.setAttribute('aria-hidden', 'true');
-        button.replaceChildren(spinner, button.dataset.loadingLabel);
-    });
-}));
+// data-confirm y data-loading-label los atiende app.js.
+
 </script>

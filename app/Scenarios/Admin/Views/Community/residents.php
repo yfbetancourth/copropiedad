@@ -128,7 +128,7 @@ $hasSelection = $canWrite || $canDelete;
                                     <?php endif; ?>
                                     <?php if ($canWrite): ?>
                                         <form method="post" action="<?= $escape($basePath) ?>/comunidad/residentes/estado"
-                                              <?= $active ? 'onsubmit="return confirm(\'¿Desactivar a este residente? No podrá entrar al portal.\');"' : '' ?>>
+                                              <?= $active ? 'data-confirm="¿Desactivar a este residente? No podrá entrar al portal."' : '' ?>>
                                             <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
                                             <input type="hidden" name="user_id" value="<?= $id ?>">
                                             <input type="hidden" name="active" value="<?= $active ? '0' : '1' ?>">
@@ -160,24 +160,24 @@ $hasSelection = $canWrite || $canDelete;
             <input type="hidden" name="action" value="">
             <input type="hidden" name="estado" value="<?= $escape($status) ?>">
         </form>
-        <div class="modal fade" id="resident-bulk-modal" tabindex="-1" aria-labelledby="resident-bulk-title" aria-hidden="true">
+        <dialog class="modal" id="resident-bulk-modal" aria-labelledby="resident-bulk-title">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h2 class="modal-title h5" id="resident-bulk-title">Acción en lote</h2>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        <button type="button" class="btn-close" command="close" commandfor="resident-bulk-modal" aria-label="Cerrar"></button>
                     </div>
                     <div class="modal-body">
                         <p id="resident-bulk-text" class="mb-2"></p>
                         <p id="resident-bulk-note" class="small text-secondary mb-0"></p>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-outline-secondary" command="close" commandfor="resident-bulk-modal">Cancelar</button>
                         <button type="button" class="btn btn-primary" id="resident-bulk-confirm">Confirmar</button>
                     </div>
                 </div>
             </div>
-        </div>
+        </dialog>
     <?php endif; ?>
 </section>
 <?php if ($residents !== []): ?>
@@ -237,7 +237,7 @@ $hasSelection = $canWrite || $canDelete;
         if (action === 'deactivate') notes.push('No podrán entrar al portal; su historial se conserva.');
         document.getElementById('resident-bulk-note').textContent = notes.join(' ');
         pending = { action, ids: targets.map((row) => row.dataset.id) };
-        bootstrap.Modal.getOrCreateInstance(modalElement).show(); // Bootstrap se carga al final de la página
+        modalElement.showModal();
     };
     document.getElementById('resident-bulk-confirm')?.addEventListener('click', (event) => {
         if (!pending || pending.ids.length === 0) return;

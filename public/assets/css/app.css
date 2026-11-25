@@ -1,0 +1,79 @@
+/* Estilos propios que acompañan a app.js: componentes nativos con la apariencia de Bootstrap/AdminLTE. */
+
+/* ---- <dialog class="modal"> ------------------------------------------------------------------------------
+   Conserva el marcado de Bootstrap (.modal-dialog > .modal-content). El <dialog> ocupa toda la ventana, como el
+   .modal original, para que .modal-dialog-centered y .modal-dialog-scrollable sigan funcionando. */
+dialog.modal {
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+}
+dialog.modal[open] {
+    display: block;
+}
+dialog.modal::backdrop {
+    background: rgb(0 0 0 / 0.5);
+}
+.app-confirm-message {
+    white-space: pre-line; /* Los mensajes usan saltos de línea para listar elementos. */
+}
+
+/* ---- Menús desplegables con popover ----------------------------------------------------------------------- */
+.dropdown-menu[popover] {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+}
+.dropdown-menu[popover]:popover-open {
+    display: block;
+}
+@supports (position-area: block-end) {
+    /* El botón con popovertarget es el ancla implícita; si no cabe abajo o a un lado, se voltea. */
+    .dropdown-menu[popover] {
+        position-area: block-end span-inline-end;
+        position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+        margin-block-start: 0.25rem;
+    }
+    .dropdown-menu-end[popover] {
+        position-area: block-end span-inline-start;
+    }
+}
+/* ---- <progress> con los colores del tema ------------------------------------------------------------------
+   Guía «progress»: appearance: none, pista en el elemento y relleno en los pseudo-elementos de cada motor
+   (nunca agrupados en la misma regla). */
+progress.app-progress {
+    --progress-fill: var(--bs-primary);
+    appearance: none;
+    display: block;
+    inline-size: 100%;
+    block-size: var(--progress-height, 0.4rem);
+    border: 0 solid;
+    border-radius: 1e5px;
+    overflow: clip;
+    background: var(--bs-secondary-bg);
+}
+progress.app-progress::-webkit-progress-bar {
+    background: transparent;
+}
+progress.app-progress::-webkit-progress-value {
+    background: var(--progress-fill);
+    border-radius: 1e5px;
+    transition: inline-size 0.3s;
+}
+progress.app-progress::-moz-progress-bar {
+    background: var(--progress-fill);
+    border-radius: 1e5px;
+}
+progress.app-progress.is-danger { --progress-fill: var(--bs-danger); }
+progress.app-progress.is-warning { --progress-fill: var(--bs-warning); }
+progress.app-progress.is-info { --progress-fill: var(--bs-info); }
+progress.app-progress.is-success { --progress-fill: var(--bs-success); }
+
+/* ---- Interruptores --------------------------------------------------------------------------------------- */
+input[type="checkbox"][switch] {
+    accent-color: var(--bs-primary);
+}

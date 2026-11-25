@@ -27,7 +27,7 @@ $linkValid = $token !== '';
                 <input id="password" name="password" type="password" class="form-control" autocomplete="new-password" minlength="12" required autofocus aria-describedby="password-help">
                 <button class="btn btn-outline-secondary" type="button" data-toggle-password="password" aria-label="Mostrar contraseña" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button>
             </div>
-            <div class="progress mt-2" style="height: .3rem" aria-hidden="true"><div id="password-meter" class="progress-bar" style="width: 0%"></div></div>
+            <progress id="password-meter" class="app-progress mt-2" style="--progress-height: .3rem" value="0" max="4" aria-hidden="true"></progress>
             <div id="password-help" class="form-text">Mínimo 12 caracteres.</div>
             <div class="form-text text-warning" data-capslock-for="password" hidden><i class="bi bi-capslock-fill me-1" aria-hidden="true"></i>Bloq Mayús está activado.</div>
         </div>
@@ -52,8 +52,8 @@ $linkValid = $token !== '';
             const value = password.value;
             const variety = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((r) => r.test(value)).length;
             const score = value.length === 0 ? 0 : value.length < 12 ? 1 : Math.min(4, 1 + variety + (value.length >= 16 ? 1 : 0) - 1);
-            meter.style.width = `${score * 25}%`;
-            meter.className = `progress-bar ${['', 'bg-danger', 'bg-warning', 'bg-info', 'bg-success'][score]}`;
+            meter.value = score;
+            meter.className = `app-progress mt-2 ${['', 'is-danger', 'is-warning', 'is-info', 'is-success'][score]}`;
             help.textContent = value.length === 0 ? 'Mínimo 12 caracteres.'
                 : value.length < 12 ? `Faltan ${12 - value.length} caracteres.`
                 : ['', '', 'Aceptable. Combinar mayúsculas, números o símbolos la hace más segura.', 'Buena contraseña.', 'Contraseña muy segura.'][score];

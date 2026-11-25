@@ -220,9 +220,9 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
         </div>
     <?php endif; ?>
     <ul class="nav nav-tabs" role="tablist">
-        <li class="nav-item" role="presentation"><button class="nav-link" id="tab-preparar" data-bs-toggle="tab" data-bs-target="#pane-preparar" type="button" role="tab" aria-controls="pane-preparar">Preparar y emitir <span class="badge rounded-pill text-bg-primary ms-1"><?= $stateCounts['pending'] + $stateCounts['problem'] ?></span></button></li>
-        <li class="nav-item" role="presentation"><button class="nav-link" id="tab-notas" data-bs-toggle="tab" data-bs-target="#pane-notas" type="button" role="tab" aria-controls="pane-notas">Notas emitidas <span class="badge rounded-pill text-bg-secondary ms-1"><?= $issuedCount ?></span><?php if ($summary['failed'] > 0): ?> <i class="bi bi-exclamation-triangle-fill text-danger" title="Hay correos fallidos"></i><?php endif; ?></button></li>
-        <li class="nav-item" role="presentation"><button class="nav-link" id="tab-pagos" data-bs-toggle="tab" data-bs-target="#pane-pagos" type="button" role="tab" aria-controls="pane-pagos">Pagos <span class="badge rounded-pill text-bg-secondary ms-1"><?= count(array_filter($payments, static fn (array $p): bool => $p['voided_at'] === null)) ?></span></button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="tab-preparar" data-tab type="button" role="tab" aria-controls="pane-preparar">Preparar y emitir <span class="badge rounded-pill text-bg-primary ms-1"><?= $stateCounts['pending'] + $stateCounts['problem'] ?></span></button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="tab-notas" data-tab type="button" role="tab" aria-controls="pane-notas">Notas emitidas <span class="badge rounded-pill text-bg-secondary ms-1"><?= $issuedCount ?></span><?php if ($summary['failed'] > 0): ?> <i class="bi bi-exclamation-triangle-fill text-danger" title="Hay correos fallidos"></i><?php endif; ?></button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" id="tab-pagos" data-tab type="button" role="tab" aria-controls="pane-pagos">Pagos <span class="badge rounded-pill text-bg-secondary ms-1"><?= count(array_filter($payments, static fn (array $p): bool => $p['voided_at'] === null)) ?></span></button></li>
     </ul>
 
     <div class="tab-content card border-0 border-top-0 shadow-sm rounded-top-0 mb-3">
@@ -305,7 +305,7 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                                 <td class="text-end small"><?= $short($row['fee']) ?></td>
                                 <td class="text-end small">
                                     <?php if ($row['item_details'] !== []): ?>
-                                        <button class="btn btn-link btn-sm p-0" type="button" data-bs-toggle="collapse" data-bs-target="#items-<?= $escape($row['id']) ?>" aria-expanded="false"><?= $short($otherCents) ?> <i class="bi bi-chevron-down small" aria-hidden="true"></i></button>
+                                        <button class="btn btn-link btn-sm p-0" type="button" data-collapse aria-controls="items-<?= $escape($row['id']) ?>" aria-expanded="false"><?= $short($otherCents) ?> <i class="bi bi-chevron-down small" aria-hidden="true"></i></button>
                                     <?php else: ?>
                                         <?= $short(0) ?>
                                     <?php endif; ?>
@@ -386,7 +386,7 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                                         <i class="bi bi-check2-square me-1" aria-hidden="true"></i>Emitir y enviar seleccionados <span class="badge text-bg-primary ms-1" id="issue-selected-count">0</span>
                                     </button>
                                 <?php endif; ?>
-                                <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#issue-modal" <?= $readyToIssue ? '' : 'disabled' ?>>
+                                <button class="btn btn-primary" type="button" data-issue-all aria-haspopup="dialog" <?= $readyToIssue ? '' : 'disabled' ?>>
                                     <i class="bi bi-send me-1" aria-hidden="true"></i>Emitir y enviar <?= (int) $preview['new_count'] ?> nota(s)
                                 </button>
                             </div>
@@ -587,7 +587,7 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                                             <input type="hidden" name="payment_id" value="<?= (int) $payment['id'] ?>">
                                             <button class="btn btn-link btn-sm p-0 ms-1" type="submit" title="Reenviar el comprobante por correo a las cuentas del inmueble">Reenviar</button>
                                         </form>
-                                        <button class="btn btn-link btn-sm text-danger p-0 ms-1" type="button" data-bs-toggle="collapse" data-bs-target="#void-<?= (int) $payment['id'] ?>">Anular…</button>
+                                        <button class="btn btn-link btn-sm text-danger p-0 ms-1" type="button" data-collapse aria-controls="void-<?= (int) $payment['id'] ?>">Anular…</button>
                                         <form method="post" action="<?= $escape($basePath) ?>/cartera/cobros/pago/anular" class="collapse mt-1" id="void-<?= (int) $payment['id'] ?>"
                                               data-confirm="¿Anular el pago de <?= $escape($short($amount)) ?> de <?= $escape($payment['unit_name']) ?>? El saldo de la nota aumentará en ese valor.">
                                             <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
@@ -625,13 +625,13 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
 
 <?php if ($canWrite && is_array($preview)): ?>
     <!-- Agregar concepto -->
-    <div class="modal fade" id="item-modal" tabindex="-1" aria-labelledby="item-modal-title" aria-hidden="true">
+    <dialog class="modal" id="item-modal" aria-labelledby="item-modal-title">
         <div class="modal-dialog">
             <form class="modal-content" method="post" action="<?= $escape($basePath) ?>/cartera/cobros/concepto" data-money-form id="item-form"
                   data-single-action="<?= $escape($basePath) ?>/cartera/cobros/concepto" data-bulk-action="<?= $escape($basePath) ?>/cartera/cobros/concepto/lote">
                 <div class="modal-header">
                     <h2 class="modal-title h5" id="item-modal-title">Agregar concepto</h2>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    <button type="button" class="btn-close" command="close" commandfor="item-modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body">
                     <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
@@ -664,21 +664,21 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-outline-secondary" command="close" commandfor="item-modal">Cancelar</button>
                     <button class="btn btn-primary" type="submit" data-loading-label="Guardando…">Agregar concepto</button>
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <?php if ($readyToIssue || $canIssueSelected): ?>
         <!-- Confirmar emisión (todo el período o solo los inmuebles seleccionados) -->
-        <div class="modal fade" id="issue-modal" tabindex="-1" aria-labelledby="issue-modal-title" aria-hidden="true">
+        <dialog class="modal" id="issue-modal" aria-labelledby="issue-modal-title">
             <div class="modal-dialog modal-xl modal-dialog-scrollable">
                 <form class="modal-content" method="post" action="<?= $escape($basePath) ?>/cartera/cobros/emitir" id="issue-form">
                     <div class="modal-header">
                         <h2 class="modal-title h5" id="issue-modal-title" data-all="Emitir notas de <?= $escape($periodLabel) ?>">Emitir notas de <?= $escape($periodLabel) ?></h2>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                        <button type="button" class="btn-close" command="close" commandfor="issue-modal" aria-label="Cerrar"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
@@ -726,28 +726,25 @@ $senderHtml = '<strong>' . $escape($senderLabel) . '</strong> '
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Revisar otra vez</button>
+                        <button type="button" class="btn btn-outline-secondary" command="close" commandfor="issue-modal">Revisar otra vez</button>
                         <button class="btn btn-primary" type="submit" data-loading-label="Emitiendo y enviando…" disabled id="issue-submit"><i class="bi bi-send me-1" aria-hidden="true"></i>Emitir y enviar</button>
                     </div>
                 </form>
             </div>
-        </div>
+        </dialog>
     <?php endif; ?>
 <?php endif; ?>
 
 <script src="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/js/data-grid.js?v=1"></script>
 <script nonce="<?= \App\Core\Csp::nonce() ?>">
-// Bootstrap se carga al final del layout: se espera a que el documento esté listo.
+// app.js (diferido) ya se ejecutó cuando ocurre DOMContentLoaded.
 document.addEventListener('DOMContentLoaded', () => {
     const page = document.getElementById('billing-page');
     const money = (cents) => '$ ' + (cents / 100).toLocaleString('es-CO', { minimumFractionDigits: cents % 100 ? 2 : 0, maximumFractionDigits: 2 });
 
     // Pestañas con dirección propia (#preparar, #notas, #pagos) para volver al mismo lugar.
-    const showTab = (name) => {
-        const button = document.getElementById(`tab-${name}`);
-        if (button) bootstrap.Tab.getOrCreateInstance(button).show();
-    };
-    document.querySelectorAll('[data-bs-toggle="tab"]').forEach((button) => button.addEventListener('shown.bs.tab', () => {
+    const showTab = (name) => document.getElementById(`tab-${name}`)?.click();
+    document.querySelectorAll('[data-tab]').forEach((button) => button.addEventListener('tab:shown', () => {
         history.replaceState(null, '', `#${button.id.replace('tab-', '')}`);
     }));
     showTab(['preparar', 'notas', 'pagos'].includes(location.hash.slice(1)) ? location.hash.slice(1) : page.dataset.defaultTab);
@@ -778,7 +775,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Emitir solo los inmuebles seleccionados: solo cuentan los que están «Listos» (data-state="pending").
     const readyOnly = (rows) => rows.filter((row) => row.dataset.state === 'pending');
-    let pendingIssueSelection = null;
+    // Prepara el formulario de emisión antes de abrirlo (se asigna más abajo, si existe el modal).
+    let prepareIssue = () => {};
     function updateIssueSelectedButton(selectedRows) {
         const button = document.getElementById('issue-selected-button');
         if (!button) return;
@@ -794,8 +792,8 @@ document.addEventListener('DOMContentLoaded', () => {
             window.alert('Ninguno de los inmuebles seleccionados está «Listo» para emitir (ya emitidos o con pendientes).');
             return;
         }
-        pendingIssueSelection = rows;
-        bootstrap.Modal.getOrCreateInstance(document.getElementById('issue-modal')).show();
+        prepareIssue(rows);
+        document.getElementById('issue-modal').showModal();
     }
     // rows = null: todo el período (botón principal). Con filas: solo esas.
     function applyIssueMode(rows) {
@@ -927,7 +925,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const itemModalElement = document.getElementById('item-modal');
     let openItemModal = () => {};
     if (itemModalElement) {
-        const itemModal = bootstrap.Modal.getOrCreateInstance(itemModalElement);
+        const itemModal = {
+            show: () => {
+                itemModalElement.showModal();
+                document.getElementById('item-amount-display').focus();
+            },
+            hide: () => itemModalElement.close(),
+        };
         const itemForm = document.getElementById('item-form');
         const bulkUnits = document.getElementById('item-bulk-units');
         const singleUnit = document.getElementById('item-unit');
@@ -974,7 +978,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('[data-add-item]').forEach((button) => button.addEventListener('click', () => {
             openItemModal([{ id: button.dataset.unitId, name: button.dataset.unitName, issued: false }]);
         }));
-        itemModalElement.addEventListener('shown.bs.modal', () => document.getElementById('item-amount-display').focus());
     }
 
     // Registrar pago: muestra el saldo de la nota y avisa si quedará saldo a favor.
@@ -1025,9 +1028,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
         document.getElementById('payment-form').addEventListener('submit', (event) => {
             const cents = parseMoney(display.value);
-            if (cents !== null && cents > balance() && !window.confirm(`El valor supera el saldo de la nota. Quedará ${money(cents - Math.max(balance(), 0))} a favor del residente. ¿Registrar de todos modos?`)) {
-                event.preventDefault();
-                event.stopImmediatePropagation();
+            if (cents !== null && cents > balance()) {
+                appConfirm.submit(event, `El valor supera el saldo de la nota. Quedará ${money(cents - Math.max(balance(), 0))} a favor del residente. ¿Registrar de todos modos?`, { accept: 'Registrar' });
             }
         });
     }
@@ -1105,31 +1107,19 @@ document.addEventListener('DOMContentLoaded', () => {
         draftUnit.addEventListener('change', loadDraft);
         document.getElementById('draft-prev').addEventListener('click', () => step(-1));
         document.getElementById('draft-next').addEventListener('click', () => step(1));
-        document.getElementById('issue-modal').addEventListener('show.bs.modal', (event) => {
-            // El botón principal (relatedTarget) emite todo; la acción de selección abre el modal sin relatedTarget.
-            applyIssueMode(event.relatedTarget ? null : pendingIssueSelection);
-            pendingIssueSelection = null;
+        // selection = null: todo el período (botón principal); con filas: solo esas (acción de selección).
+        prepareIssue = (selection) => {
+            applyIssueMode(selection);
             updateIssueState();
             loadDraft();
+        };
+        document.querySelector('[data-issue-all]')?.addEventListener('click', () => {
+            prepareIssue(null);
+            document.getElementById('issue-modal').showModal();
         });
     }
 
-    // Confirmaciones y estado «procesando» para evitar envíos dobles.
-    document.querySelectorAll('form[data-confirm]').forEach((form) => form.addEventListener('submit', (event) => {
-        if (!window.confirm(form.dataset.confirm)) event.preventDefault();
-    }));
-    document.querySelectorAll('form').forEach((form) => form.addEventListener('submit', (event) => {
-        if (event.defaultPrevented || form.method.toLowerCase() !== 'post') return;
-        const button = form.querySelector('button[type="submit"][data-loading-label]');
-        if (button) {
-            setTimeout(() => {
-                button.disabled = true;
-                const spinner = document.createElement('span');
-                spinner.className = 'spinner-border spinner-border-sm me-1';
-                spinner.setAttribute('aria-hidden', 'true');
-                button.replaceChildren(spinner, button.dataset.loadingLabel);
-            });
-        }
-    }));
+    // Las confirmaciones (data-confirm) y el estado «procesando» (data-loading-label) los atiende app.js.
+
 });
 </script>

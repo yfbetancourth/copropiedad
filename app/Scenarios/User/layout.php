@@ -94,14 +94,14 @@ $csrfToken = Session::csrfToken();
         <div class="container-fluid">
             <ul class="navbar-nav">
                 <li class="nav-item">
-                    <button class="nav-link" type="button" data-lte-toggle="sidebar" aria-label="Alternar menú lateral">
+                    <button class="nav-link" type="button" data-sidebar-toggle aria-expanded="true" aria-label="Alternar menú lateral">
                         <i class="bi bi-list" aria-hidden="true"></i>
                     </button>
                 </li>
             </ul>
             <ul class="navbar-nav ms-auto align-items-center gap-1">
                 <li class="nav-item dropdown">
-                    <button class="nav-link position-relative px-2" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false"
+                    <button popovertarget="notifications-menu" class="nav-link position-relative px-2" type="button"
                             aria-label="Notificaciones<?= $notificationCount > 0 ? ': ' . $notificationCount . ' sin leer' : '' ?>">
                         <i class="bi bi-bell fs-5" aria-hidden="true"></i>
                         <?php if ($notificationCount > 0): ?>
@@ -110,7 +110,7 @@ $csrfToken = Session::csrfToken();
                             </span>
                         <?php endif; ?>
                     </button>
-                    <div class="dropdown-menu dropdown-menu-end shadow border-0 p-0 overflow-hidden" style="min-width: min(22rem, 92vw)">
+                    <div id="notifications-menu" popover class="dropdown-menu dropdown-menu-end shadow border-0 p-0 overflow-hidden" style="min-width: min(22rem, 92vw)">
                         <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-body-tertiary border-bottom">
                             <strong>Notificaciones</strong>
                             <span class="small text-secondary"><?= $notificationCount ?> sin leer</span>
