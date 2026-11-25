@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core;
 
+use Dotenv\Dotenv;
 use LogicException;
 use PDOException;
 
@@ -13,6 +14,7 @@ use PDOException;
  *   {slug}.APP_BASE_DOMAIN       -> el conjunto con ese slug
  *   APP_BASE_DOMAIN / www.       -> la plataforma (consola del Superadmin)
  *   otro host (p. ej. localhost) -> APP_DEFAULT_TENANT fuera de producción; en producción, 404
+ *   copia propia (APP_TENANT)    -> siempre ese conjunto, con cualquier dominio (conjuntos/{slug}/)
  *
  * Toda consulta de datos de negocio debe filtrar por Tenant::id().
  */
@@ -23,7 +25,12 @@ final class Tenant
     /** Subdominios que no pueden usarse como slug de un cliente. */
     public const RESERVED_SLUGS = ['www', 'admin', 'app', 'api', 'mail', 'smtp', 'ftp', 'static', 'cdn', 'soporte', 'plataforma'];
 
+    /** Directorio (dentro del proyecto original) con la copia propia de cada conjunto: conjuntos/{slug}/. */
+    public const SITES_DIRECTORY = 'conjuntos';
+
     private static bool $resolved = false;
+    /** @var array<string, ?string> */
+    private static array $siteUrls = [];
     private static ?array $current = null;
     /** @var array<string, bool> */
     private static array $modules = [];
@@ -34,6 +41,16 @@ final class Tenant
     public static function resolve(): void
     {
         if (self::$resolved) {
+            return;
+        }
+
+        // Copia propia de un conjunto (conjuntos/{slug}/): atiende solo a ese conjunto, con cualquier dominio.
+        if (self::isFixed()) {
+            $fixed = self::isValidSlug(self::fixedSlug()) ? self::findBySlug(self::fixedSlug()) : null;
+            if ($fixed === null) {
+                self::notFound();
+            }
+            self::set($fixed);
             return;
         }
 
@@ -58,13 +75,108 @@ final class Tenant
 
         $tenant = is_string($slug) && self::isValidSlug($slug) ? self::findBySlug($slug) : null;
         if ($tenant === null) {
-            http_response_code(404);
-            header('Content-Type: text/html; charset=UTF-8');
-            echo 'No encontramos este conjunto residencial. Verifica la dirección.';
-            exit;
+            self::notFound();
         }
 
+        self::redirectToOwnSite($tenant['slug']);
         self::set($tenant);
+    }
+
+    /** true en la copia de un conjunto: su .env define APP_TENANT. */
+    public static function isFixed(): bool
+    {
+        return self::fixedSlug() !== '';
+    }
+
+    /**
+     * Directorio raíz de los archivos de un conjunto (storage/ y public/uploads/): su copia en conjuntos/{slug}/
+     * si ya la tiene; si no, este proyecto. Sin $tenantId, el conjunto actual.
+     */
+    public static function homeDirectory(?int $tenantId = null): string
+    {
+        $projectRoot = dirname(__DIR__, 2);
+        if (self::isFixed()) {
+            return $projectRoot;
+        }
+
+        $slug = $tenantId === null || $tenantId === self::scopeId()
+            ? (string) (self::current()['slug'] ?? '')
+            : self::slugOf($tenantId);
+        $siteDirectory = $slug === '' ? null : self::siteDirectory($slug);
+
+        return $siteDirectory ?? $projectRoot;
+    }
+
+    /** URL pública (APP_URL) de la copia propia de un conjunto, o null si aún no tiene una. */
+    public static function siteUrl(string $slug): ?string
+    {
+        if (array_key_exists($slug, self::$siteUrls)) {
+            return self::$siteUrls[$slug];
+        }
+
+        $url = null;
+        $directory = self::siteDirectory($slug);
+        if ($directory !== null) {
+            $values = Dotenv::parse((string) file_get_contents($directory . DIRECTORY_SEPARATOR . '.env'));
+            $candidate = rtrim(trim((string) ($values['APP_URL'] ?? '')), '/');
+            $url = filter_var($candidate, FILTER_VALIDATE_URL) !== false ? $candidate : null;
+        }
+
+        return self::$siteUrls[$slug] = $url;
+    }
+
+    private static function fixedSlug(): string
+    {
+        return strtolower(Env::get('APP_TENANT'));
+    }
+
+    /** conjuntos/{slug}/ si existe y está configurado (.env); solo desde el proyecto original. */
+    private static function siteDirectory(string $slug): ?string
+    {
+        if (self::isFixed() || !self::isValidSlug($slug)) {
+            return null;
+        }
+        $directory = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . self::SITES_DIRECTORY . DIRECTORY_SEPARATOR . $slug;
+
+        return is_file($directory . DIRECTORY_SEPARATOR . '.env') ? $directory : null;
+    }
+
+    /**
+     * Un conjunto con copia propia se navega desde ella: las visitas (GET/HEAD) por subdominio se redirigen.
+     * Los POST siguen atendiéndose aquí para no romper webhooks de pasarelas registrados con la dirección anterior.
+     */
+    private static function redirectToOwnSite(string $slug): void
+    {
+        $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+        $siteUrl = self::siteUrl($slug);
+        if ($siteUrl === null || ($method !== 'GET' && $method !== 'HEAD') || PHP_SAPI === 'cli') {
+            return;
+        }
+
+        $uri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+        $basePath = rtrim((string) parse_url(Env::get('APP_URL'), PHP_URL_PATH), '/');
+        if ($basePath !== '' && strncasecmp($uri, $basePath, strlen($basePath)) === 0) {
+            $uri = substr($uri, strlen($basePath));
+        }
+
+        header('Location: ' . $siteUrl . '/' . ltrim($uri, '/'), true, 302);
+        exit;
+    }
+
+    private static function slugOf(int $tenantId): string
+    {
+        $statement = Database::connection()->prepare('SELECT slug FROM tenants WHERE id = ? LIMIT 1');
+        $statement->execute([$tenantId]);
+
+        return (string) ($statement->fetchColumn() ?: '');
+    }
+
+    private static function notFound(): never
+    {
+        http_response_code(404);
+        header('Content-Type: text/html; charset=UTF-8');
+        echo 'No encontramos este conjunto residencial. Verifica la dirección.';
+        exit;
     }
 
     /** Fija el cliente de forma explícita (scripts de consola y pruebas). */
@@ -142,6 +254,18 @@ final class Tenant
         $port = is_array($parts) && isset($parts['port']) ? ':' . (int) $parts['port'] : '';
         $basePath = is_array($parts) && is_string($parts['path'] ?? null) ? rtrim($parts['path'], '/') : '';
         $baseDomain = self::baseDomain();
+
+        if (!$platform) {
+            // La copia del propio conjunto usa su APP_URL; desde el original, la del conjunto si ya tiene copia.
+            if (self::isFixed() && ($slug === null || $slug === self::fixedSlug())) {
+                return rtrim($appUrl, '/') . '/' . ltrim($path, '/');
+            }
+            $targetSlug = $slug ?? (string) (self::current()['slug'] ?? '');
+            $siteUrl = $targetSlug === '' ? null : self::siteUrl($targetSlug);
+            if ($siteUrl !== null) {
+                return $siteUrl . '/' . ltrim($path, '/');
+            }
+        }
 
         if ($baseDomain === '') {
             $host = is_array($parts) && is_string($parts['host'] ?? null) ? $parts['host'] : self::requestHost();

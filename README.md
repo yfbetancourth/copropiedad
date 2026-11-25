@@ -395,3 +395,43 @@ Get-Content .\database\migrations\032_add_resident_type_owner_rule.sql | & C:\xa
 ```powershell
 Get-Content .\database\migrations\030_create_resident_conversations.sql | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
 ```
+
+## Directorio propio por conjunto residencial
+
+Cada conjunto puede tener su propia copia en `conjuntos/{slug}/`, a cuya carpeta `public/` se apunta su dominio.
+El código se edita **solo** en este proyecto (el repositorio); `bin/deploy-conjunto.php` lo replica en cada copia:
+
+```powershell
+C:\xampp84\php\php.exe bin\deploy-conjunto.php st-trope                            # crea o actualiza una copia
+C:\xampp84\php\php.exe bin\deploy-conjunto.php st-trope --url=https://st-trope.com # fija su dominio (APP_URL)
+C:\xampp84\php\php.exe bin\deploy-conjunto.php --all                               # actualiza todas tras un cambio
+```
+
+- Cada copia tiene su `.env` (con `APP_TENANT={slug}`), `storage/` y `public/uploads/`; el script nunca los sobrescribe.
+  `conjuntos/` no se versiona en git.
+- La copia atiende solo a su conjunto con cualquier dominio. La base de datos es compartida.
+- Este proyecto sigue siendo la consola del Superadmin. Los enlaces, archivos y reinicios de un conjunto con copia
+  apuntan a su directorio, y las visitas por su subdominio se redirigen a la copia (los POST de webhooks se siguen atendiendo).
+- Las migraciones se aplican una sola vez sobre la base compartida; después basta con `--all`.
+- Después de cada cambio de código hay que ejecutar `--all`; si no, las copias siguen con la versión anterior
+  (el archivo `DEPLOYED` de cada copia indica qué versión tiene).
+- Para apuntar un dominio: crear el VirtualHost (o el dominio adicional del hosting) con `DocumentRoot`
+  en `conjuntos/{slug}/public` y ejecutar el script con `--url=https://dominio`.
+
+## Privacidad, cookies y autorización de datos (migración 037)
+
+Cumple la Ley 1581 de 2012 y el Decreto 1377 de 2013 (compilado en el Decreto 1074 de 2015), vigentes a noviembre
+de 2026; la reforma a la Ley 1581 (PL 274/2025C) seguía en trámite.
+
+- **Módulo `privacidad`**: el Superadmin lo habilita por conjunto (Consola › Conjuntos › Módulos «Privacidad y contacto web»). Deshabilitado, el panel responde 404 y la página pública no muestra políticas, aviso ni formulario; las versiones y autorizaciones ya guardadas se conservan.
+- **Panel › Personalización › Privacidad y cookies** (permiso `privacidad`): datos del responsable, política de
+  tratamiento de datos, texto de la autorización del formulario y política de cookies. Cada publicación crea una
+  versión nueva e inmutable con fecha, autor y descripción del cambio. Se ofrecen plantillas iniciales completadas
+  con los datos del conjunto, que el conjunto debe revisar (idealmente con un abogado) antes de publicarlas.
+- **Panel › Personalización › Registro de autorizaciones**: prueba de cada autorización (titular, fecha, IP,
+  navegador y versiones aceptadas), búsqueda, exportación CSV y registro de revocaciones. Las autorizaciones no se borran.
+- **Panel › Comunicación › Contacto del sitio web** (permiso `contacto`): mensajes del formulario de la página pública.
+- **Página pública**: `/politica-de-datos`, `/autorizacion-de-datos`, `/politica-de-cookies`, enlaces en el pie,
+  aviso informativo de cookies (el sitio solo usa cookies necesarias) y formulario de contacto con casilla de
+  autorización obligatoria y sin marcar. El formulario aparece cuando están publicadas la política y la autorización.
+  Se protege sin cookies: token firmado con tiempo mínimo, campo trampa y máximo 5 mensajes por hora por IP.

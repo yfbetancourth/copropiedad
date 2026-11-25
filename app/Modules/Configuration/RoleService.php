@@ -30,6 +30,8 @@ final class RoleService
         'comunidad.residentes' => 'Comunidad / Residentes',
         'zonas.comunes' => 'Zonas comunes / Espacios y reservas',
         'clasificados' => 'Clasificados / Revisión y publicación',
+        'contacto' => 'Comunicación / Contacto del sitio web',
+        'privacidad' => 'Privacidad y datos personales / Políticas y autorizaciones',
     ];
 
     public const LEVELS = [

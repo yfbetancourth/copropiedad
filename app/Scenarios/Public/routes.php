@@ -23,6 +23,7 @@ if (Tenant::isPlatform()) {
 require dirname(__DIR__, 2) . '/Modules/Home/routes.php';
 require dirname(__DIR__, 2) . '/Modules/Classifieds/routes.php';
 require dirname(__DIR__, 2) . '/Modules/Billing/public-routes.php';
+require dirname(__DIR__, 2) . '/Modules/Privacy/routes.php';
 
 $router->get('/robots.txt', static function (): void {
     $appUrl = rtrim(Tenant::absoluteUrl('/'), '/');

@@ -1,0 +1,25 @@
+# ¿Qué son las cookies?
+
+Las cookies son pequeños archivos que un sitio web guarda en el navegador para recordar información entre una página y otra. Un mecanismo parecido es el almacenamiento local del navegador.
+
+# Cookies que usa este sitio
+
+El sitio web de {nombre} usa únicamente cookies y almacenamiento estrictamente necesarios para su funcionamiento y seguridad. No usa cookies de publicidad, de analítica ni de seguimiento de terceros.
+
+- Cookie de sesión (PHPSESSID): se crea solo cuando una persona inicia sesión en el portal de residentes o en el panel administrativo. Mantiene la sesión abierta y protege los formularios. Es propia, no se comparte con terceros y se borra al cerrar el navegador o la sesión.
+- Aviso de cookies (almacenamiento local): recuerda que ya leíste este aviso para no mostrarlo en cada página. No contiene datos personales.
+- Preferencias de tablas (almacenamiento local): en el panel administrativo, recuerda el orden y los filtros que elige el usuario. No contiene datos personales.
+
+# Servicios de terceros
+
+- Tipografías: el sitio carga sus tipografías desde cdn.jsdelivr.net. Ese servicio recibe la dirección IP del navegador para entregar los archivos, pero no instala cookies.
+- Mapas: el enlace «Cómo llegar» abre Google Maps en una pestaña nueva; Google aplica sus propias políticas solo si visitas su sitio.
+- Pagos en línea: si un residente paga en línea, la pasarela de pago puede usar sus propias cookies en su sitio, de acuerdo con sus políticas.
+
+# Cómo gestionar las cookies
+
+Puedes ver, bloquear o borrar las cookies desde la configuración de tu navegador. Si bloqueas la cookie de sesión, el sitio público seguirá funcionando, pero no podrás iniciar sesión en el portal de residentes.
+
+# Cambios en esta política
+
+Si el sitio incorpora otro tipo de cookies, por ejemplo de analítica, esta política se actualizará con una nueva versión y se pedirá tu consentimiento antes de activarlas. Para preguntas sobre esta política escribe a {correo}.

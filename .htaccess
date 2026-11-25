@@ -1,0 +1,4 @@
+# Solo public/ (y conjuntos/{slug}/public/) es accesible por web. Esto protege .env, app/, storage/,
+# vendor/ y database/ cuando el servidor publica toda la carpeta del proyecto (p. ej. XAMPP en htdocs).
+# En producción, el dominio debe apuntar directamente a la carpeta public/ correspondiente.
+Require all denied

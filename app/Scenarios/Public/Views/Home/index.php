@@ -152,3 +152,74 @@ $propertyTypeLabels = [
     <div class="resident-cta"><div><p class="eyebrow"><?= $text('resident_cta_eyebrow') ?></p><h3><?= $text('resident_cta_title') ?></h3><p><?= $text('resident_cta_text') ?></p></div><a class="button button-dark" href="<?= $escape($basePath) ?>/login?destino=usuario"><?= $text('resident_cta_button') ?> <span aria-hidden="true">↗</span></a></div>
 </section>
 <?php endif; ?>
+
+<?php if (is_array($contactForm ?? null)): ?>
+<?php
+$contactErrors = $contactForm['errors'];
+$contactOld = $contactForm['old'];
+$contactValue = static fn (string $key): string => $escape($contactOld[$key] ?? '');
+$contactInvalid = static fn (string $key): string => isset($contactErrors[$key]) ? ' aria-invalid="true" aria-describedby="contact-' . $key . '-error"' : '';
+$contactError = static fn (string $key): string => isset($contactErrors[$key])
+    ? '<p class="field-error" id="contact-' . $key . '-error">' . $escape($contactErrors[$key]) . '</p>'
+    : '';
+?>
+<section class="contact-section section-block" id="contacto" aria-labelledby="contact-title">
+    <div class="contact-copy">
+        <p class="eyebrow"><span class="eyebrow-line"></span> Contacto</p>
+        <h2 id="contact-title">Escríbenos <em>tu mensaje</em></h2>
+        <p>¿Tienes una pregunta sobre <?= $escape($name) ?>? Déjanos tus datos y la administración te responderá por correo.</p>
+        <p class="contact-legal">Tratamos tus datos según la <a href="<?= $escape($basePath) ?>/politica-de-datos">Política de tratamiento de datos personales</a>. Puedes consultar, actualizar o suprimir tus datos y revocar tu autorización en cualquier momento.</p>
+    </div>
+    <div class="contact-card">
+        <?php if ($contactForm['sent']): ?>
+            <div class="form-notice form-notice-success" role="status" tabindex="-1" data-focus-on-load>
+                <strong>¡Mensaje enviado!</strong> Gracias por escribirnos. La administración te responderá al correo que indicaste.
+            </div>
+        <?php endif; ?>
+        <?php if (isset($contactErrors['form'])): ?>
+            <div class="form-notice form-notice-error" role="alert"><?= $escape($contactErrors['form']) ?></div>
+        <?php elseif ($contactErrors !== []): ?>
+            <div class="form-notice form-notice-error" role="alert" tabindex="-1" data-focus-on-load>Revisa los campos marcados para enviar tu mensaje.</div>
+        <?php endif; ?>
+        <form class="contact-form" method="post" action="<?= $escape($basePath) ?>/contacto#contacto" novalidate>
+            <input type="hidden" name="token" value="<?= $escape($contactForm['token']) ?>">
+            <div class="contact-trap" aria-hidden="true">
+                <label for="contact-<?= $escape($contactForm['honeypot']) ?>">No llenes este campo</label>
+                <input type="text" id="contact-<?= $escape($contactForm['honeypot']) ?>" name="<?= $escape($contactForm['honeypot']) ?>" tabindex="-1" autocomplete="off">
+            </div>
+            <div class="field-row">
+                <div class="field">
+                    <label for="contact-name">Nombre completo</label>
+                    <input type="text" id="contact-name" name="name" value="<?= $contactValue('name') ?>" maxlength="100" autocomplete="name" required<?= $contactInvalid('name') ?>>
+                    <?= $contactError('name') ?>
+                </div>
+                <div class="field">
+                    <label for="contact-email">Correo electrónico</label>
+                    <input type="email" id="contact-email" name="email" value="<?= $contactValue('email') ?>" maxlength="254" autocomplete="email" required<?= $contactInvalid('email') ?>>
+                    <?= $contactError('email') ?>
+                </div>
+            </div>
+            <div class="field">
+                <label for="contact-phone">Teléfono <span class="field-optional">(opcional)</span></label>
+                <input type="tel" id="contact-phone" name="phone" value="<?= $contactValue('phone') ?>" maxlength="30" autocomplete="tel"<?= $contactInvalid('phone') ?>>
+                <?= $contactError('phone') ?>
+            </div>
+            <div class="field">
+                <label for="contact-message">Mensaje</label>
+                <textarea id="contact-message" name="message" rows="5" minlength="10" maxlength="2000" required<?= $contactInvalid('message') ?>><?= $contactValue('message') ?></textarea>
+                <?= $contactError('message') ?>
+            </div>
+            <div class="field field-consent">
+                <input type="checkbox" id="contact-authorization" name="authorization" value="1" required<?= ($contactOld['authorization'] ?? '') === '1' ? ' checked' : '' ?><?= $contactInvalid('authorization') ?>>
+                <label for="contact-authorization"><?= $escape($contactForm['authorizationText']) ?> <a href="<?= $escape($basePath) ?>/politica-de-datos" target="_blank" rel="noopener">Ver política<span class="visually-hidden"> (se abre en una pestaña nueva)</span></a>.</label>
+                <?= $contactError('authorization') ?>
+            </div>
+            <button class="button button-dark" type="submit"<?= $contactForm['preview'] ? ' disabled title="No disponible en la vista previa"' : '' ?>>Enviar mensaje <span aria-hidden="true">↗</span></button>
+        </form>
+    </div>
+</section>
+<script>
+    // Lleva el foco al resultado del envío para que lectores de pantalla lo anuncien.
+    document.querySelector('[data-focus-on-load]')?.focus();
+</script>
+<?php endif; ?>

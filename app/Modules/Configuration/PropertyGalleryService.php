@@ -126,6 +126,6 @@ final class PropertyGalleryService
     /** Carpeta pública de la galería de un conjunto (también la usa el reinicio del Superadmin). */
     public static function directoryFor(int $tenantId): string
     {
-        return dirname(__DIR__, 3) . '/public/uploads/property-gallery/' . $tenantId;
+        return Tenant::homeDirectory($tenantId) . '/public/uploads/property-gallery/' . $tenantId;
     }
 }

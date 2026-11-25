@@ -62,9 +62,12 @@ final class Url
             return '/';
         }
 
+        // Sin distinguir mayúsculas: en Windows, Apache sirve /copropiedad/ igual que /Copropiedad/.
         $basePath = self::basePath();
-        if ($basePath !== '' && ($path === $basePath || str_starts_with($path, $basePath . '/'))) {
-            $path = substr($path, strlen($basePath));
+        $baseLength = strlen($basePath);
+        if ($basePath !== '' && strncasecmp($path, $basePath, $baseLength) === 0
+            && (strlen($path) === $baseLength || $path[$baseLength] === '/')) {
+            $path = substr($path, $baseLength);
         }
 
         if (str_ends_with(str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? ''), '/admin/index.php')

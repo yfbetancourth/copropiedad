@@ -1,0 +1,74 @@
+# 1. Responsable del tratamiento
+
+{nombre}, identificado con NIT {nit}, con domicilio en {direccion}, es el responsable del tratamiento de los datos personales que recolecta en el ejercicio de la administración de la propiedad horizontal (Ley 675 de 2001) y a través de su sitio web {sitio}.
+
+- Correo electrónico: {correo}
+- Teléfono: {telefono}
+- Dirección: {direccion}
+
+Esta política se expide en cumplimiento de la Ley Estatutaria 1581 de 2012, el Decreto 1377 de 2013 (compilado en el Decreto Único Reglamentario 1074 de 2015) y demás normas que las modifiquen o complementen.
+
+# 2. Definiciones
+
+- Titular: persona natural cuyos datos personales son objeto de tratamiento.
+- Dato personal: cualquier información vinculada o que pueda asociarse a una o varias personas naturales determinadas o determinables.
+- Tratamiento: cualquier operación sobre datos personales, como la recolección, almacenamiento, uso, circulación o supresión.
+- Autorización: consentimiento previo, expreso e informado del titular para llevar a cabo el tratamiento.
+- Responsable: quien decide sobre la base de datos y el tratamiento. Encargado: quien realiza el tratamiento por cuenta del responsable.
+
+# 3. Datos que se tratan
+
+- Propietarios, residentes y arrendatarios: nombre, documento de identidad, correo, teléfono, inmueble, vínculo con el inmueble, información de cuotas, pagos y cartera, reservas de zonas comunes y comunicaciones con la administración.
+- Visitantes del sitio web que usan el formulario de contacto: nombre, correo electrónico, teléfono (opcional) y el contenido del mensaje.
+- Datos técnicos del sitio web: dirección IP, fecha y hora y navegador, usados como prueba de la autorización y para la seguridad del sitio.
+
+No se solicitan datos sensibles. Si alguna vez se requieren, su suministro será facultativo y se pedirá autorización explícita. No se tratan datos de niños, niñas y adolescentes salvo los de naturaleza pública o los estrictamente necesarios para la convivencia en la copropiedad, respetando su interés superior.
+
+# 4. Finalidades del tratamiento
+
+- Administrar la copropiedad conforme a la Ley 675 de 2001 y al reglamento de propiedad horizontal.
+- Liquidar, cobrar y registrar cuotas de administración, cuotas extraordinarias, intereses y multas, y gestionar la cartera.
+- Procesar pagos en línea a través de las pasarelas de pago habilitadas.
+- Enviar comunicados, avisos, convocatorias y notificaciones relacionadas con la copropiedad.
+- Gestionar reservas de zonas comunes, clasificados y solicitudes de los residentes.
+- Atender y responder los mensajes recibidos a través del formulario de contacto del sitio web.
+- Cumplir obligaciones legales, contables y tributarias y atender requerimientos de autoridades.
+
+Los datos solo se usarán para las finalidades informadas. Cualquier nueva finalidad requerirá una nueva autorización.
+
+# 5. Derechos de los titulares
+
+De acuerdo con el artículo 8 de la Ley 1581 de 2012, el titular tiene derecho a:
+
+- Conocer, actualizar y rectificar sus datos personales.
+- Solicitar prueba de la autorización otorgada.
+- Ser informado sobre el uso que se ha dado a sus datos.
+- Presentar quejas ante la Superintendencia de Industria y Comercio, una vez agotado el trámite de consulta o reclamo ante el responsable.
+- Revocar la autorización y solicitar la supresión de sus datos cuando no exista un deber legal o contractual de conservarlos.
+- Acceder en forma gratuita a sus datos personales.
+
+# 6. Área responsable de peticiones, consultas y reclamos
+
+El área encargada de atender las peticiones, consultas y reclamos es: {area}, a través del correo {correo}.
+
+# 7. Procedimiento para ejercer los derechos
+
+Consultas: el titular o sus causahabientes pueden consultar la información personal que repose en las bases de datos. La consulta se atenderá en un término máximo de diez (10) días hábiles contados a partir de su recibo. Si no fuere posible atenderla en ese término, se informará al interesado el motivo y la fecha en que se atenderá, que no podrá superar cinco (5) días hábiles adicionales.
+
+Reclamos: quien considere que la información debe ser corregida, actualizada o suprimida, o advierta un presunto incumplimiento, puede presentar un reclamo por escrito al correo {correo}, con la identificación del titular, la descripción de los hechos, la dirección de respuesta y los documentos que quiera hacer valer. Si el reclamo está incompleto se requerirá al interesado dentro de los cinco (5) días siguientes para que lo subsane; si pasan dos (2) meses sin que presente la información requerida, se entenderá que desistió. El reclamo se atenderá en un término máximo de quince (15) días hábiles contados desde el día siguiente a su recibo. Si no fuere posible atenderlo en ese término, se informará el motivo y la fecha de atención, que no podrá superar ocho (8) días hábiles adicionales.
+
+Revocatoria y supresión: el titular puede revocar la autorización o pedir la supresión de sus datos en cualquier momento por el mismo correo. La solicitud no procede cuando exista un deber legal o contractual de permanecer en la base de datos.
+
+# 8. Encargados y transferencias
+
+Para prestar sus servicios, la copropiedad se apoya en proveedores que actúan como encargados del tratamiento, como el proveedor de la plataforma tecnológica y de alojamiento del sitio web, el servicio de correo electrónico y las pasarelas de pago. Estos proveedores solo pueden usar los datos para prestar el servicio contratado y deben protegerlos. Si algún proveedor almacena datos fuera de Colombia, la transferencia se hará conforme al artículo 26 de la Ley 1581 de 2012.
+
+# 9. Seguridad de la información
+
+La copropiedad adopta medidas técnicas, humanas y administrativas para proteger los datos contra adulteración, pérdida, consulta, uso o acceso no autorizado, como el acceso restringido por usuario y contraseña, el registro de las autorizaciones y la comunicación cifrada con el sitio web.
+
+# 10. Vigencia
+
+Esta política rige a partir del {fecha}. Los datos se conservarán mientras exista la relación con la copropiedad y durante el tiempo necesario para cumplir las finalidades informadas y las obligaciones legales. Los mensajes del formulario de contacto se conservarán mientras se atiende la solicitud y hasta por doce (12) meses después.
+
+Cualquier cambio sustancial en esta política se comunicará en el sitio web antes de su aplicación, indicando la versión y la fecha de vigencia.

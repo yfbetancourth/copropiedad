@@ -62,6 +62,13 @@ final class ModuleCatalog
             'permissions' => ['clasificados'],
             'requires' => [],
         ],
+        'privacidad' => [
+            'label' => 'Privacidad y contacto web',
+            'description' => 'Política de tratamiento de datos, autorización y política de cookies versionadas (Ley 1581 de 2012), aviso de cookies, formulario de contacto en la página pública y registro de autorizaciones.',
+            'icon' => 'bi-shield-lock',
+            'permissions' => ['privacidad', 'contacto'],
+            'requires' => [],
+        ],
     ];
 
     public static function exists(string $module): bool

@@ -26,7 +26,7 @@ final class Session
             'httponly' => true,
             'secure' => self::isHttps(),
             'samesite' => 'Lax',
-            'path' => '/',
+            'path' => self::cookiePath(),
         ]);
         session_start();
     }
@@ -46,6 +46,20 @@ final class Session
         return is_string($token)
             && isset($_SESSION['csrf_token'])
             && hash_equals($_SESSION['csrf_token'], $token);
+    }
+
+    /**
+     * La copia de un conjunto limita la cookie a su ruta (APP_URL), para que varias copias servidas
+     * desde el mismo host (p. ej. localhost) no compartan la sesión.
+     */
+    private static function cookiePath(): string
+    {
+        if (Env::get('APP_TENANT') === '') {
+            return '/';
+        }
+        $path = parse_url(Env::get('APP_URL'), PHP_URL_PATH);
+
+        return is_string($path) && $path !== '' ? rtrim($path, '/') . '/' : '/';
     }
 
     public static function isHttps(): bool

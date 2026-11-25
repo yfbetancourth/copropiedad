@@ -38,7 +38,19 @@ $navLinks = [
 if ($classifiedsEnabled) {
     $navLinks[] = ['Clasificados', $isHomePage ? '#clasificados' : $basePath . '/clasificados', !$isHomePage];
 }
+if (is_array($contactForm ?? null)) {
+    $navLinks[] = ['Contacto', '#contacto', false];
+}
 $loginUrl = $basePath . '/login?destino=usuario';
+// Documentos de privacidad publicados (Configuración / Privacidad y cookies) para el pie y el aviso de cookies.
+$privacyService = new \App\Modules\Privacy\PrivacyService();
+$legalLinks = [];
+foreach (\App\Modules\Privacy\PrivacyService::DOCUMENTS as $legalKey => $legalDocument) {
+    if ($privacyService->current($legalKey) !== null) {
+        $legalLinks[$legalKey] = [$legalDocument['label'], $basePath . $legalDocument['public_path']];
+    }
+}
+$cookiePolicy = $privacyService->current('cookie_policy');
 // Textos editables (Configuración / Sitio público). Las páginas que no los pasan usan los publicados.
 $sitePreview = ($sitePreview ?? false) === true;
 $siteTexts = is_array($siteTexts ?? null) ? $siteTexts : (new \App\Modules\Configuration\PublicSiteService())->published();
@@ -69,7 +81,7 @@ $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/inter@5.0.18/index.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/fraunces@5.0.21/wght.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource-variable/fraunces@5.0.21/wght-italic.css">
-    <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/portada/css/public.css?v=3">
+    <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/portada/css/public.css?v=4">
     <?php if ($isHomePage): ?>
         <link rel="preload" as="image" href="<?= $escape($basePath . ($galleryImages[0]['url'] ?? '/assets/portada/images/community-placeholder.svg')) ?>" fetchpriority="high">
         <script type="application/ld+json"><?= json_encode($structuredSite, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
@@ -118,6 +130,14 @@ $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 
             <?php if ($classifiedsEnabled): ?><a href="<?= $escape($basePath) ?>/clasificados">Clasificados</a><?php endif; ?>
             <a href="<?= $escape($loginUrl) ?>">Portal de residentes</a>
         </nav>
+        <?php if ($legalLinks !== []): ?>
+            <nav class="footer-links" aria-label="Privacidad">
+                <h2>Privacidad</h2>
+                <?php foreach ($legalLinks as [$legalLabel, $legalHref]): ?>
+                    <a href="<?= $escape($legalHref) ?>"><?= $escape($legalLabel) ?></a>
+                <?php endforeach; ?>
+            </nav>
+        <?php endif; ?>
         <?php if ($address !== ''): ?>
             <div class="footer-links">
                 <h2>Encuéntranos</h2>
@@ -131,5 +151,30 @@ $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 
         <span>Clasificados publicados por los residentes.</span>
     </div>
 </footer>
+<?php if ($cookiePolicy !== null && !$sitePreview): ?>
+    <?php // Aviso informativo: el sitio solo usa cookies necesarias. Vuelve a mostrarse con cada versión nueva de la política. ?>
+    <div class="cookie-notice" role="region" aria-label="Aviso de cookies" data-cookie-notice="<?= 'v' . (int) $cookiePolicy['version'] ?>" hidden>
+        <p>Este sitio usa solo cookies necesarias para su funcionamiento y seguridad, como la de inicio de sesión del portal. No usamos cookies de publicidad ni de analítica.</p>
+        <div class="cookie-notice-actions">
+            <a class="text-link" href="<?= $escape($basePath) ?>/politica-de-cookies">Política de cookies</a>
+            <button class="button button-dark" type="button" data-cookie-dismiss>Entendido</button>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var notice = document.querySelector('[data-cookie-notice]');
+            if (!notice) { return; }
+            var key = 'aviso-cookies-' + notice.getAttribute('data-cookie-notice');
+            var seen = false;
+            try { seen = window.localStorage.getItem(key) === '1'; } catch (error) { /* navegador sin almacenamiento */ }
+            if (seen) { return; }
+            notice.hidden = false;
+            notice.querySelector('[data-cookie-dismiss]').addEventListener('click', function () {
+                try { window.localStorage.setItem(key, '1'); } catch (error) { /* se mostrará de nuevo */ }
+                notice.hidden = true;
+            });
+        })();
+    </script>
+<?php endif; ?>
 </body>
 </html>

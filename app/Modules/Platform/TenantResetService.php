@@ -62,6 +62,12 @@ final class TenantResetService
             'requires' => ['bookings'],
             'counts' => ['common_areas' => 'espacios'],
         ],
+        'contact' => [
+            'label' => 'Mensajes del sitio web',
+            'detail' => 'Mensajes del formulario de contacto de la página pública. Las políticas y el registro de autorizaciones se conservan: son la prueba legal de las autorizaciones.',
+            'requires' => [],
+            'counts' => ['contact_messages' => 'mensajes'],
+        ],
         'classifieds' => [
             'label' => 'Clasificados',
             'detail' => 'Publicaciones de venta y arriendo con sus fotos.',
@@ -146,6 +152,7 @@ final class TenantResetService
         ['conversations', 'resident_conversations', 'DELETE FROM resident_conversations WHERE tenant_id = ?'],
         ['bookings', 'common_area_bookings', 'DELETE FROM common_area_bookings WHERE tenant_id = ?'],
         ['common_areas', 'common_areas', 'DELETE FROM common_areas WHERE tenant_id = ?'],
+        ['contact', 'contact_messages', 'DELETE FROM contact_messages WHERE tenant_id = ?'],
         ['classifieds', 'property_classifieds', 'DELETE FROM property_classifieds WHERE tenant_id = ?'],
         ['assignments', 'property_unit_relationship_history', 'DELETE FROM property_unit_relationship_history WHERE tenant_id = ?'],
         ['assignments', 'property_unit_assignments', 'DELETE FROM property_unit_assignments WHERE tenant_id = ?'],
@@ -304,13 +311,13 @@ final class TenantResetService
                 'SELECT images.storage_name FROM property_classified_images AS images
                  JOIN property_classifieds AS listings ON listings.id = images.listing_id
                  WHERE listings.tenant_id = ?',
-                Storage::directory('classifieds')
+                Storage::directory('classifieds', $tenantId)
             );
         }
         if (isset($selected['billing'], $tables['billing_payment_reports'])) {
             $collect(
                 'SELECT proof_storage_name FROM billing_payment_reports WHERE tenant_id = ?',
-                Storage::directory('payment-proofs')
+                Storage::directory('payment-proofs', $tenantId)
             );
         }
         if (isset($selected['gallery'])) {

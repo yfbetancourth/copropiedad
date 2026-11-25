@@ -1,4 +1,6 @@
 Options -Indexes
+# La raíz del proyecto (y la de cada copia en conjuntos/) niega el acceso web; solo public/ se publica.
+Require all granted
 RewriteEngine On
 # Each application scenario has its own front controller.
 RewriteRule ^admin/index\.php$ - [L]

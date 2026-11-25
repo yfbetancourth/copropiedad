@@ -55,6 +55,7 @@ $menu = [
     ['Comunicación', [
         ['mensajes', '/comunicacion/atencion', 'bi-chat-dots', 'Atención a residentes', ['/comunicacion/atencion*']],
         ['mensajes', '/mensajes', 'bi-megaphone', 'Comunicados a residentes', ['/mensajes']],
+        ['contacto', '/comunicacion/contacto', 'bi-envelope-paper', 'Contacto del sitio web', ['/comunicacion/contacto']],
         ['configuracion.correo', '/configuracion/correo', 'bi-envelope-at', 'Correo', ['/configuracion/correo']],
     ]],
     ['Conformación', [
@@ -72,6 +73,8 @@ $menu = [
     ['Personalización', [
         ['configuracion.parametrizacion', '/configuracion/sitio-publico', 'bi-window', 'Sitio público', ['/configuracion/sitio-publico*']],
         ['configuracion.parametrizacion', '/configuracion/galeria-publica', 'bi-images', 'Galería pública', ['/configuracion/galeria-publica']],
+        ['privacidad', '/configuracion/privacidad', 'bi-shield-lock', 'Privacidad y cookies', ['/configuracion/privacidad', '/configuracion/privacidad/version']],
+        ['privacidad', '/configuracion/privacidad/autorizaciones', 'bi-journal-check', 'Registro de autorizaciones', ['/configuracion/privacidad/autorizaciones']],
     ]],
 ];
 if ($isPlatform) {
@@ -105,6 +108,9 @@ if (!$isPlatform && $can('zonas.comunes')) {
 }
 if (!$isPlatform && $can('clasificados')) {
     $menuBadges['/clasificados'] = (new \App\Modules\Classifieds\ClassifiedsService())->pendingCount();
+}
+if (!$isPlatform && $can('contacto')) {
+    $menuBadges['/comunicacion/contacto'] = (new \App\Modules\Privacy\ContactService())->newCount();
 }
 $sidebarSections = [];
 foreach ($menu as [$menuTitle, $menuEntries]) {

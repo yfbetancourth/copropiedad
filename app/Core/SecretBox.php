@@ -46,6 +46,15 @@ final class SecretBox
         return $plaintext;
     }
 
+    /**
+     * Firma HMAC-SHA256 (hex) de $data para un propósito concreto, derivada de APP_KEY. El propósito separa
+     * los usos (p. ej. «contact-form» o «ip-hash») para que una firma no sirva en otro contexto.
+     */
+    public static function mac(string $purpose, string $data): string
+    {
+        return hash_hmac('sha256', $data, hash_hmac('sha256', $purpose, self::key(), true));
+    }
+
     private static function key(): string
     {
         $setting = Env::get('APP_KEY');

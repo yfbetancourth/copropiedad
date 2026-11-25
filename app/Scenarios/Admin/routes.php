@@ -22,3 +22,4 @@ require dirname(__DIR__, 2) . '/Modules/Messaging/routes.php';
 require dirname(__DIR__, 2) . '/Modules/Community/routes.php';
 require dirname(__DIR__, 2) . '/Modules/CommonAreas/routes.php';
 require dirname(__DIR__, 2) . '/Modules/Classifieds/admin-routes.php';
+require dirname(__DIR__, 2) . '/Modules/Privacy/admin-routes.php';
