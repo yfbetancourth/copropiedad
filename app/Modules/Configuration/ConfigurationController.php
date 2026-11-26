@@ -1241,7 +1241,7 @@ final class ConfigurationController
             }
         }
         if ($changed) {
-            (new CompositionService())->saveAnswers($housingType, $answers);
+            (new CompositionService())->saveAnswers($answers);
         } elseif ($structureExists) {
             Http::flash(self::FLASH, 'success', 'La cantidad no cambió; la estructura de inmuebles se conserva.');
         }

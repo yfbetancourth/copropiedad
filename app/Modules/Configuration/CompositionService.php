@@ -7,11 +7,15 @@ namespace App\Modules\Configuration;
 use App\Core\Database;
 use App\Core\Tenant;
 use App\Modules\PropertyAssignment\RelationshipHistory;
-use JsonException;
 use RuntimeException;
 
 final class CompositionService
 {
+    /** Preguntas del asistente, en el orden en que se hacen; cada una es una columna de copropiedad_composition. */
+    public const ANSWER_FIELDS = [
+        'houses', 'towers', 'floors_per_tower', 'units_per_floor', 'commercial_properties', 'parking_spots', 'storage_units',
+    ];
+
     /**
      * Estructura del conjunto. units es null mientras el asistente no haya generado inmuebles; cada inmueble trae
      * su coeficiente como texto con 4 decimales ('' si falta), igual que lo escribe el formulario.
@@ -20,11 +24,12 @@ final class CompositionService
      */
     public function current(): ?array
     {
-        $pdo = Database::connection();
-        $statement = $pdo->prepare(
-            'SELECT housing_type, answers, completed
-             FROM copropiedad_composition
-             WHERE tenant_id = ?'
+        // El tipo de vivienda vive solo en la caracterización: al cambiarlo, la conformación se borra.
+        $statement = Database::connection()->prepare(
+            'SELECT settings.housing_type, composition.completed, composition.' . implode(', composition.', self::ANSWER_FIELDS) . '
+             FROM copropiedad_composition AS composition
+             LEFT JOIN copropiedad_settings AS settings ON settings.tenant_id = composition.tenant_id
+             WHERE composition.tenant_id = ?'
         );
         $statement->execute([Tenant::id()]);
         $row = $statement->fetch();
@@ -32,13 +37,11 @@ final class CompositionService
             return null;
         }
 
-        try {
-            $answers = json_decode((string) $row['answers'], true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            throw new RuntimeException('No se pudo leer la estructura guardada de la copropiedad.', 0, $exception);
-        }
-        if (!is_array($answers)) {
-            throw new RuntimeException('La estructura guardada de la copropiedad tiene un formato invalido.');
+        $answers = [];
+        foreach (self::ANSWER_FIELDS as $field) {
+            if ($row[$field] !== null) {
+                $answers[$field] = (int) $row[$field];
+            }
         }
 
         $units = [];
@@ -52,7 +55,7 @@ final class CompositionService
         }
 
         return [
-            'housing_type' => (string) $row['housing_type'],
+            'housing_type' => (string) ($row['housing_type'] ?? ''),
             'answers' => $answers,
             'units' => $units === [] ? null : $units,
             'completed' => (bool) $row['completed'],
@@ -88,22 +91,31 @@ final class CompositionService
     }
 
     /**
+     * Guarda las respuestas del asistente (las no respondidas quedan en NULL) y borra la estructura generada.
+     *
      * @param array<string, int> $answers
      */
-    public function saveAnswers(string $housingType, array $answers): void
+    public function saveAnswers(array $answers): void
     {
-        $encoded = json_encode($answers, JSON_THROW_ON_ERROR);
+        $unknown = array_diff(array_keys($answers), self::ANSWER_FIELDS);
+        if ($unknown !== []) {
+            throw new RuntimeException('Pregunta de conformación desconocida: ' . implode(', ', $unknown));
+        }
+        $values = [];
+        foreach (self::ANSWER_FIELDS as $field) {
+            $values[] = isset($answers[$field]) ? (int) $answers[$field] : null;
+        }
+        $columns = implode(', ', self::ANSWER_FIELDS);
+        $updates = implode(', ', array_map(static fn (string $field): string => "$field = VALUES($field)", self::ANSWER_FIELDS));
+
         $pdo = Database::connection();
         $pdo->beginTransaction();
         try {
             $pdo->prepare(
-                'INSERT INTO copropiedad_composition (tenant_id, housing_type, answers, completed)
-                 VALUES (?, ?, ?, 0)
-                 ON DUPLICATE KEY UPDATE
-                    housing_type = VALUES(housing_type),
-                    answers = VALUES(answers),
-                    completed = 0'
-            )->execute([Tenant::id(), $housingType, $encoded]);
+                "INSERT INTO copropiedad_composition (tenant_id, $columns, completed)
+                 VALUES (?" . str_repeat(', ?', count(self::ANSWER_FIELDS)) . ", 0)
+                 ON DUPLICATE KEY UPDATE $updates, completed = 0"
+            )->execute([Tenant::id(), ...$values]);
             $pdo->prepare('DELETE FROM property_unit_assignments WHERE tenant_id = ?')->execute([Tenant::id()]);
             RelationshipHistory::closeAll($pdo, 'reinicio_conformacion', self::actorId());
             $pdo->prepare('DELETE FROM property_units WHERE tenant_id = ?')->execute([Tenant::id()]);
