@@ -58,7 +58,7 @@ final class Tenant
         $baseDomain = self::baseDomain();
         $slug = null;
 
-        if ($baseDomain !== '' && ($host === $baseDomain || $host === 'www.' . $baseDomain)) {
+        if ($baseDomain !== '' && ($host === $baseDomain || $host === 'www.' . $baseDomain || self::isLocalNetworkAlias($host))) {
             self::set(null);
             return;
         }
@@ -122,7 +122,9 @@ final class Tenant
             $url = filter_var($candidate, FILTER_VALIDATE_URL) !== false ? $candidate : null;
         }
 
-        return self::$siteUrls[$slug] = $url;
+        self::$siteUrls[$slug] = $url;
+
+        return $url === null ? null : self::forRequestHost($url);
     }
 
     private static function fixedSlug(): string
@@ -258,7 +260,7 @@ final class Tenant
         if (!$platform) {
             // La copia del propio conjunto usa su APP_URL; desde el original, la del conjunto si ya tiene copia.
             if (self::isFixed() && ($slug === null || $slug === self::fixedSlug())) {
-                return rtrim($appUrl, '/') . '/' . ltrim($path, '/');
+                return self::forRequestHost(rtrim($appUrl, '/')) . '/' . ltrim($path, '/');
             }
             $targetSlug = $slug ?? (string) (self::current()['slug'] ?? '');
             $siteUrl = $targetSlug === '' ? null : self::siteUrl($targetSlug);
@@ -330,6 +332,43 @@ final class Tenant
     private static function isProduction(): bool
     {
         return (Env::get('APP_ENV') ?: 'production') === 'production';
+    }
+
+    private const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '::1', '[::1]'];
+
+    /**
+     * Fuera de producción, con el dominio base en localhost: la IP o el nombre de este equipo en la red local
+     * (p. ej. http://192.168.1.20/Copropiedad/public/admin) abren la plataforma igual que localhost.
+     */
+    private static function isLocalNetworkAlias(string $host): bool
+    {
+        if (self::isProduction() || !in_array(self::baseDomain(), self::LOOPBACK_HOSTS, true) || $host === '') {
+            return false;
+        }
+
+        return filter_var($host, FILTER_VALIDATE_IP) !== false || $host === strtolower((string) gethostname());
+    }
+
+    /**
+     * Fuera de producción, una URL configurada con localhost se reescribe con el host de la petición, para que
+     * las redirecciones y enlaces sigan funcionando al entrar desde otro equipo de la red. En producción, o si
+     * la URL ya usa otro dominio, no cambia.
+     */
+    private static function forRequestHost(string $url): string
+    {
+        if (self::isProduction() || PHP_SAPI === 'cli') {
+            return $url;
+        }
+        $configuredHost = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $requestHost = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        // Solo nombres de host o IP con puerto opcional: nunca se copia a la URL un encabezado Host malformado.
+        if (!in_array($configuredHost, self::LOOPBACK_HOSTS, true)
+            || preg_match('/^(?:[a-z0-9.-]+|\[[0-9a-f:]+\])(?::\d{1,5})?$/D', $requestHost) !== 1
+            || preg_replace('/:\d+$/', '', $requestHost) === $configuredHost) {
+            return $url;
+        }
+
+        return preg_replace('~^(https?://)[^/]+~i', '${1}' . $requestHost, $url) ?? $url;
     }
 
 }
