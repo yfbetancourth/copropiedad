@@ -28,7 +28,7 @@ $hiddenByGallery = $galleryCount > 0 ? 'values' : 'spaces';
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
         <div>
             <h1 class="h3 mb-1">Sitio público</h1>
-            <p class="text-secondary mb-0">Textos de la página pública del conjunto. Los cambios se guardan como borrador y el público los ve cuando los publicas.</p>
+            <p class="text-secondary mb-0">Colores y textos de la página pública del conjunto. Los cambios se guardan como borrador y el público los ve cuando los publicas.</p>
         </div>
         <div class="d-flex gap-2 flex-wrap">
             <a class="btn btn-outline-secondary" href="<?= $escape($publicBasePath) ?>/" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Ver sitio publicado</a>
@@ -82,6 +82,59 @@ $hiddenByGallery = $galleryCount > 0 ? 'values' : 'spaces';
 
     <form method="post" action="<?= $escape($basePath) ?>/configuracion/sitio-publico/guardar" novalidate>
         <input type="hidden" name="_token" value="<?= $escape($csrfToken) ?>">
+
+        <?php $paletteError = $errors['palette'] ?? null; ?>
+        <div class="card mb-3">
+            <fieldset class="card-body" aria-describedby="palette-help">
+                <legend class="h6 fw-semibold mb-2">
+                    <i class="bi bi-palette me-1" aria-hidden="true"></i>Paleta de colores
+                </legend>
+                <p id="palette-help" class="small text-secondary">
+                    Elige cómo se ve la página pública del conjunto. Todas las paletas cumplen los contrastes de
+                    accesibilidad (WCAG AA). El cambio se guarda en el borrador: revísalo en la vista previa y publícalo.
+                </p>
+                <?php if ($paletteError): ?><div class="alert alert-danger py-2" role="alert"><?= $escape($paletteError) ?></div><?php endif; ?>
+                <div class="palette-grid">
+                    <?php foreach (\App\Modules\Configuration\PublicSitePalette::PALETTES as $paletteKey => $paletteOption): ?>
+                        <?php
+                        $c = $paletteOption['colors'];
+                        // Valores del catálogo (constantes del código), no datos del usuario.
+                        $swatchStyle = sprintf(
+                            '--sw-paper:%s;--sw-deep:%s;--sw-ink:%s;--sw-muted:%s;--sw-brand:%s;--sw-brand-deep:%s;--sw-accent:%s;--sw-tint:%s',
+                            $c['paper'], $c['paper-deep'], $c['ink'], $c['muted'], $c['brand'], $c['brand-deep'], $c['accent'], $c['brand-tint']
+                        );
+                        $paletteId = 'palette-' . $paletteKey;
+                        ?>
+                        <label class="palette-option" for="<?= $escape($paletteId) ?>">
+                            <span class="palette-preview" style="<?= $escape($swatchStyle) ?>" aria-hidden="true">
+                                <span class="palette-preview-bar"></span>
+                                <span class="palette-preview-body">
+                                    <span class="palette-preview-eyebrow"></span>
+                                    <span class="palette-preview-title"></span>
+                                    <span class="palette-preview-text"></span>
+                                    <span class="palette-preview-actions">
+                                        <span class="palette-preview-button"></span>
+                                        <span class="palette-preview-dot"></span>
+                                    </span>
+                                </span>
+                                <span class="palette-preview-strip"></span>
+                            </span>
+                            <span class="palette-option-text">
+                                <input class="form-check-input mt-0" type="radio" id="<?= $escape($paletteId) ?>" name="palette" value="<?= $escape($paletteKey) ?>"
+                                    <?= $paletteKey === $palette ? 'checked' : '' ?> <?= $canWrite && $available ? '' : 'disabled' ?>>
+                                <span>
+                                    <span class="fw-semibold d-block">
+                                        <?= $escape($paletteOption['label']) ?>
+                                        <?php if ($paletteKey === $status['published_palette']): ?><span class="badge text-bg-success ms-1">Publicada</span><?php endif; ?>
+                                    </span>
+                                    <span class="small text-secondary d-block"><?= $escape($paletteOption['description']) ?></span>
+                                </span>
+                            </span>
+                        </label>
+                    <?php endforeach; ?>
+                </div>
+            </fieldset>
+        </div>
         <?php foreach (PublicSiteService::SECTIONS as $sectionKey => $section): ?>
             <?php
             $sectionErrors = array_intersect_key($errors, $section['fields']);

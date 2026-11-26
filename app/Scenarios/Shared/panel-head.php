@@ -16,5 +16,5 @@ declare(strict_types=1);
     <link rel="stylesheet" href="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/css/icons.css?v=1">
     <link rel="stylesheet" href="<?= $vendor ?>/admin-lte@4.10.2/css/adminlte.min.css">
     <link rel="stylesheet" href="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/css/app.css?v=1">
-    <link rel="stylesheet" href="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/css/theme.css?v=3">
+    <link rel="stylesheet" href="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/css/theme.css?v=4">
 </head>

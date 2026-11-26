@@ -106,7 +106,7 @@ final class TenantResetService
         ],
         'gallery' => [
             'label' => 'Sitio público',
-            'detail' => 'Imágenes de la galería y textos personalizados (publicados y borrador) de la página pública.',
+            'detail' => 'Imágenes de la galería, textos personalizados y paleta de colores (publicados y borrador) de la página pública.',
             'requires' => [],
             'counts' => [':gallery' => 'imágenes', 'public_site_texts' => 'textos'],
         ],

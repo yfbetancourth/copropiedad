@@ -1,5 +1,5 @@
--- Estructura completa de la base de datos Copropiedad (sin datos), con las migraciones 001 a 048 aplicadas.
--- Generado el 2026-11-26 09:03 desde la base local con mysqldump --no-data.
+-- Estructura completa de la base de datos Copropiedad (sin datos), con las migraciones 001 a 049 aplicadas.
+-- Generado el 2026-11-26 12:04 desde la base local con mysqldump --no-data.
 -- Uso en una base nueva y vacía:
 --   mysql -u root -e "CREATE DATABASE copropiedad CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 --   mysql -u root copropiedad < database/schema/copropiedad-schema.sql
@@ -1326,8 +1326,10 @@ DROP TABLE IF EXISTS `public_site_content`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `public_site_content` (
   `tenant_id` bigint(20) unsigned NOT NULL,
+  `published_palette` varchar(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL DEFAULT 'bosque',
   `published_at` datetime DEFAULT NULL,
   `published_by` bigint(20) unsigned DEFAULT NULL,
+  `draft_palette` varchar(32) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
   `draft_updated_at` datetime DEFAULT NULL,
   `draft_updated_by` bigint(20) unsigned DEFAULT NULL,
   PRIMARY KEY (`tenant_id`),
@@ -1335,7 +1337,8 @@ CREATE TABLE `public_site_content` (
   KEY `fk_public_site_draft_by` (`draft_updated_by`),
   CONSTRAINT `fk_public_site_draft_by` FOREIGN KEY (`draft_updated_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_public_site_published_by` FOREIGN KEY (`published_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_public_site_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+  CONSTRAINT `fk_public_site_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `chk_public_site_palettes` CHECK (`published_palette` regexp '^[a-z0-9-]{1,32}$' and (`draft_palette` is null or `draft_palette` regexp '^[a-z0-9-]{1,32}$'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

@@ -412,11 +412,13 @@ final class ConfigurationController
         Session::start();
         $errors = $_SESSION['public_site_errors'] ?? [];
         $old = $_SESSION['public_site_old'] ?? null;
-        unset($_SESSION['public_site_errors'], $_SESSION['public_site_old']);
+        $oldPalette = $_SESSION['public_site_old_palette'] ?? null;
+        unset($_SESSION['public_site_errors'], $_SESSION['public_site_old'], $_SESSION['public_site_old_palette']);
         $service = new PublicSiteService();
-        $this->render('public-site', 'Configuracion / Sitio publico', [
+        $this->render('public-site', 'Configuración / Sitio público', [
             'actor' => $actor,
             'values' => is_array($old) ? $old : $service->draftOverrides(),
+            'palette' => is_string($oldPalette) && PublicSitePalette::exists($oldPalette) ? $oldPalette : $service->draftPalette(),
             'status' => $service->status(),
             'errors' => is_array($errors) ? $errors : [],
             'galleryCount' => count((new PropertyGalleryService())->images()),
@@ -434,7 +436,7 @@ final class ConfigurationController
         $input = $_POST['site'] ?? [];
         $input = is_array($input) ? $input : [];
         try {
-            $errors = (new PublicSiteService())->saveDraft($input, (int) $actor['id']);
+            $errors = (new PublicSiteService())->saveDraft($input, (int) $actor['id'], $_POST['palette'] ?? null);
         } catch (RuntimeException $exception) {
             Http::flash(self::FLASH, 'error', $exception->getMessage());
             Http::redirect('/configuracion/sitio-publico');
@@ -446,6 +448,7 @@ final class ConfigurationController
                 static fn (mixed $value): string => is_string($value) ? $value : '',
                 array_intersect_key($input, PublicSiteService::fields())
             );
+            $_SESSION['public_site_old_palette'] = Http::string($_POST['palette'] ?? null);
             Http::flash(self::FLASH, 'error', 'Revisa los campos marcados; el borrador no se guardó.');
             Http::redirect('/configuracion/sitio-publico');
         }

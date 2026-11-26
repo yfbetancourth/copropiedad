@@ -27,7 +27,7 @@ $brandIcon = '<svg viewBox="0 0 36 36" aria-hidden="true" focusable="false"><pat
     <link rel="stylesheet" href="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/css/icons.css?v=1">
     <link rel="stylesheet" href="<?= $vendor ?>/admin-lte@4.10.2/css/adminlte.min.css">
     <link rel="stylesheet" href="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/css/app.css?v=1">
-    <link rel="stylesheet" href="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/css/theme.css?v=3">
+    <link rel="stylesheet" href="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/css/theme.css?v=4">
     <style>
         /* Colores, tipografía, foco y controles vienen de theme.css; aquí solo la composición de la pantalla. */
         :root {

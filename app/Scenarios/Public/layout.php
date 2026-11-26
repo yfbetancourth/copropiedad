@@ -54,6 +54,10 @@ $cookiePolicy = $privacyService->current('cookie_policy');
 // Textos editables (Configuración / Sitio público). Las páginas que no los pasan usan los publicados.
 $sitePreview = ($sitePreview ?? false) === true;
 $siteTexts = is_array($siteTexts ?? null) ? $siteTexts : (new \App\Modules\Configuration\PublicSiteService())->published();
+// Paleta de colores elegida en Configuración / Sitio público (la del borrador solo en la vista previa).
+$sitePalette = $sitePreview
+    ? (new \App\Modules\Configuration\PublicSiteService())->draftPalette()
+    : (new \App\Modules\Configuration\PublicSiteService())->publishedPalette();
 $siteText = static fn (string $key): string => $escape(
     \App\Modules\Configuration\PublicSiteService::fill((string) ($siteTexts[$key] ?? ''), $propertyName)
 );
@@ -68,7 +72,7 @@ $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 
     <meta name="description" content="<?= $escape($metaDescription) ?>">
     <meta name="robots" content="<?= $sitePreview ? 'noindex,nofollow' : 'index,follow,max-image-preview:large' ?>">
     <?php if ($canonicalUrl !== ''): ?><link rel="canonical" href="<?= $escape($canonicalUrl) ?>"><?php endif; ?>
-    <meta name="theme-color" content="#f6f4ee">
+    <meta name="theme-color" content="<?= $escape(\App\Modules\Configuration\PublicSitePalette::themeColor($sitePalette)) ?>">
     <meta property="og:type" content="website">
     <meta property="og:locale" content="es_CO">
     <meta property="og:site_name" content="<?= $escape($propertyName) ?>">
@@ -80,7 +84,8 @@ $brandIcon = '<svg viewBox="0 0 36 36" focusable="false"><path d="M5 29V14.5L18 
     <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/vendor/inter-variable@5.0.18/index.css">
     <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/vendor/fraunces-variable@5.0.21/wght.css">
     <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/vendor/fraunces-variable@5.0.21/wght-italic.css">
-    <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/portada/css/public.css?v=4">
+    <link rel="stylesheet" href="<?= $escape($basePath) ?>/assets/portada/css/public.css?v=5">
+    <style>:root { <?= \App\Modules\Configuration\PublicSitePalette::declarations($sitePalette) ?> }</style>
     <?php if ($isHomePage): ?>
         <link rel="preload" as="image" href="<?= $escape($basePath . ($galleryImages[0]['url'] ?? '/assets/portada/images/community-placeholder.svg')) ?>" fetchpriority="high">
         <script type="application/ld+json"><?= json_encode($structuredSite, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>

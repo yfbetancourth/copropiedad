@@ -626,3 +626,20 @@ todas las edades, sobre todo desde el celular.
 
 Todo vive en `public/assets/css/theme.css` como tokens (`--cp-*`) que redefinen las variables de Bootstrap 5.3 y
 AdminLTE 4; las vistas no cambian. Para ajustar la marca basta con cambiar la paleta del nivel 1.
+
+## Paleta de colores del sitio público (migración 049)
+
+En **Personalización / Sitio público** el administrador elige entre seis paletas (Bosque, Confianza, Mar, Terracota,
+Pizarra, Ciruela) con una miniatura de cada una. La paleta sigue el mismo flujo que los textos: se guarda en el
+borrador, se revisa en la vista previa y el público la ve al publicar.
+
+- **Datos**: `public_site_content.published_palette` (por defecto `bosque`, la identidad original) y `draft_palette`
+  (NULL = el borrador no la cambia). Sin JSON; los valores de color viven en
+  `App\Modules\Configuration\PublicSitePalette`, fuente única para el sitio y para el selector.
+- **CSS**: `public/assets/portada/css/public.css` usa tokens semánticos (`--brand`, `--brand-deep`, `--accent`,
+  `--accent-text`…); el layout público escribe los de la paleta elegida. Todas las paletas cumplen WCAG AA
+  (texto ≥ 4.5:1, foco ≥ 3:1); una paleta nueva debe pasar las mismas verificaciones antes de agregarse.
+
+```powershell
+Get-Content .\database\migrations\049_add_public_site_palette.sql | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
+```

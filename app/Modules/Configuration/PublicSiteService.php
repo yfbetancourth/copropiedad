@@ -150,8 +150,22 @@ final class PublicSiteService
         return $row['draft'] ?? $row['published'];
     }
 
+    /** Paleta que ve el público (PublicSitePalette). */
+    public function publishedPalette(): string
+    {
+        return PublicSitePalette::resolve($this->row()['published_palette']);
+    }
+
+    /** Paleta del borrador; sin borrador (o si el borrador no la cambió), la publicada. */
+    public function draftPalette(): string
+    {
+        $row = $this->row();
+
+        return PublicSitePalette::resolve($row['draft'] !== null ? ($row['draft_palette'] ?? $row['published_palette']) : $row['published_palette']);
+    }
+
     /**
-     * @return array{available: bool, has_draft: bool, draft_updated_at: ?string, published_at: ?string, customized: int}
+     * @return array{available: bool, has_draft: bool, draft_updated_at: ?string, published_at: ?string, customized: int, published_palette: string}
      */
     public function status(): array
     {
@@ -163,19 +177,24 @@ final class PublicSiteService
             'draft_updated_at' => $row['draft_updated_at'],
             'published_at' => $row['published_at'],
             'customized' => count($row['published']),
+            'published_palette' => PublicSitePalette::resolve($row['published_palette']),
         ];
     }
 
     /**
-     * Valida y guarda el borrador. Devuelve los errores por campo (vacío si se guardó).
+     * Valida y guarda el borrador (textos y paleta). Devuelve los errores por campo (vacío si se guardó).
      *
      * @param array<string, mixed> $input
+     * @param mixed $palette clave de PublicSitePalette; null = el borrador conserva la paleta publicada
      * @return array<string, string>
      */
-    public function saveDraft(array $input, int $actorId): array
+    public function saveDraft(array $input, int $actorId, mixed $palette = null): array
     {
         $overrides = [];
         $errors = [];
+        if ($palette !== null && (!is_string($palette) || !PublicSitePalette::exists($palette))) {
+            $errors['palette'] = 'Elige una de las paletas de la lista.';
+        }
         foreach (self::fields() as $key => [$label, $default, $maxLength, $multiline]) {
             $value = $input[$key] ?? '';
             if (!is_string($value)) {
@@ -198,12 +217,13 @@ final class PublicSiteService
 
         $this->requireTable();
         $tenantId = Tenant::id();
-        $this->transaction(function (PDO $pdo) use ($tenantId, $overrides, $actorId): void {
+        $this->transaction(function (PDO $pdo) use ($tenantId, $overrides, $actorId, $palette): void {
             $pdo->prepare(
-                'INSERT INTO public_site_content (tenant_id, draft_updated_at, draft_updated_by)
-                 VALUES (?, NOW(), ?)
-                 ON DUPLICATE KEY UPDATE draft_updated_at = VALUES(draft_updated_at), draft_updated_by = VALUES(draft_updated_by)'
-            )->execute([$tenantId, $actorId]);
+                'INSERT INTO public_site_content (tenant_id, draft_palette, draft_updated_at, draft_updated_by)
+                 VALUES (?, ?, NOW(), ?)
+                 ON DUPLICATE KEY UPDATE draft_palette = VALUES(draft_palette),
+                    draft_updated_at = VALUES(draft_updated_at), draft_updated_by = VALUES(draft_updated_by)'
+            )->execute([$tenantId, $palette, $actorId]);
             $pdo->prepare("DELETE FROM public_site_texts WHERE tenant_id = ? AND version = 'draft'")->execute([$tenantId]);
             $insert = $pdo->prepare("INSERT INTO public_site_texts (tenant_id, version, field_key, content) VALUES (?, 'draft', ?, ?)");
             foreach ($overrides as $key => $value) {
@@ -232,7 +252,8 @@ final class PublicSiteService
             $pdo->prepare("UPDATE public_site_texts SET version = 'published' WHERE tenant_id = ? AND version = 'draft'")->execute([$tenantId]);
             $pdo->prepare(
                 'UPDATE public_site_content
-                    SET published_at = NOW(), published_by = ?, draft_updated_at = NULL, draft_updated_by = NULL
+                    SET published_palette = COALESCE(draft_palette, published_palette), draft_palette = NULL,
+                        published_at = NOW(), published_by = ?, draft_updated_at = NULL, draft_updated_by = NULL
                   WHERE tenant_id = ?'
             )->execute([$actorId, $tenantId]);
 
@@ -248,7 +269,7 @@ final class PublicSiteService
         return $this->transaction(function (PDO $pdo) use ($tenantId): bool {
             $pdo->prepare("DELETE FROM public_site_texts WHERE tenant_id = ? AND version = 'draft'")->execute([$tenantId]);
             $statement = $pdo->prepare(
-                'UPDATE public_site_content SET draft_updated_at = NULL, draft_updated_by = NULL
+                'UPDATE public_site_content SET draft_palette = NULL, draft_updated_at = NULL, draft_updated_by = NULL
                   WHERE tenant_id = ? AND draft_updated_at IS NOT NULL'
             );
             $statement->execute([$tenantId]);
@@ -322,21 +343,24 @@ final class PublicSiteService
 
     /**
      * @return array{available: bool, published: array<string, string>, draft: ?array<string, string>,
-     *               draft_updated_at: ?string, published_at: ?string}
+     *               draft_updated_at: ?string, published_at: ?string, published_palette: ?string, draft_palette: ?string}
      */
     private function row(): array
     {
-        $empty = ['available' => true, 'published' => [], 'draft' => null, 'draft_updated_at' => null, 'published_at' => null];
+        $empty = ['available' => true, 'published' => [], 'draft' => null, 'draft_updated_at' => null, 'published_at' => null,
+            'published_palette' => null, 'draft_palette' => null];
         $pdo = Database::connection();
         try {
-            $statement = $pdo->prepare('SELECT published_at, draft_updated_at FROM public_site_content WHERE tenant_id = ?');
+            $statement = $pdo->prepare(
+                'SELECT published_at, draft_updated_at, published_palette, draft_palette FROM public_site_content WHERE tenant_id = ?'
+            );
             $statement->execute([Tenant::id()]);
             $row = $statement->fetch();
             $texts = $pdo->prepare('SELECT version, field_key, content FROM public_site_texts WHERE tenant_id = ?');
             $texts->execute([Tenant::id()]);
         } catch (PDOException $exception) {
-            // Sin las migraciones 035/045 el sitio público sigue funcionando con los textos por defecto.
-            if ($exception->getCode() === '42S02') {
+            // Sin las migraciones 035/045/049 el sitio público sigue funcionando con los textos y colores por defecto.
+            if (in_array($exception->getCode(), ['42S02', '42S22'], true)) {
                 return ['available' => false] + $empty;
             }
             throw $exception;
@@ -365,13 +389,15 @@ final class PublicSiteService
             'draft' => $row['draft_updated_at'] !== null ? $byVersion['draft'] : null,
             'draft_updated_at' => $row['draft_updated_at'],
             'published_at' => $row['published_at'],
+            'published_palette' => (string) $row['published_palette'],
+            'draft_palette' => $row['draft_palette'] !== null ? (string) $row['draft_palette'] : null,
         ];
     }
 
     private function requireTable(): void
     {
         if (!$this->row()['available']) {
-            throw new RuntimeException('Falta aplicar las migraciones 035 y 045 (sitio público). Pídele al administrador técnico que las aplique.');
+            throw new RuntimeException('Falta aplicar las migraciones 035, 045 y 049 (sitio público). Pídele al administrador técnico que las aplique.');
         }
     }
 }

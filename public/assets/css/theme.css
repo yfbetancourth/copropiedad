@@ -347,6 +347,106 @@ textarea.form-control {
     letter-spacing: 0.01em;
 }
 
+/* ---- Selector de paleta del sitio público (Configuración / Sitio público) -------------------------------------
+   Cada opción recibe los colores de su paleta en variables --sw-* (desde PublicSitePalette); la miniatura dibuja
+   una portada en pequeño. La elegida se marca con :has(:checked), sin JavaScript. */
+.palette-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+    gap: 0.875rem;
+}
+.palette-option {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--cp-color-divider);
+    border-radius: var(--cp-radius-lg);
+    background: var(--cp-color-surface);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.palette-option:hover {
+    border-color: var(--cp-color-field-border);
+}
+.palette-option:has(:checked) {
+    border-color: var(--cp-color-primary);
+    background: var(--cp-teal-50);
+    outline: 2px solid var(--cp-color-primary); /* además del color: un contorno marca la elegida */
+    outline-offset: -1px;
+}
+.palette-option:has(:disabled) {
+    cursor: default;
+}
+.palette-option-text {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.625rem;
+}
+.palette-option-text .form-check-input {
+    flex: 0 0 auto;
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+    margin-block-start: 0.125rem;
+}
+.palette-preview {
+    display: grid;
+    grid-template-rows: 0.875rem 1fr 0.625rem;
+    block-size: 7.5rem;
+    overflow: hidden;
+    border: 1px solid var(--cp-color-divider);
+    border-radius: var(--cp-radius);
+    background: var(--sw-paper);
+}
+.palette-preview-bar {
+    background: var(--sw-brand-deep);
+}
+.palette-preview-strip {
+    background: var(--sw-deep);
+}
+.palette-preview-body {
+    display: grid;
+    align-content: center;
+    gap: 0.35rem;
+    padding-inline: 0.75rem;
+}
+.palette-preview-eyebrow,
+.palette-preview-title,
+.palette-preview-text {
+    display: block;
+    block-size: 0.4rem;
+    border-radius: 1e5px;
+}
+.palette-preview-eyebrow { inline-size: 30%; background: var(--sw-brand); }
+.palette-preview-title { inline-size: 75%; block-size: 0.6rem; background: var(--sw-ink); }
+.palette-preview-text { inline-size: 55%; background: var(--sw-muted); }
+.palette-preview-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-block-start: 0.2rem;
+}
+.palette-preview-button {
+    inline-size: 2.75rem;
+    block-size: 0.9rem;
+    border-radius: 1e5px;
+    background: var(--sw-brand-deep);
+}
+.palette-preview-dot {
+    inline-size: 0.9rem;
+    block-size: 0.9rem;
+    border-radius: 50%;
+    background: var(--sw-accent);
+    box-shadow: 0 0 0 3px var(--sw-tint);
+}
+@media (forced-colors: active) {
+    .palette-option:has(:checked) {
+        outline-color: Highlight;
+    }
+    .palette-preview {
+        forced-color-adjust: none; /* la miniatura ES la información de color que se elige */
+    }
+}
+
 /* ---- Movimiento: solo transiciones de color; se conservan con movimiento reducido (no desplazan nada) ------- */
 :where(.btn, .nav-link, .dropdown-item, .page-link, .form-control, .form-select) {
     transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
