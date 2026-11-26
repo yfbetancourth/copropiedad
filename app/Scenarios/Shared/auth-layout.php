@@ -27,14 +27,14 @@ $brandIcon = '<svg viewBox="0 0 36 36" aria-hidden="true" focusable="false"><pat
     <link rel="stylesheet" href="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/css/icons.css?v=1">
     <link rel="stylesheet" href="<?= $vendor ?>/admin-lte@4.10.2/css/adminlte.min.css">
     <link rel="stylesheet" href="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/css/app.css?v=1">
-    <link rel="stylesheet" href="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/css/theme.css?v=4">
+    <link rel="stylesheet" href="<?= $escape(\App\Core\Url::publicBasePath()) ?>/assets/css/theme.css?v=6">
     <style>
         /* Colores, tipografía, foco y controles vienen de theme.css; aquí solo la composición de la pantalla. */
         :root {
-            --auth-green: var(--cp-teal-950);
-            --auth-green-soft: var(--cp-teal-700);
+            --auth-green: var(--cp-brand-900);
+            --auth-green-soft: var(--cp-brand-700);
             --auth-paper: var(--cp-color-page);
-            --auth-orange: var(--cp-teal-800);
+            --auth-orange: var(--cp-brand-800);
         }
         body { min-height: 100vh; margin: 0; background: var(--auth-paper); color: var(--cp-color-text); }
         .auth-shell { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
@@ -42,17 +42,17 @@ $brandIcon = '<svg viewBox="0 0 36 36" aria-hidden="true" focusable="false"><pat
             position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between;
             padding: clamp(32px, 5vw, 64px); color: #fff; background: var(--auth-green);
             background-image: radial-gradient(circle at 85% 10%, rgba(255,255,255,.09) 0 160px, transparent 161px),
-                              radial-gradient(circle at 0% 100%, rgba(20,184,166,.22) 0 220px, transparent 221px);
+                              radial-gradient(circle at 0% 100%, rgba(34,184,207,.22) 0 220px, transparent 221px);
         }
         .auth-brand.has-photo { background-size: cover; background-position: center; }
-        .auth-brand.has-photo::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(13,59,56,.55) 0%, rgba(13,59,56,.86) 100%); }
+        .auth-brand.has-photo::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(22,78,99,.55) 0%, rgba(22,78,99,.88) 100%); }
         .auth-brand > * { position: relative; }
         .auth-logo { display: inline-flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; font-weight: 700; font-size: 17px; line-height: 1.15; }
         .auth-logo small { display: block; margin-top: 3px; font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; opacity: .75; }
         .auth-mark { width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 12px; background: rgba(255,255,255,.14); }
         .auth-mark svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
         .auth-headline { max-width: 460px; margin: 0 0 18px; font-family: var(--cp-font-heading); font-size: clamp(34px, 3.6vw, 52px); font-weight: 600; letter-spacing: -.03em; line-height: 1.05; }
-        .auth-headline em { font-style: normal; font-weight: 300; color: #5EEAD4; }
+        .auth-headline em { font-style: normal; font-weight: 300; color: #A5F3FC; }
         .auth-features { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; font-size: 16px; }
         .auth-features i { width: 32px; height: 32px; display: inline-grid; place-items: center; margin-right: 10px; border-radius: 8px; background: rgba(255,255,255,.14); }
         .auth-brand-footer { font-size: 14px; opacity: .8; }
@@ -68,8 +68,8 @@ $brandIcon = '<svg viewBox="0 0 36 36" aria-hidden="true" focusable="false"><pat
         .auth-content a:not(.btn):hover { color: var(--auth-orange); text-decoration: underline; }
         .auth-content .form-control, .auth-content .input-group-text, .auth-content .btn { min-height: 48px; }
         .auth-content .input-group-text { background: #fff; color: var(--cp-color-text-muted); }
-        .auth-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 24px; border-radius: 12px; background: #DDEFEC; }
-        .auth-switch a { padding: 9px 12px; min-block-size: var(--cp-target); display: grid; place-items: center; border-radius: 9px; color: var(--cp-teal-900); font-weight: 600; text-align: center; text-decoration: none; font-size: 15px; }
+        .auth-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 24px; border-radius: 12px; background: var(--cp-brand-100); }
+        .auth-switch a { padding: 9px 12px; min-block-size: var(--cp-target); display: grid; place-items: center; border-radius: 9px; color: var(--cp-brand-900); font-weight: 600; text-align: center; text-decoration: none; font-size: 15px; }
         .auth-switch a[aria-current="page"] { background: #fff; color: var(--auth-green); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
         .auth-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: var(--cp-color-text-muted); font-size: 15px; }
         .auth-footer a { color: inherit; text-decoration: none; }

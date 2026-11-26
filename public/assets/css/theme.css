@@ -4,78 +4,86 @@
  * Dirección (skill ui-ux-pro-max, verificada contra el nicho): administración de propiedad horizontal en Colombia.
  * Compradores: administradores y consejos de administración (manejan dinero, documentos y la Ley 675): necesitan
  * confianza y claridad. Usuarios: residentes de todas las edades, sobre todo desde el celular.
- *   Estilo: minimalismo suizo (riesgo de accesibilidad bajo), sin vidrio ni degradados.
- *   Color: «trust teal + professional blue». Tipografía: Lexend (títulos) + Source Sans 3 (texto), 16 px mínimo.
- *   Contrastes verificados: texto ≥ 4.5:1 sobre su fondo; bordes de campos y anillo de foco ≥ 3:1.
+ *   Paleta «Fresca»: «calm cyan + health green» de la skill, oscurecida un tono donde hace falta (#0891B2 → #0E7490 y
+ *   #059669 → #047857: los originales dan 3.7:1 sobre blanco). Fondos aireados, barra lateral clara.
+ *   Estilo: «Soft UI Evolution» (sombras suaves en capas, radios de 10 px, contraste medido; el neumorfismo puro lo
+ *   marca la skill como riesgo alto). Tipografía: Lexend (títulos) + Source Sans 3 (texto), 16 px mínimo.
+ *   Contrastes medidos: texto 11:1, atenuado ≥ 5.9:1, botones ≥ 5.4:1, menú ≥ 4.8:1, bordes de campos y foco ≥ 3:1.
  *
  * Va sin @layer a propósito: Bootstrap y AdminLTE no usan capas y un estilo en capa perdería frente a ellos.
  */
 
 /* ---- Tokens ------------------------------------------------------------------------------------------------ */
-:root {
-    /* Nivel 1: paleta. */
-    --cp-teal-50: #F0FDFA;
-    --cp-teal-100: #CCFBF1;
-    --cp-teal-200: #99F6E4;
-    --cp-teal-500: #14B8A6;
-    --cp-teal-700: #0F766E;
-    --cp-teal-800: #115E59;
-    --cp-teal-900: #134E4A;
-    --cp-teal-950: #0D3B38;
+/* También en [data-bs-theme="light"]: Bootstrap redefine ahí sus variables (la barra lateral clara lo usa). */
+:root,
+[data-bs-theme="light"] {
+    /* Nivel 1: paleta «Fresca» (cian calmado + verde salud). */
+    --cp-brand-50: #F4FAFB;   /* fondo de página: casi blanco, apenas cian */
+    --cp-brand-100: #E0F4F8;  /* realces suaves, elemento activo del menú */
+    --cp-brand-200: #B9E6EF;
+    --cp-brand-500: #22B8CF;  /* solo decorativo */
+    --cp-brand-700: #0E7490;  /* primario: 5.36:1 sobre blanco */
+    --cp-brand-800: #155E75;
+    --cp-brand-900: #164E63;
+    --cp-brand-950: #0F3440;
+    --cp-ink: #17414E;        /* texto: 11:1 sobre blanco */
     --cp-sky-700: #0369A1;
-    --cp-slate-600: #475569;
-    --cp-mist-300: #D5E5E2;
-    --cp-mist-500: #7A9692;
-    --cp-green-700: #15803D;
+    --cp-slate-600: #4A6470;  /* atenuado: 6.27:1 */
+    --cp-mist-300: #D7EBEF;   /* divisor (decorativo) */
+    --cp-mist-500: #7896A0;   /* borde de campo: ≥ 3:1 */
+    --cp-green-700: #047857;  /* verde salud: 5.48:1 */
     --cp-amber-700: #B45309;
     --cp-red-600: #DC2626;
 
     /* Nivel 2: semántica. */
-    --cp-color-primary: var(--cp-teal-700);
-    --cp-color-primary-strong: var(--cp-teal-800);
-    --cp-color-accent: var(--cp-sky-700);
-    --cp-color-text: var(--cp-teal-900);
+    --cp-color-primary: var(--cp-brand-700);
+    --cp-color-primary-strong: var(--cp-brand-800);
+    --cp-color-accent: var(--cp-green-700);
+    --cp-color-text: var(--cp-ink);
     --cp-color-text-muted: var(--cp-slate-600);
-    --cp-color-page: var(--cp-teal-50);
+    --cp-color-page: var(--cp-brand-50);
     --cp-color-surface: #FFFFFF;
     --cp-color-divider: var(--cp-mist-300);      /* decorativo: separa tarjetas y filas */
-    --cp-color-field-border: var(--cp-mist-500); /* límite de un control: 3.18:1 sobre blanco */
+    --cp-color-field-border: var(--cp-mist-500); /* límite de un control: ≥ 3:1 sobre blanco */
     --cp-font-heading: "Lexend Variable", "Source Sans 3", system-ui, sans-serif;
     --cp-font-body: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
     --cp-radius: 0.625rem;
     --cp-radius-lg: 0.875rem;
     --cp-target: 2.75rem; /* 44 px: cómodo con el dedo y para usuarios mayores */
-    --cp-shadow-card: 0 1px 2px rgb(19 78 74 / 0.06), 0 1px 1px rgb(19 78 74 / 0.04);
+    /* Sombras suaves en capas (Soft UI Evolution): profundidad sin bordes duros. */
+    --cp-shadow-card: 0 1px 2px rgb(22 78 99 / 0.05), 0 4px 14px rgb(22 78 99 / 0.06);
 
     /* Nivel 3: Bootstrap 5.3 / AdminLTE 4. */
     --bs-primary: var(--cp-color-primary);
-    --bs-primary-rgb: 15, 118, 110;
-    --bs-primary-text-emphasis: var(--cp-teal-800);
-    --bs-primary-bg-subtle: var(--cp-teal-100);
-    --bs-primary-border-subtle: var(--cp-teal-200);
-    --bs-info: var(--cp-color-accent);
+    --bs-primary-rgb: 14, 116, 144;
+    --bs-primary-text-emphasis: var(--cp-brand-800);
+    --bs-primary-bg-subtle: var(--cp-brand-100);
+    --bs-primary-border-subtle: var(--cp-brand-200);
+    --bs-info: var(--cp-sky-700);
     --bs-info-rgb: 3, 105, 161;
     --bs-success: var(--cp-green-700);
-    --bs-success-rgb: 21, 128, 61;
+    --bs-success-rgb: 4, 120, 87;
     --bs-danger: var(--cp-red-600);
     --bs-danger-rgb: 220, 38, 38;
     --bs-body-bg: var(--cp-color-page);
-    --bs-body-bg-rgb: 240, 253, 250;
+    --bs-body-bg-rgb: 244, 250, 251;
     --bs-body-color: var(--cp-color-text);
-    --bs-body-color-rgb: 19, 78, 74;
-    --bs-emphasis-color: var(--cp-teal-950);
+    --bs-body-color-rgb: 23, 65, 78;
+    --bs-emphasis-color: var(--cp-brand-950);
     --bs-secondary-color: var(--cp-color-text-muted);
-    --bs-heading-color: var(--cp-teal-950);
+    --bs-heading-color: var(--cp-brand-950);
     --bs-link-color: var(--cp-color-primary);
-    --bs-link-color-rgb: 15, 118, 110;
+    --bs-link-color-rgb: 14, 116, 144;
     --bs-link-hover-color: var(--cp-color-primary-strong);
-    --bs-link-hover-color-rgb: 17, 94, 89;
+    --bs-link-hover-color-rgb: 21, 94, 117;
     --bs-border-color: var(--cp-color-divider);
     --bs-border-radius: var(--cp-radius);
     --bs-border-radius-lg: var(--cp-radius-lg);
     --bs-font-sans-serif: var(--cp-font-body);
     --bs-body-font-size: 1rem;
-    --bs-focus-ring-color: rgb(15 118 110 / 0.4);
+    --bs-focus-ring-color: rgb(14 116 144 / 0.4);
+    --bs-secondary-bg: var(--cp-brand-100);
+    --bs-tertiary-bg: var(--cp-brand-50);
     color-scheme: light;
     accent-color: var(--cp-color-primary);
 }
@@ -90,8 +98,8 @@ body {
     letter-spacing: -0.01em;
 }
 ::selection {
-    background: var(--cp-teal-200);
-    color: var(--cp-teal-950);
+    background: var(--cp-brand-200);
+    color: var(--cp-brand-950);
 }
 
 /* Foco visible propio (WCAG 2.4.7): contorno, no sombra, para que siga visible en Colores forzados. */
@@ -110,20 +118,25 @@ body {
 [data-bs-theme="light"] {
     --lte-sidebar-width: 17.5rem;
 }
-.app-sidebar[data-bs-theme="dark"] {
-    --lte-sidebar-color: #B7D4D0;            /* 7.85:1 */
-    --lte-sidebar-hover-bg: rgb(255 255 255 / 0.08);
-    --lte-sidebar-hover-color: #FFFFFF;
-    --lte-sidebar-menu-active-bg: rgb(20 184 166 / 0.18);
-    --lte-sidebar-menu-active-color: #FFFFFF;
-    --lte-sidebar-header-color: #8FB5B0;
-    background-color: var(--cp-teal-950) !important; /* AdminLTE fija bg-body-secondary con !important */
+.app-sidebar {
+    --lte-sidebar-color: #2C4A55;                 /* 9.47:1 sobre blanco */
+    --lte-sidebar-hover-bg: var(--cp-brand-50);
+    --lte-sidebar-hover-color: var(--cp-brand-900);
+    --lte-sidebar-menu-active-bg: var(--cp-brand-100);
+    --lte-sidebar-menu-active-color: var(--cp-brand-800); /* 6.39:1 sobre el realce */
+    --lte-sidebar-header-color: #5B7680;          /* 4.83:1 */
+    background-color: var(--cp-color-surface) !important; /* AdminLTE fija bg-body-secondary con !important */
+    border-inline-end: 1px solid var(--cp-color-divider);
+    box-shadow: 0 0 24px rgb(22 78 99 / 0.04) !important;
 }
 .app-sidebar .sidebar-brand {
-    border-block-end-color: rgb(255 255 255 / 0.08);
+    border-block-end-color: var(--cp-color-divider);
 }
 .app-sidebar .brand-text {
-    color: #FFFFFF;
+    color: var(--cp-brand-900);
+}
+.app-sidebar .nav-icon {
+    color: var(--cp-brand-700);
 }
 .sidebar-menu .nav-link {
     min-block-size: var(--cp-target);
@@ -132,7 +145,7 @@ body {
     border-radius: var(--cp-radius);
 }
 .sidebar-menu > .nav-item > .nav-link.active {
-    box-shadow: inset 3px 0 0 var(--cp-teal-500);
+    box-shadow: inset 3px 0 0 var(--cp-brand-700);
     font-weight: 600;
 }
 .sidebar-menu .nav-header {
@@ -160,7 +173,7 @@ body {
     font-size: 1.25rem;
 }
 .app-header .nav-link[data-sidebar-toggle]:hover {
-    background: var(--cp-teal-50);
+    background: var(--cp-brand-50);
 }
 .sidebar-menu .nav-link p {
     white-space: normal; /* si una etiqueta aún no cabe, pasa a otra línea en vez de cortarse */
@@ -173,16 +186,17 @@ body {
     --bs-card-border-radius: var(--cp-radius-lg);
     --bs-card-inner-border-radius: calc(var(--cp-radius-lg) - 1px);
     --bs-card-cap-bg: var(--cp-color-surface);
+    border-color: var(--cp-color-divider);
     box-shadow: var(--cp-shadow-card);
 }
 .card-header {
     border-block-end-color: var(--cp-color-divider);
 }
 /* AdminLTE compila los colores de las variantes; se reasignan a la paleta (franja superior de .card-outline). */
-.card-primary { --lte-card-variant-bg: var(--cp-teal-700); --lte-card-variant-bg-rgb: 15, 118, 110; }
+.card-primary { --lte-card-variant-bg: var(--cp-brand-700); --lte-card-variant-bg-rgb: 14, 116, 144; }
 .card-info { --lte-card-variant-bg: var(--cp-sky-700); --lte-card-variant-bg-rgb: 3, 105, 161; }
-.card-success { --lte-card-variant-bg: var(--cp-green-700); --lte-card-variant-bg-rgb: 21, 128, 61; }
-.card-secondary { --lte-card-variant-bg: var(--cp-mist-500); --lte-card-variant-bg-rgb: 122, 150, 146; }
+.card-success { --lte-card-variant-bg: var(--cp-green-700); --lte-card-variant-bg-rgb: 4, 120, 87; }
+.card-secondary { --lte-card-variant-bg: var(--cp-mist-500); --lte-card-variant-bg-rgb: 120, 150, 160; }
 
 /* ---- Botones (44 px de alto; Bootstrap compila sus colores, por eso se redefinen las variables) -------------- */
 .btn {
@@ -205,24 +219,24 @@ body {
     }
 }
 .btn-primary {
-    --bs-btn-bg: var(--cp-teal-700);
-    --bs-btn-border-color: var(--cp-teal-700);
-    --bs-btn-hover-bg: var(--cp-teal-800);
-    --bs-btn-hover-border-color: var(--cp-teal-800);
-    --bs-btn-active-bg: var(--cp-teal-900);
-    --bs-btn-active-border-color: var(--cp-teal-900);
-    --bs-btn-disabled-bg: var(--cp-teal-700);
-    --bs-btn-disabled-border-color: var(--cp-teal-700);
+    --bs-btn-bg: var(--cp-brand-700);
+    --bs-btn-border-color: var(--cp-brand-700);
+    --bs-btn-hover-bg: var(--cp-brand-800);
+    --bs-btn-hover-border-color: var(--cp-brand-800);
+    --bs-btn-active-bg: var(--cp-brand-900);
+    --bs-btn-active-border-color: var(--cp-brand-900);
+    --bs-btn-disabled-bg: var(--cp-brand-700);
+    --bs-btn-disabled-border-color: var(--cp-brand-700);
 }
 .btn-outline-primary {
-    --bs-btn-color: var(--cp-teal-700);
-    --bs-btn-border-color: var(--cp-teal-700);
-    --bs-btn-hover-bg: var(--cp-teal-700);
-    --bs-btn-hover-border-color: var(--cp-teal-700);
-    --bs-btn-active-bg: var(--cp-teal-800);
-    --bs-btn-active-border-color: var(--cp-teal-800);
-    --bs-btn-disabled-color: var(--cp-teal-700);
-    --bs-btn-disabled-border-color: var(--cp-teal-700);
+    --bs-btn-color: var(--cp-brand-700);
+    --bs-btn-border-color: var(--cp-brand-700);
+    --bs-btn-hover-bg: var(--cp-brand-700);
+    --bs-btn-hover-border-color: var(--cp-brand-700);
+    --bs-btn-active-bg: var(--cp-brand-800);
+    --bs-btn-active-border-color: var(--cp-brand-800);
+    --bs-btn-disabled-color: var(--cp-brand-700);
+    --bs-btn-disabled-border-color: var(--cp-brand-700);
 }
 .btn-info {
     --bs-btn-color: #FFFFFF;
@@ -235,8 +249,8 @@ body {
 .btn-success {
     --bs-btn-bg: var(--cp-green-700);
     --bs-btn-border-color: var(--cp-green-700);
-    --bs-btn-hover-bg: #166534;
-    --bs-btn-hover-border-color: #166534;
+    --bs-btn-hover-bg: #065F46;
+    --bs-btn-hover-border-color: #065F46;
 }
 .btn-link {
     --bs-btn-color: var(--cp-color-primary);
@@ -281,9 +295,12 @@ textarea.form-control {
 .form-control:user-invalid {
     border-color: var(--cp-red-600);
 }
+.form-control::placeholder {
+    color: #5B7680; /* 4.83:1: legible sin confundirse con un valor escrito */
+}
 .input-group-text {
     border-color: var(--cp-color-field-border);
-    background: var(--cp-teal-50);
+    background: var(--cp-brand-50);
     color: var(--cp-color-text-muted);
 }
 
@@ -291,12 +308,12 @@ textarea.form-control {
 .table {
     --bs-table-color: var(--cp-color-text);
     --bs-table-border-color: var(--cp-color-divider);
-    --bs-table-hover-bg: rgb(15 118 110 / 0.05);
-    --bs-table-striped-bg: rgb(15 118 110 / 0.03);
+    --bs-table-hover-bg: rgb(14 116 144 / 0.05);
+    --bs-table-striped-bg: rgb(14 116 144 / 0.03);
 }
 .table > thead > tr > th {
-    background: var(--cp-teal-50);
-    color: var(--cp-teal-900);
+    background: #EEF8FA;
+    color: var(--cp-brand-900);
     font-weight: 600;
     white-space: nowrap;
 }
@@ -306,7 +323,7 @@ textarea.form-control {
     --bs-nav-pills-link-active-bg: var(--cp-color-primary);
 }
 .nav-tabs {
-    --bs-nav-tabs-link-active-color: var(--cp-teal-900);
+    --bs-nav-tabs-link-active-color: var(--cp-brand-900);
 }
 .nav-link {
     --bs-nav-link-color: var(--cp-color-primary);
@@ -370,7 +387,7 @@ textarea.form-control {
 }
 .palette-option:has(:checked) {
     border-color: var(--cp-color-primary);
-    background: var(--cp-teal-50);
+    background: var(--cp-brand-50);
     outline: 2px solid var(--cp-color-primary); /* además del color: un contorno marca la elegida */
     outline-offset: -1px;
 }
@@ -449,7 +466,7 @@ textarea.form-control {
 
 /* ---- Movimiento: solo transiciones de color; se conservan con movimiento reducido (no desplazan nada) ------- */
 :where(.btn, .nav-link, .dropdown-item, .page-link, .form-control, .form-select) {
-    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease; /* 200 ms: Soft UI Evolution */
 }
 
 /* ---- Colores forzados (Alto contraste de Windows): las sombras desaparecen; se apoya en bordes y contornos -- */

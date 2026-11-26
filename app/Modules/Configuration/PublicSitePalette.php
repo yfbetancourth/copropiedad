@@ -34,9 +34,19 @@ final class PublicSitePalette
                 'accent' => '#C2703F', 'accent-text' => '#9A5226', 'accent-tint' => '#F6E5D8', 'accent-ink' => '#8A4A23',
             ],
         ],
+        'fresca' => [
+            'label' => 'Fresca',
+            'description' => 'Cian calmado con verde salud, como el panel. Suave, aireada y muy legible.',
+            'colors' => [
+                'paper' => '#F4FAFB', 'paper-soft' => '#FAFDFE', 'paper-deep' => '#E0F1F5',
+                'ink' => '#17414E', 'ink-soft' => '#2C4A55', 'muted' => '#4A6470',
+                'brand' => '#0E7490', 'brand-deep' => '#155E75', 'brand-hover' => '#164E63', 'brand-tint' => '#DDF2F7',
+                'accent' => '#059669', 'accent-text' => '#047857', 'accent-tint' => '#DDF6EC', 'accent-ink' => '#065F46',
+            ],
+        ],
         'confianza' => [
             'label' => 'Confianza',
-            'description' => 'Verde azulado y azul profesional, como el panel. Sobria y clara.',
+            'description' => 'Verde azulado y azul profesional. Sobria y clara.',
             'colors' => [
                 'paper' => '#F3F8F7', 'paper-soft' => '#FAFDFC', 'paper-deep' => '#E2EEEB',
                 'ink' => '#0D3B38', 'ink-soft' => '#24504C', 'muted' => '#4A6461',

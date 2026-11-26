@@ -15,7 +15,7 @@ declare(strict_types=1);
  */
 $sidebarSections = array_values(array_filter($sidebarSections, static fn (array $section): bool => $section['items'] !== []));
 ?>
-<aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
+<aside class="app-sidebar bg-body-secondary" data-bs-theme="light">
     <div class="sidebar-brand">
         <a class="brand-link w-100 px-3" style="min-width: 0" href="<?= $escape($sidebarBrandHref) ?>" title="<?= $escape($propertyName) ?>">
             <span class="brand-text fw-semibold text-truncate d-block"><?= $escape($propertyName) ?></span>
@@ -31,7 +31,7 @@ $sidebarSections = array_values(array_filter($sidebarSections, static fn (array 
             require __DIR__ . '/avatar.php';
             ?>
             <div class="lh-sm" style="min-width: 0">
-                <div class="fw-semibold text-truncate text-white"><?= $escape($sidebarUser['name']) ?></div>
+                <div class="fw-semibold text-truncate text-body-emphasis"><?= $escape($sidebarUser['name']) ?></div>
                 <?php if ($sidebarUser['role'] !== ''): ?>
                     <div class="small text-secondary text-truncate"><?= $escape($sidebarUser['role']) ?></div>
                 <?php endif; ?>

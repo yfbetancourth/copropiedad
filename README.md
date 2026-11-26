@@ -618,8 +618,11 @@ Dirección definida con la skill ui-ux-pro-max y verificada contra el nicho: adm
 Colombia. Compran administradores y consejos (dinero, documentos, Ley 675): confianza y claridad. Usan residentes de
 todas las edades, sobre todo desde el celular.
 
-- **Estilo**: minimalismo suizo (sin vidrio ni degradados, que la skill marca como riesgo de accesibilidad).
-- **Color**: verde azulado de confianza `#0F766E` + azul profesional `#0369A1`; barra lateral `#0D3B38`.
+- **Estilo**: «Soft UI Evolution» (sombras suaves en capas, radios de 10 px, transiciones de 200 ms, contraste medido);
+  la skill marca el neumorfismo puro y el vidrio como riesgo de accesibilidad.
+- **Color (paleta «Fresca»)**: cian calmado `#0E7490` + verde salud `#047857` («calm cyan + health green» de la skill,
+  oscurecidos un tono: los originales `#0891B2` y `#059669` dan 3.7:1 sobre blanco). Fondo `#F4FAFB`, texto `#17414E`
+  (11:1), barra lateral clara con el activo en cian suave.
 - **Tipografía**: Lexend (títulos, diseñada para legibilidad) + Source Sans 3 (texto, 16 px). Servidas localmente.
 - **Accesibilidad**: texto ≥ 4.5:1, bordes de campos y foco ≥ 3:1, foco con `outline` en `:focus-visible`, botones y
   campos de 44 px, validación con `:user-invalid`, soporte de Colores forzados.
@@ -629,8 +632,8 @@ AdminLTE 4; las vistas no cambian. Para ajustar la marca basta con cambiar la pa
 
 ## Paleta de colores del sitio público (migración 049)
 
-En **Personalización / Sitio público** el administrador elige entre seis paletas (Bosque, Confianza, Mar, Terracota,
-Pizarra, Ciruela) con una miniatura de cada una. La paleta sigue el mismo flujo que los textos: se guarda en el
+En **Personalización / Sitio público** el administrador elige entre siete paletas (Bosque, Fresca —la del panel—,
+Confianza, Mar, Terracota, Pizarra, Ciruela) con una miniatura de cada una. La paleta sigue el mismo flujo que los textos: se guarda en el
 borrador, se revisa en la vista previa y el público la ve al publicar.
 
 - **Datos**: `public_site_content.published_palette` (por defecto `bosque`, la identidad original) y `draft_palette`

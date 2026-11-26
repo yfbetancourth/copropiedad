@@ -173,12 +173,12 @@ final class PaymentLinkService
             $expires
         );
         $e = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-        $html = '<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#134E4A;max-width:560px">'
+        $html = '<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#17414E;max-width:560px">'
             . '<p>Hola ' . $e((string) $user['username']) . ',</p>'
             . '<p>La administración de <strong>' . $e((string) $statement['property_name']) . '</strong> te comparte un enlace para pagar la nota de cobro <strong>'
             . $e((string) $statement['number']) . '</strong> (' . $e((string) $statement['unit_name']) . ', período ' . $e((string) $statement['period']) . ').</p>'
             . '<p style="font-size:20px;margin:16px 0"><strong>' . $e($amount) . '</strong></p>'
-            . '<p><a href="' . $e($link['url']) . '" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#0F766E;color:#fff;text-decoration:none;font-weight:600">Pagar en línea</a></p>'
+            . '<p><a href="' . $e($link['url']) . '" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#0E7490;color:#fff;text-decoration:none;font-weight:600">Pagar en línea</a></p>'
             . '<p style="color:#5f675f;font-size:13px">El enlace vence el ' . $e($expires) . '. Si el botón no funciona, copia esta dirección: ' . $e($link['url']) . '</p>'
             . '<p style="color:#5f675f;font-size:13px">Si ya pagaste, ignora este mensaje.</p></div>';
 
