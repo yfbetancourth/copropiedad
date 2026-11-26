@@ -1,0 +1,364 @@
+/*
+ * Tema visual de Copropiedad (panel administrativo, portal de residentes y acceso).
+ *
+ * Dirección (skill ui-ux-pro-max, verificada contra el nicho): administración de propiedad horizontal en Colombia.
+ * Compradores: administradores y consejos de administración (manejan dinero, documentos y la Ley 675): necesitan
+ * confianza y claridad. Usuarios: residentes de todas las edades, sobre todo desde el celular.
+ *   Estilo: minimalismo suizo (riesgo de accesibilidad bajo), sin vidrio ni degradados.
+ *   Color: «trust teal + professional blue». Tipografía: Lexend (títulos) + Source Sans 3 (texto), 16 px mínimo.
+ *   Contrastes verificados: texto ≥ 4.5:1 sobre su fondo; bordes de campos y anillo de foco ≥ 3:1.
+ *
+ * Va sin @layer a propósito: Bootstrap y AdminLTE no usan capas y un estilo en capa perdería frente a ellos.
+ */
+
+/* ---- Tokens ------------------------------------------------------------------------------------------------ */
+:root {
+    /* Nivel 1: paleta. */
+    --cp-teal-50: #F0FDFA;
+    --cp-teal-100: #CCFBF1;
+    --cp-teal-200: #99F6E4;
+    --cp-teal-500: #14B8A6;
+    --cp-teal-700: #0F766E;
+    --cp-teal-800: #115E59;
+    --cp-teal-900: #134E4A;
+    --cp-teal-950: #0D3B38;
+    --cp-sky-700: #0369A1;
+    --cp-slate-600: #475569;
+    --cp-mist-300: #D5E5E2;
+    --cp-mist-500: #7A9692;
+    --cp-green-700: #15803D;
+    --cp-amber-700: #B45309;
+    --cp-red-600: #DC2626;
+
+    /* Nivel 2: semántica. */
+    --cp-color-primary: var(--cp-teal-700);
+    --cp-color-primary-strong: var(--cp-teal-800);
+    --cp-color-accent: var(--cp-sky-700);
+    --cp-color-text: var(--cp-teal-900);
+    --cp-color-text-muted: var(--cp-slate-600);
+    --cp-color-page: var(--cp-teal-50);
+    --cp-color-surface: #FFFFFF;
+    --cp-color-divider: var(--cp-mist-300);      /* decorativo: separa tarjetas y filas */
+    --cp-color-field-border: var(--cp-mist-500); /* límite de un control: 3.18:1 sobre blanco */
+    --cp-font-heading: "Lexend Variable", "Source Sans 3", system-ui, sans-serif;
+    --cp-font-body: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --cp-radius: 0.625rem;
+    --cp-radius-lg: 0.875rem;
+    --cp-target: 2.75rem; /* 44 px: cómodo con el dedo y para usuarios mayores */
+    --cp-shadow-card: 0 1px 2px rgb(19 78 74 / 0.06), 0 1px 1px rgb(19 78 74 / 0.04);
+
+    /* Nivel 3: Bootstrap 5.3 / AdminLTE 4. */
+    --bs-primary: var(--cp-color-primary);
+    --bs-primary-rgb: 15, 118, 110;
+    --bs-primary-text-emphasis: var(--cp-teal-800);
+    --bs-primary-bg-subtle: var(--cp-teal-100);
+    --bs-primary-border-subtle: var(--cp-teal-200);
+    --bs-info: var(--cp-color-accent);
+    --bs-info-rgb: 3, 105, 161;
+    --bs-success: var(--cp-green-700);
+    --bs-success-rgb: 21, 128, 61;
+    --bs-danger: var(--cp-red-600);
+    --bs-danger-rgb: 220, 38, 38;
+    --bs-body-bg: var(--cp-color-page);
+    --bs-body-bg-rgb: 240, 253, 250;
+    --bs-body-color: var(--cp-color-text);
+    --bs-body-color-rgb: 19, 78, 74;
+    --bs-emphasis-color: var(--cp-teal-950);
+    --bs-secondary-color: var(--cp-color-text-muted);
+    --bs-heading-color: var(--cp-teal-950);
+    --bs-link-color: var(--cp-color-primary);
+    --bs-link-color-rgb: 15, 118, 110;
+    --bs-link-hover-color: var(--cp-color-primary-strong);
+    --bs-link-hover-color-rgb: 17, 94, 89;
+    --bs-border-color: var(--cp-color-divider);
+    --bs-border-radius: var(--cp-radius);
+    --bs-border-radius-lg: var(--cp-radius-lg);
+    --bs-font-sans-serif: var(--cp-font-body);
+    --bs-body-font-size: 1rem;
+    --bs-focus-ring-color: rgb(15 118 110 / 0.4);
+    color-scheme: light;
+    accent-color: var(--cp-color-primary);
+}
+
+/* ---- Base y tipografía ------------------------------------------------------------------------------------- */
+body {
+    line-height: 1.55;
+}
+:where(h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6, .card-title, .brand-text, .app-content-header h1) {
+    font-family: var(--cp-font-heading);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+::selection {
+    background: var(--cp-teal-200);
+    color: var(--cp-teal-950);
+}
+
+/* Foco visible propio (WCAG 2.4.7): contorno, no sombra, para que siga visible en Colores forzados. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 3px solid var(--cp-color-primary);
+    outline-offset: 2px;
+}
+.form-control:focus-visible,
+.form-select:focus-visible {
+    outline-offset: 0;
+}
+
+/* ---- Barra lateral ----------------------------------------------------------------------------------------- */
+/* Más ancha que los 250 px de AdminLTE: las etiquetas largas («Consignaciones por identificar») no se cortan. */
+:root,
+[data-bs-theme="light"] {
+    --lte-sidebar-width: 17.5rem;
+}
+.app-sidebar[data-bs-theme="dark"] {
+    --lte-sidebar-color: #B7D4D0;            /* 7.85:1 */
+    --lte-sidebar-hover-bg: rgb(255 255 255 / 0.08);
+    --lte-sidebar-hover-color: #FFFFFF;
+    --lte-sidebar-menu-active-bg: rgb(20 184 166 / 0.18);
+    --lte-sidebar-menu-active-color: #FFFFFF;
+    --lte-sidebar-header-color: #8FB5B0;
+    background-color: var(--cp-teal-950) !important; /* AdminLTE fija bg-body-secondary con !important */
+}
+.app-sidebar .sidebar-brand {
+    border-block-end-color: rgb(255 255 255 / 0.08);
+}
+.app-sidebar .brand-text {
+    color: #FFFFFF;
+}
+.sidebar-menu .nav-link {
+    min-block-size: var(--cp-target);
+    display: flex;
+    align-items: center;
+    border-radius: var(--cp-radius);
+}
+.sidebar-menu > .nav-item > .nav-link.active {
+    box-shadow: inset 3px 0 0 var(--cp-teal-500);
+    font-weight: 600;
+}
+.sidebar-menu .nav-header {
+    letter-spacing: 0.06em;
+}
+
+/* ---- Encabezado y contenido -------------------------------------------------------------------------------- */
+.app-header {
+    background: var(--cp-color-surface);
+    border-block-end: 1px solid var(--cp-color-divider);
+    box-shadow: none;
+}
+.app-main {
+    background: var(--cp-color-page);
+}
+/* El botón del menú y los íconos del encabezado: 44 × 44 px y color de marca (AdminLTE los deja en 28 px). */
+.app-header .nav-link[data-sidebar-toggle] {
+    max-height: none;
+    block-size: var(--cp-target);
+    min-inline-size: var(--cp-target);
+    display: inline-grid;
+    place-items: center;
+    border-radius: var(--cp-radius);
+    color: var(--cp-color-primary);
+    font-size: 1.25rem;
+}
+.app-header .nav-link[data-sidebar-toggle]:hover {
+    background: var(--cp-teal-50);
+}
+.sidebar-menu .nav-link p {
+    white-space: normal; /* si una etiqueta aún no cabe, pasa a otra línea en vez de cortarse */
+    line-height: 1.25;
+}
+
+/* ---- Tarjetas ---------------------------------------------------------------------------------------------- */
+.card {
+    --bs-card-border-color: var(--cp-color-divider);
+    --bs-card-border-radius: var(--cp-radius-lg);
+    --bs-card-inner-border-radius: calc(var(--cp-radius-lg) - 1px);
+    --bs-card-cap-bg: var(--cp-color-surface);
+    box-shadow: var(--cp-shadow-card);
+}
+.card-header {
+    border-block-end-color: var(--cp-color-divider);
+}
+/* AdminLTE compila los colores de las variantes; se reasignan a la paleta (franja superior de .card-outline). */
+.card-primary { --lte-card-variant-bg: var(--cp-teal-700); --lte-card-variant-bg-rgb: 15, 118, 110; }
+.card-info { --lte-card-variant-bg: var(--cp-sky-700); --lte-card-variant-bg-rgb: 3, 105, 161; }
+.card-success { --lte-card-variant-bg: var(--cp-green-700); --lte-card-variant-bg-rgb: 21, 128, 61; }
+.card-secondary { --lte-card-variant-bg: var(--cp-mist-500); --lte-card-variant-bg-rgb: 122, 150, 146; }
+
+/* ---- Botones (44 px de alto; Bootstrap compila sus colores, por eso se redefinen las variables) -------------- */
+.btn {
+    --bs-btn-font-weight: 600;
+    --bs-btn-border-radius: var(--cp-radius);
+    --bs-btn-focus-box-shadow: none; /* el foco lo da el contorno de :focus-visible */
+    min-block-size: var(--cp-target);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+.btn-sm {
+    min-block-size: 2rem; /* ≥ 24 px (WCAG 2.5.8); se agranda con puntero grueso */
+    --bs-btn-border-radius: calc(var(--cp-radius) - 0.125rem);
+}
+@media (pointer: coarse) {
+    .btn-sm {
+        min-block-size: var(--cp-target);
+    }
+}
+.btn-primary {
+    --bs-btn-bg: var(--cp-teal-700);
+    --bs-btn-border-color: var(--cp-teal-700);
+    --bs-btn-hover-bg: var(--cp-teal-800);
+    --bs-btn-hover-border-color: var(--cp-teal-800);
+    --bs-btn-active-bg: var(--cp-teal-900);
+    --bs-btn-active-border-color: var(--cp-teal-900);
+    --bs-btn-disabled-bg: var(--cp-teal-700);
+    --bs-btn-disabled-border-color: var(--cp-teal-700);
+}
+.btn-outline-primary {
+    --bs-btn-color: var(--cp-teal-700);
+    --bs-btn-border-color: var(--cp-teal-700);
+    --bs-btn-hover-bg: var(--cp-teal-700);
+    --bs-btn-hover-border-color: var(--cp-teal-700);
+    --bs-btn-active-bg: var(--cp-teal-800);
+    --bs-btn-active-border-color: var(--cp-teal-800);
+    --bs-btn-disabled-color: var(--cp-teal-700);
+    --bs-btn-disabled-border-color: var(--cp-teal-700);
+}
+.btn-info {
+    --bs-btn-color: #FFFFFF;
+    --bs-btn-bg: var(--cp-sky-700);
+    --bs-btn-border-color: var(--cp-sky-700);
+    --bs-btn-hover-color: #FFFFFF;
+    --bs-btn-hover-bg: #075985;
+    --bs-btn-hover-border-color: #075985;
+}
+.btn-success {
+    --bs-btn-bg: var(--cp-green-700);
+    --bs-btn-border-color: var(--cp-green-700);
+    --bs-btn-hover-bg: #166534;
+    --bs-btn-hover-border-color: #166534;
+}
+.btn-link {
+    --bs-btn-color: var(--cp-color-primary);
+    --bs-btn-hover-color: var(--cp-color-primary-strong);
+}
+
+/* ---- Formularios ------------------------------------------------------------------------------------------- */
+.form-control,
+.form-select {
+    min-block-size: var(--cp-target);
+    border-color: var(--cp-color-field-border);
+    border-radius: var(--cp-radius);
+    font-size: 1rem; /* evita el zoom automático de iOS y se lee mejor */
+}
+.form-control-sm,
+.form-select-sm {
+    min-block-size: 2rem;
+}
+textarea.form-control {
+    resize: vertical;
+}
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--cp-color-primary);
+    box-shadow: none;
+}
+.form-label {
+    font-weight: 600;
+}
+.form-check-input {
+    border-color: var(--cp-color-field-border);
+}
+.form-check-input:checked {
+    background-color: var(--cp-color-primary);
+    border-color: var(--cp-color-primary);
+}
+.form-check-input:focus {
+    border-color: var(--cp-color-primary);
+    box-shadow: none;
+}
+/* Validación solo después de interactuar (no marcar en rojo un formulario recién abierto). */
+.form-control:user-invalid {
+    border-color: var(--cp-red-600);
+}
+.input-group-text {
+    border-color: var(--cp-color-field-border);
+    background: var(--cp-teal-50);
+    color: var(--cp-color-text-muted);
+}
+
+/* ---- Tablas ------------------------------------------------------------------------------------------------ */
+.table {
+    --bs-table-color: var(--cp-color-text);
+    --bs-table-border-color: var(--cp-color-divider);
+    --bs-table-hover-bg: rgb(15 118 110 / 0.05);
+    --bs-table-striped-bg: rgb(15 118 110 / 0.03);
+}
+.table > thead > tr > th {
+    background: var(--cp-teal-50);
+    color: var(--cp-teal-900);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* ---- Navegación, paginación, listas, menús ----------------------------------------------------------------- */
+.nav-pills {
+    --bs-nav-pills-link-active-bg: var(--cp-color-primary);
+}
+.nav-tabs {
+    --bs-nav-tabs-link-active-color: var(--cp-teal-900);
+}
+.nav-link {
+    --bs-nav-link-color: var(--cp-color-primary);
+    --bs-nav-link-hover-color: var(--cp-color-primary-strong);
+}
+.pagination {
+    --bs-pagination-color: var(--cp-color-primary);
+    --bs-pagination-hover-color: var(--cp-color-primary-strong);
+    --bs-pagination-active-bg: var(--cp-color-primary);
+    --bs-pagination-active-border-color: var(--cp-color-primary);
+    --bs-pagination-focus-box-shadow: none;
+}
+.list-group {
+    --bs-list-group-active-bg: var(--cp-color-primary);
+    --bs-list-group-active-border-color: var(--cp-color-primary);
+}
+.dropdown-menu {
+    --bs-dropdown-link-active-bg: var(--cp-color-primary);
+    --bs-dropdown-border-color: var(--cp-color-divider);
+    --bs-dropdown-border-radius: var(--cp-radius);
+}
+.dropdown-item {
+    min-block-size: 2.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.progress {
+    --bs-progress-bar-bg: var(--cp-color-primary);
+}
+
+/* ---- Alertas y distintivos (el color nunca va solo: las alertas llevan ícono o texto) --------------------- */
+.alert {
+    --bs-alert-border-radius: var(--cp-radius);
+}
+.badge {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+/* ---- Movimiento: solo transiciones de color; se conservan con movimiento reducido (no desplazan nada) ------- */
+:where(.btn, .nav-link, .dropdown-item, .page-link, .form-control, .form-select) {
+    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* ---- Colores forzados (Alto contraste de Windows): las sombras desaparecen; se apoya en bordes y contornos -- */
+@media (forced-colors: active) {
+    .card {
+        border: 1px solid CanvasText;
+    }
+    .sidebar-menu > .nav-item > .nav-link.active {
+        outline: 2px solid Highlight;
+        outline-offset: -2px;
+    }
+}

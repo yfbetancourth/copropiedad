@@ -611,3 +611,18 @@ Las migraciones son idempotentes. Aplicar en orden, con respaldo previo:
 **Modo SQL estricto.** `App\Core\Database` fija `STRICT_ALL_TABLES` (y `ERROR_FOR_DIVISION_BY_ZERO`, `NO_ZERO_DATE`…) en
 cada conexión: un valor que no cabe es un error y no se guarda recortado o vacío. XAMPP arranca MariaDB sin modo
 estricto; MariaDB de producción lo trae por defecto.
+
+## Renovación visual (tema «confianza»)
+
+Dirección definida con la skill ui-ux-pro-max y verificada contra el nicho: administración de propiedad horizontal en
+Colombia. Compran administradores y consejos (dinero, documentos, Ley 675): confianza y claridad. Usan residentes de
+todas las edades, sobre todo desde el celular.
+
+- **Estilo**: minimalismo suizo (sin vidrio ni degradados, que la skill marca como riesgo de accesibilidad).
+- **Color**: verde azulado de confianza `#0F766E` + azul profesional `#0369A1`; barra lateral `#0D3B38`.
+- **Tipografía**: Lexend (títulos, diseñada para legibilidad) + Source Sans 3 (texto, 16 px). Servidas localmente.
+- **Accesibilidad**: texto ≥ 4.5:1, bordes de campos y foco ≥ 3:1, foco con `outline` en `:focus-visible`, botones y
+  campos de 44 px, validación con `:user-invalid`, soporte de Colores forzados.
+
+Todo vive en `public/assets/css/theme.css` como tokens (`--cp-*`) que redefinen las variables de Bootstrap 5.3 y
+AdminLTE 4; las vistas no cambian. Para ajustar la marca basta con cambiar la paleta del nivel 1.
