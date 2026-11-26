@@ -14,8 +14,19 @@ final class Http
     public static function requireCsrf(): void
     {
         if (!Session::verifyCsrf($_POST['_token'] ?? null)) {
-            http_response_code(419);
-            echo 'La sesión del formulario venció. Recarga la página e intenta nuevamente.';
+            http_response_code(403); // 419 no es estándar: Apache lo convierte en 500.
+            header('Content-Type: text/html; charset=UTF-8');
+            header('Cache-Control: no-store');
+            $escape = static fn (string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            echo '<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
+                . '<title>La sesión del formulario venció</title></head>'
+                . '<body style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#f6f4ee;color:#1f2721;margin:0;padding:48px 16px">'
+                . '<main style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:28px">'
+                . '<h1 style="font-size:20px;margin:0 0 12px">La sesión del formulario venció</h1>'
+                . '<p style="margin:0 0 12px;line-height:1.5">Por seguridad, el formulario dejó de ser válido: pasó mucho tiempo sin actividad o la sesión se cerró en otra pestaña. No se guardó ningún cambio.</p>'
+                . '<p style="margin:0 0 20px;line-height:1.5">Vuelve, recarga la página y envíalo de nuevo.</p>'
+                . '<a href="' . $escape(Url::to('/')) . '" data-back style="color:#2f4637;font-weight:600">← Volver al formulario</a></main>'
+                . '<script src="' . $escape(Csp::appScriptUrl()) . '" defer></script></body></html>';
             exit;
         }
     }

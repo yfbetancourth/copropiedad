@@ -574,3 +574,13 @@ php bin/build-icons.php package/icons
 
 Requisitos de navegador: `<dialog>`, popover y comandos de invocación (Baseline 2025). En navegadores sin comandos de
 invocación, `app.js` los emula; sin anchor positioning, ubica los menús por script.
+
+## Sesiones (cookie por sitio)
+
+- La plataforma usa la cookie `COPROPIEDAD_SID` (ruta `/`) y cada copia de conjunto `COPROPIEDAD_SID_<SLUG>` (ruta de
+  su `APP_URL`). Antes todas usaban `PHPSESSID`: la cookie de la raíz llegaba también a los conjuntos, compartían una
+  sesión, y al iniciar o cerrar sesión en uno se borraba la del otro («La sesión del formulario venció»).
+- Los datos de sesión duran al menos 2 horas en el servidor (`session.gc_maxlifetime`), por encima de los 30 minutos de
+  inactividad con que la aplicación cierra la sesión.
+- Un token CSRF inválido responde 403 con una página que explica qué pasó (419 no es estándar y Apache lo devolvía
+  como 500).

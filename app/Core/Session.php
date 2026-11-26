@@ -8,6 +8,9 @@ use RuntimeException;
 
 final class Session
 {
+    /** Vida mínima de los datos de sesión en el servidor (debe superar los 30 min de inactividad permitidos). */
+    private const LIFETIME_SECONDS = 7200;
+
     public static function start(): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -21,7 +24,13 @@ final class Session
         // Reject caller-supplied session IDs that PHP has not issued.
         ini_set('session.use_strict_mode', '1');
         ini_set('session.use_only_cookies', '1');
+        // PHP borra por defecto las sesiones a los 24 min (gc_maxlifetime=1440), antes del cierre por inactividad
+        // de 30 min de Authorization: un formulario abierto ese tiempo perdía su token CSRF. Margen: 2 horas.
+        if ((int) ini_get('session.gc_maxlifetime') < self::LIFETIME_SECONDS) {
+            ini_set('session.gc_maxlifetime', (string) self::LIFETIME_SECONDS);
+        }
 
+        session_name(self::cookieName());
         session_set_cookie_params([
             'httponly' => true,
             'secure' => self::isHttps(),
@@ -46,6 +55,18 @@ final class Session
         return is_string($token)
             && isset($_SESSION['csrf_token'])
             && hash_equals($_SESSION['csrf_token'], $token);
+    }
+
+    /**
+     * Nombre propio de la cookie para la plataforma y para cada conjunto. Con un nombre común (PHPSESSID), la
+     * cookie de la raíz (ruta /) también se enviaba a las copias de los conjuntos: compartían una misma sesión y
+     * al iniciar sesión en uno (o al salir del otro) se borraba la del otro, con su token CSRF.
+     */
+    private static function cookieName(): string
+    {
+        $slug = preg_replace('/[^A-Za-z0-9]/', '', Env::get('APP_TENANT')) ?? '';
+
+        return $slug === '' ? 'COPROPIEDAD_SID' : 'COPROPIEDAD_SID_' . strtoupper($slug);
     }
 
     /**
