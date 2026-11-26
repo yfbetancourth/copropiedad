@@ -1,11 +1,16 @@
--- Estructura completa de la base de datos Copropiedad (sin datos), con las migraciones 001 a 042 aplicadas.
--- Generado el 2026-11-25 16:48 desde la base local con mysqldump --no-data.
+-- Estructura completa de la base de datos Copropiedad (sin datos), con las migraciones 001 a 048 aplicadas.
+-- Generado el 2026-11-26 09:03 desde la base local con mysqldump --no-data.
 -- Uso en una base nueva y vacía:
 --   mysql -u root -e "CREATE DATABASE copropiedad CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 --   mysql -u root copropiedad < database/schema/copropiedad-schema.sql
 -- Después: crear el Superadmin con bin/create-superadmin.php. Una base existente se actualiza con database/migrations/.
 
 /*M!999999\- enable the sandbox mode */ 
+-- MariaDB dump 10.19  Distrib 10.11.16-MariaDB, for Win64 (AMD64)
+--
+-- Host: 127.0.0.1    Database: copropiedad
+-- ------------------------------------------------------
+-- Server version	10.11.16-MariaDB
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
@@ -17,6 +22,11 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `admin_message_recipients`
+--
+
 DROP TABLE IF EXISTS `admin_message_recipients`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -31,6 +41,11 @@ CREATE TABLE `admin_message_recipients` (
   CONSTRAINT `fk_admin_message_recipients_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `admin_messages`
+--
+
 DROP TABLE IF EXISTS `admin_messages`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -48,6 +63,11 @@ CREATE TABLE `admin_messages` (
   CONSTRAINT `fk_admin_messages_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `admin_password_reset_tokens`
+--
+
 DROP TABLE IF EXISTS `admin_password_reset_tokens`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -64,6 +84,11 @@ CREATE TABLE `admin_password_reset_tokens` (
   CONSTRAINT `fk_admin_reset_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `admin_role_permissions`
+--
+
 DROP TABLE IF EXISTS `admin_role_permissions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -75,6 +100,11 @@ CREATE TABLE `admin_role_permissions` (
   CONSTRAINT `fk_admin_role_permissions_role` FOREIGN KEY (`role_id`) REFERENCES `admin_roles` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `admin_roles`
+--
+
 DROP TABLE IF EXISTS `admin_roles`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -90,10 +120,16 @@ CREATE TABLE `admin_roles` (
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_admin_roles_scope_name` (`tenant_scope`,`name`),
+  UNIQUE KEY `uq_admin_roles_tenant_id` (`tenant_id`,`id`),
   KEY `idx_admin_roles_tenant` (`tenant_id`),
   CONSTRAINT `fk_admin_roles_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `admin_user_mail_settings`
+--
+
 DROP TABLE IF EXISTS `admin_user_mail_settings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -114,6 +150,11 @@ CREATE TABLE `admin_user_mail_settings` (
   CONSTRAINT `fk_admin_user_mail_settings_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `admin_users`
+--
+
 DROP TABLE IF EXISTS `admin_users`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -134,12 +175,19 @@ CREATE TABLE `admin_users` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_admin_users_scope_username` (`tenant_scope`,`username`),
   UNIQUE KEY `uq_admin_users_scope_email` (`tenant_scope`,`email`),
+  UNIQUE KEY `uq_admin_users_tenant_id` (`tenant_id`,`id`),
   KEY `idx_admin_users_role_id` (`role_id`),
   KEY `idx_admin_users_tenant` (`tenant_id`),
-  CONSTRAINT `fk_admin_users_role` FOREIGN KEY (`role_id`) REFERENCES `admin_roles` (`id`),
+  KEY `fk_admin_users_role_id_tenant` (`tenant_id`,`role_id`),
+  CONSTRAINT `fk_admin_users_role_id_tenant` FOREIGN KEY (`tenant_id`, `role_id`) REFERENCES `admin_roles` (`tenant_id`, `id`),
   CONSTRAINT `fk_admin_users_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_bank_imports`
+--
+
 DROP TABLE IF EXISTS `billing_bank_imports`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -156,6 +204,7 @@ CREATE TABLE `billing_bank_imports` (
   `confirmed_by` bigint(20) unsigned DEFAULT NULL,
   `confirmed_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_billing_bank_imports_tenant_id` (`tenant_id`,`id`),
   KEY `idx_bank_imports_tenant` (`tenant_id`,`created_at`),
   KEY `fk_bank_imports_uploaded_by` (`uploaded_by`),
   KEY `fk_bank_imports_confirmed_by` (`confirmed_by`),
@@ -164,6 +213,11 @@ CREATE TABLE `billing_bank_imports` (
   CONSTRAINT `fk_bank_imports_uploaded_by` FOREIGN KEY (`uploaded_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_bank_movements`
+--
+
 DROP TABLE IF EXISTS `billing_bank_movements`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -193,13 +247,23 @@ CREATE TABLE `billing_bank_movements` (
   KEY `idx_bank_movements_fingerprint` (`tenant_id`,`fingerprint`),
   KEY `fk_bank_movements_deposit` (`deposit_id`),
   KEY `fk_bank_movements_payment` (`payment_id`),
+  KEY `fk_bank_movements_proposed_statement` (`proposed_statement_id`),
+  KEY `fk_bank_movements_proposed_report` (`proposed_report_id`),
+  KEY `fk_billing_bank_movements_import_id_tenant` (`tenant_id`,`import_id`),
   CONSTRAINT `fk_bank_movements_deposit` FOREIGN KEY (`deposit_id`) REFERENCES `billing_unidentified_deposits` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_bank_movements_import` FOREIGN KEY (`import_id`) REFERENCES `billing_bank_imports` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_bank_movements_payment` FOREIGN KEY (`payment_id`) REFERENCES `billing_payments` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_bank_movements_proposed_report` FOREIGN KEY (`proposed_report_id`) REFERENCES `billing_payment_reports` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_bank_movements_proposed_statement` FOREIGN KEY (`proposed_statement_id`) REFERENCES `billing_statements` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_bank_movements_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `fk_billing_bank_movements_import_id_tenant` FOREIGN KEY (`tenant_id`, `import_id`) REFERENCES `billing_bank_imports` (`tenant_id`, `id`) ON DELETE CASCADE,
   CONSTRAINT `chk_bank_movement_amount` CHECK (`amount` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_bold_terminal_payments`
+--
+
 DROP TABLE IF EXISTS `billing_bold_terminal_payments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -222,19 +286,26 @@ CREATE TABLE `billing_bold_terminal_payments` (
   KEY `idx_bold_terminal_statement` (`statement_id`,`user_id`,`status`),
   KEY `fk_bold_terminal_user` (`user_id`),
   KEY `idx_bold_terminal_tenant` (`tenant_id`,`status`),
-  CONSTRAINT `fk_bold_terminal_statement` FOREIGN KEY (`statement_id`) REFERENCES `billing_statements` (`id`),
+  KEY `fk_billing_bold_terminal_payments_statement_id_tenant` (`tenant_id`,`statement_id`),
+  KEY `fk_billing_bold_terminal_payments_user_id_tenant` (`tenant_id`,`user_id`),
+  CONSTRAINT `fk_billing_bold_terminal_payments_statement_id_tenant` FOREIGN KEY (`tenant_id`, `statement_id`) REFERENCES `billing_statements` (`tenant_id`, `id`),
+  CONSTRAINT `fk_billing_bold_terminal_payments_user_id_tenant` FOREIGN KEY (`tenant_id`, `user_id`) REFERENCES `admin_users` (`tenant_id`, `id`),
   CONSTRAINT `fk_bold_terminal_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
-  CONSTRAINT `fk_bold_terminal_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`),
   CONSTRAINT `chk_bold_terminal_amount` CHECK (`expected_amount` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_clearances`
+--
+
 DROP TABLE IF EXISTS `billing_clearances`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `billing_clearances` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `tenant_id` bigint(20) unsigned NOT NULL,
-  `unit_id` char(32) NOT NULL,
+  `unit_id` char(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   `unit_name` varchar(160) NOT NULL,
   `statement_id` bigint(20) unsigned NOT NULL,
   `code` char(12) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
@@ -248,12 +319,19 @@ CREATE TABLE `billing_clearances` (
   KEY `fk_billing_clearances_statement` (`statement_id`),
   KEY `fk_billing_clearances_issued_by` (`issued_by`),
   KEY `fk_billing_clearances_requested_by` (`requested_by`),
+  KEY `fk_billing_clearances_statement_id_tenant` (`tenant_id`,`statement_id`),
   CONSTRAINT `fk_billing_clearances_issued_by` FOREIGN KEY (`issued_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_billing_clearances_requested_by` FOREIGN KEY (`requested_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_billing_clearances_statement` FOREIGN KEY (`statement_id`) REFERENCES `billing_statements` (`id`),
-  CONSTRAINT `fk_billing_clearances_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+  CONSTRAINT `fk_billing_clearances_statement_id_tenant` FOREIGN KEY (`tenant_id`, `statement_id`) REFERENCES `billing_statements` (`tenant_id`, `id`),
+  CONSTRAINT `fk_billing_clearances_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `fk_billing_clearances_unit` FOREIGN KEY (`tenant_id`, `unit_id`) REFERENCES `property_units` (`tenant_id`, `id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_deposit_claims`
+--
+
 DROP TABLE IF EXISTS `billing_deposit_claims`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -279,13 +357,20 @@ CREATE TABLE `billing_deposit_claims` (
   KEY `fk_deposit_claims_user` (`user_id`),
   KEY `fk_deposit_claims_statement` (`statement_id`),
   KEY `fk_deposit_claims_reviewed_by` (`reviewed_by`),
-  CONSTRAINT `fk_deposit_claims_deposit` FOREIGN KEY (`deposit_id`) REFERENCES `billing_unidentified_deposits` (`id`) ON DELETE CASCADE,
+  KEY `fk_billing_deposit_claims_deposit_id_tenant` (`tenant_id`,`deposit_id`),
+  KEY `fk_billing_deposit_claims_statement_id_tenant` (`tenant_id`,`statement_id`),
+  CONSTRAINT `fk_billing_deposit_claims_deposit_id_tenant` FOREIGN KEY (`tenant_id`, `deposit_id`) REFERENCES `billing_unidentified_deposits` (`tenant_id`, `id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_billing_deposit_claims_statement_id_tenant` FOREIGN KEY (`tenant_id`, `statement_id`) REFERENCES `billing_statements` (`tenant_id`, `id`),
+  CONSTRAINT `fk_billing_deposit_claims_user_id_tenant` FOREIGN KEY (`tenant_id`, `user_id`) REFERENCES `admin_users` (`tenant_id`, `id`) ON DELETE CASCADE,
   CONSTRAINT `fk_deposit_claims_reviewed_by` FOREIGN KEY (`reviewed_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_deposit_claims_statement` FOREIGN KEY (`statement_id`) REFERENCES `billing_statements` (`id`),
-  CONSTRAINT `fk_deposit_claims_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
-  CONSTRAINT `fk_deposit_claims_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_deposit_claims_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_monthly_items`
+--
+
 DROP TABLE IF EXISTS `billing_monthly_items`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -304,11 +389,18 @@ CREATE TABLE `billing_monthly_items` (
   KEY `idx_billing_items_period_unit` (`period`,`unit_id`),
   KEY `fk_billing_item_user` (`created_by`),
   KEY `idx_billing_items_tenant_period_unit` (`tenant_id`,`period`,`unit_id`),
+  KEY `idx_billing_items_tenant_unit` (`tenant_id`,`unit_id`),
   CONSTRAINT `fk_billing_item_user` FOREIGN KEY (`created_by`) REFERENCES `admin_users` (`id`),
   CONSTRAINT `fk_billing_items_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `fk_billing_items_unit` FOREIGN KEY (`tenant_id`, `unit_id`) REFERENCES `property_units` (`tenant_id`, `id`),
   CONSTRAINT `chk_billing_item_amount` CHECK (`amount` >= 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_online_payments`
+--
+
 DROP TABLE IF EXISTS `billing_online_payments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -333,12 +425,19 @@ CREATE TABLE `billing_online_payments` (
   KEY `idx_billing_online_payment_statement` (`statement_id`,`user_id`,`status`),
   KEY `fk_billing_online_payment_user` (`user_id`),
   KEY `idx_billing_online_payment_tenant` (`tenant_id`,`status`),
-  CONSTRAINT `fk_billing_online_payment_statement` FOREIGN KEY (`statement_id`) REFERENCES `billing_statements` (`id`),
+  KEY `fk_billing_online_payments_statement_id_tenant` (`tenant_id`,`statement_id`),
+  KEY `fk_billing_online_payments_user_id_tenant` (`tenant_id`,`user_id`),
   CONSTRAINT `fk_billing_online_payment_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
-  CONSTRAINT `fk_billing_online_payment_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`),
+  CONSTRAINT `fk_billing_online_payments_statement_id_tenant` FOREIGN KEY (`tenant_id`, `statement_id`) REFERENCES `billing_statements` (`tenant_id`, `id`),
+  CONSTRAINT `fk_billing_online_payments_user_id_tenant` FOREIGN KEY (`tenant_id`, `user_id`) REFERENCES `admin_users` (`tenant_id`, `id`),
   CONSTRAINT `chk_billing_online_payment_amount` CHECK (`expected_amount` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_payment_links`
+--
+
 DROP TABLE IF EXISTS `billing_payment_links`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -366,13 +465,19 @@ CREATE TABLE `billing_payment_links` (
   KEY `fk_billing_payment_links_user` (`user_id`),
   KEY `fk_billing_payment_links_creator` (`created_by`),
   KEY `fk_billing_payment_links_revoker` (`revoked_by`),
+  KEY `fk_billing_payment_links_user_id_tenant` (`tenant_id`,`user_id`),
   CONSTRAINT `fk_billing_payment_links_creator` FOREIGN KEY (`created_by`) REFERENCES `admin_users` (`id`),
   CONSTRAINT `fk_billing_payment_links_revoker` FOREIGN KEY (`revoked_by`) REFERENCES `admin_users` (`id`),
-  CONSTRAINT `fk_billing_payment_links_statement` FOREIGN KEY (`statement_id`) REFERENCES `billing_statements` (`id`),
+  CONSTRAINT `fk_billing_payment_links_statement_id_tenant` FOREIGN KEY (`tenant_id`, `statement_id`) REFERENCES `billing_statements` (`tenant_id`, `id`),
   CONSTRAINT `fk_billing_payment_links_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
-  CONSTRAINT `fk_billing_payment_links_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`)
+  CONSTRAINT `fk_billing_payment_links_user_id_tenant` FOREIGN KEY (`tenant_id`, `user_id`) REFERENCES `admin_users` (`tenant_id`, `id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_payment_reports`
+--
+
 DROP TABLE IF EXISTS `billing_payment_reports`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -403,14 +508,21 @@ CREATE TABLE `billing_payment_reports` (
   KEY `fk_billing_payment_reports_user` (`user_id`),
   KEY `fk_billing_payment_reports_reviewer` (`reviewed_by`),
   KEY `fk_billing_payment_reports_payment` (`payment_id`),
-  CONSTRAINT `fk_billing_payment_reports_payment` FOREIGN KEY (`payment_id`) REFERENCES `billing_payments` (`id`),
+  KEY `fk_billing_payment_reports_payment_id_tenant` (`tenant_id`,`payment_id`),
+  KEY `fk_billing_payment_reports_statement_id_tenant` (`tenant_id`,`statement_id`),
+  CONSTRAINT `fk_billing_payment_reports_payment_id_tenant` FOREIGN KEY (`tenant_id`, `payment_id`) REFERENCES `billing_payments` (`tenant_id`, `id`),
   CONSTRAINT `fk_billing_payment_reports_reviewer` FOREIGN KEY (`reviewed_by`) REFERENCES `admin_users` (`id`),
-  CONSTRAINT `fk_billing_payment_reports_statement` FOREIGN KEY (`statement_id`) REFERENCES `billing_statements` (`id`),
+  CONSTRAINT `fk_billing_payment_reports_statement_id_tenant` FOREIGN KEY (`tenant_id`, `statement_id`) REFERENCES `billing_statements` (`tenant_id`, `id`),
   CONSTRAINT `fk_billing_payment_reports_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
-  CONSTRAINT `fk_billing_payment_reports_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`),
+  CONSTRAINT `fk_billing_payment_reports_user_id_tenant` FOREIGN KEY (`tenant_id`, `user_id`) REFERENCES `admin_users` (`tenant_id`, `id`),
   CONSTRAINT `chk_billing_payment_report_amount` CHECK (`amount` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_payments`
+--
+
 DROP TABLE IF EXISTS `billing_payments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -428,18 +540,25 @@ CREATE TABLE `billing_payments` (
   `voided_by` bigint(20) unsigned DEFAULT NULL,
   `void_reason` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_billing_payments_tenant_id` (`tenant_id`,`id`),
   KEY `idx_billing_payment_statement_date` (`statement_id`,`received_on`),
   KEY `fk_billing_payment_user` (`created_by`),
   KEY `idx_billing_payment_received` (`received_on`),
   KEY `fk_billing_payment_voided_by` (`voided_by`),
   KEY `idx_billing_payment_tenant_received` (`tenant_id`,`received_on`),
-  CONSTRAINT `fk_billing_payment_statement` FOREIGN KEY (`statement_id`) REFERENCES `billing_statements` (`id`),
+  KEY `fk_billing_payments_statement_id_tenant` (`tenant_id`,`statement_id`),
   CONSTRAINT `fk_billing_payment_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `fk_billing_payment_user` FOREIGN KEY (`created_by`) REFERENCES `admin_users` (`id`),
   CONSTRAINT `fk_billing_payment_voided_by` FOREIGN KEY (`voided_by`) REFERENCES `admin_users` (`id`),
+  CONSTRAINT `fk_billing_payments_statement_id_tenant` FOREIGN KEY (`tenant_id`, `statement_id`) REFERENCES `billing_statements` (`tenant_id`, `id`),
   CONSTRAINT `chk_billing_payment_amount` CHECK (`amount` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_statement_lines`
+--
+
 DROP TABLE IF EXISTS `billing_statement_lines`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -455,6 +574,11 @@ CREATE TABLE `billing_statement_lines` (
   CONSTRAINT `chk_billing_statement_line_amount` CHECK (`amount` >= 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_statement_recipients`
+--
+
 DROP TABLE IF EXISTS `billing_statement_recipients`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -476,10 +600,17 @@ CREATE TABLE `billing_statement_recipients` (
   UNIQUE KEY `uq_billing_statement_recipient` (`statement_id`,`user_id`),
   KEY `idx_billing_recipient_delivery` (`statement_id`,`delivery_status`),
   KEY `fk_billing_recipient_user` (`user_id`),
+  KEY `fk_billing_recipients_sent_by` (`sent_by`),
   CONSTRAINT `fk_billing_recipient_statement` FOREIGN KEY (`statement_id`) REFERENCES `billing_statements` (`id`),
-  CONSTRAINT `fk_billing_recipient_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`)
+  CONSTRAINT `fk_billing_recipient_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`),
+  CONSTRAINT `fk_billing_recipients_sent_by` FOREIGN KEY (`sent_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_statement_user_reads`
+--
+
 DROP TABLE IF EXISTS `billing_statement_user_reads`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -493,6 +624,11 @@ CREATE TABLE `billing_statement_user_reads` (
   CONSTRAINT `fk_billing_statement_user_reads_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_statements`
+--
+
 DROP TABLE IF EXISTS `billing_statements`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -544,15 +680,23 @@ CREATE TABLE `billing_statements` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_billing_statement_tenant_unit_period` (`tenant_id`,`unit_id`,`period`),
+  UNIQUE KEY `uq_billing_statements_tenant_id` (`tenant_id`,`id`),
   KEY `idx_billing_statement_period` (`period`),
   KEY `fk_billing_statement_user` (`issued_by`),
   KEY `fk_billing_statement_previous` (`previous_statement_id`),
   KEY `idx_billing_statement_tenant_period` (`tenant_id`,`period`),
-  CONSTRAINT `fk_billing_statement_previous` FOREIGN KEY (`previous_statement_id`) REFERENCES `billing_statements` (`id`),
+  KEY `fk_billing_statements_previous_statement_id_tenant` (`tenant_id`,`previous_statement_id`),
   CONSTRAINT `fk_billing_statement_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
-  CONSTRAINT `fk_billing_statement_user` FOREIGN KEY (`issued_by`) REFERENCES `admin_users` (`id`)
+  CONSTRAINT `fk_billing_statement_user` FOREIGN KEY (`issued_by`) REFERENCES `admin_users` (`id`),
+  CONSTRAINT `fk_billing_statements_previous_statement_id_tenant` FOREIGN KEY (`tenant_id`, `previous_statement_id`) REFERENCES `billing_statements` (`tenant_id`, `id`),
+  CONSTRAINT `fk_billing_statements_unit` FOREIGN KEY (`tenant_id`, `unit_id`) REFERENCES `property_units` (`tenant_id`, `id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_unidentified_deposits`
+--
+
 DROP TABLE IF EXISTS `billing_unidentified_deposits`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -578,34 +722,48 @@ CREATE TABLE `billing_unidentified_deposits` (
   `created_by` bigint(20) unsigned DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_billing_unidentified_deposits_tenant_id` (`tenant_id`,`id`),
   KEY `idx_unidentified_deposits_status` (`tenant_id`,`status`,`deposited_on`),
   KEY `fk_unidentified_deposits_statement` (`statement_id`),
   KEY `fk_unidentified_deposits_payment` (`payment_id`),
   KEY `fk_unidentified_deposits_resolved_by` (`resolved_by`),
   KEY `fk_unidentified_deposits_created_by` (`created_by`),
+  KEY `fk_billing_unidentified_deposits_payment_id_tenant` (`tenant_id`,`payment_id`),
+  KEY `fk_billing_unidentified_deposits_statement_id_tenant` (`tenant_id`,`statement_id`),
+  CONSTRAINT `fk_billing_unidentified_deposits_payment_id_tenant` FOREIGN KEY (`tenant_id`, `payment_id`) REFERENCES `billing_payments` (`tenant_id`, `id`),
+  CONSTRAINT `fk_billing_unidentified_deposits_statement_id_tenant` FOREIGN KEY (`tenant_id`, `statement_id`) REFERENCES `billing_statements` (`tenant_id`, `id`),
   CONSTRAINT `fk_unidentified_deposits_created_by` FOREIGN KEY (`created_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_unidentified_deposits_payment` FOREIGN KEY (`payment_id`) REFERENCES `billing_payments` (`id`),
   CONSTRAINT `fk_unidentified_deposits_resolved_by` FOREIGN KEY (`resolved_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_unidentified_deposits_statement` FOREIGN KEY (`statement_id`) REFERENCES `billing_statements` (`id`),
   CONSTRAINT `fk_unidentified_deposits_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `chk_unidentified_deposit_amount` CHECK (`amount` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_unit_references`
+--
+
 DROP TABLE IF EXISTS `billing_unit_references`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `billing_unit_references` (
   `tenant_id` bigint(20) unsigned NOT NULL,
-  `unit_id` char(32) NOT NULL,
+  `unit_id` char(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
   `sequence` int(10) unsigned NOT NULL,
   `reference` varchar(12) NOT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`tenant_id`,`unit_id`),
   UNIQUE KEY `uq_billing_unit_reference` (`tenant_id`,`reference`),
   UNIQUE KEY `uq_billing_unit_reference_sequence` (`tenant_id`,`sequence`),
-  CONSTRAINT `fk_billing_unit_references_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+  CONSTRAINT `fk_billing_unit_references_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `fk_billing_unit_references_unit` FOREIGN KEY (`tenant_id`, `unit_id`) REFERENCES `property_units` (`tenant_id`, `id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `billing_wompi_payments`
+--
+
 DROP TABLE IF EXISTS `billing_wompi_payments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -628,12 +786,33 @@ CREATE TABLE `billing_wompi_payments` (
   KEY `idx_billing_wompi_payment_statement` (`tenant_id`,`statement_id`,`status`),
   KEY `fk_billing_wompi_payment_statement` (`statement_id`),
   KEY `fk_billing_wompi_payment_user` (`user_id`),
-  CONSTRAINT `fk_billing_wompi_payment_statement` FOREIGN KEY (`statement_id`) REFERENCES `billing_statements` (`id`),
+  KEY `fk_billing_wompi_payments_user_id_tenant` (`tenant_id`,`user_id`),
   CONSTRAINT `fk_billing_wompi_payment_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
-  CONSTRAINT `fk_billing_wompi_payment_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`),
+  CONSTRAINT `fk_billing_wompi_payments_statement_id_tenant` FOREIGN KEY (`tenant_id`, `statement_id`) REFERENCES `billing_statements` (`tenant_id`, `id`),
+  CONSTRAINT `fk_billing_wompi_payments_user_id_tenant` FOREIGN KEY (`tenant_id`, `user_id`) REFERENCES `admin_users` (`tenant_id`, `id`),
   CONSTRAINT `chk_billing_wompi_payment_amount` CHECK (`expected_amount` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `bold_payment_methods`
+--
+
+DROP TABLE IF EXISTS `bold_payment_methods`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `bold_payment_methods` (
+  `tenant_id` bigint(20) unsigned NOT NULL,
+  `method_code` enum('CREDIT_CARD','PSE','BOTON_BANCOLOMBIA','NEQUI') NOT NULL,
+  PRIMARY KEY (`tenant_id`,`method_code`),
+  CONSTRAINT `fk_bold_payment_methods_settings` FOREIGN KEY (`tenant_id`) REFERENCES `bold_payment_settings` (`tenant_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `bold_payment_settings`
+--
+
 DROP TABLE IF EXISTS `bold_payment_settings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -641,7 +820,6 @@ CREATE TABLE `bold_payment_settings` (
   `tenant_id` bigint(20) unsigned NOT NULL,
   `environment` enum('sandbox','production') NOT NULL DEFAULT 'sandbox',
   `api_key_ciphertext` text NOT NULL,
-  `payment_methods` varchar(255) NOT NULL,
   `api_integrations_key_ciphertext` varchar(2048) NOT NULL DEFAULT '',
   `api_integrations_webhook_secret_ciphertext` varchar(2048) NOT NULL DEFAULT '',
   `api_integrations_terminal_model` varchar(40) NOT NULL DEFAULT '',
@@ -654,6 +832,11 @@ CREATE TABLE `bold_payment_settings` (
   CONSTRAINT `fk_bold_payment_settings_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `common_area_bookings`
+--
+
 DROP TABLE IF EXISTS `common_area_bookings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -677,13 +860,18 @@ CREATE TABLE `common_area_bookings` (
   KEY `fk_common_area_bookings_area` (`area_id`),
   KEY `fk_common_area_bookings_user` (`user_id`),
   KEY `fk_common_area_bookings_decider` (`decided_by`),
-  CONSTRAINT `fk_common_area_bookings_area` FOREIGN KEY (`area_id`) REFERENCES `common_areas` (`id`),
+  CONSTRAINT `fk_common_area_bookings_area_id_tenant` FOREIGN KEY (`tenant_id`, `area_id`) REFERENCES `common_areas` (`tenant_id`, `id`),
   CONSTRAINT `fk_common_area_bookings_decider` FOREIGN KEY (`decided_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_common_area_bookings_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
-  CONSTRAINT `fk_common_area_bookings_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_common_area_bookings_user_id_tenant` FOREIGN KEY (`tenant_id`, `user_id`) REFERENCES `admin_users` (`tenant_id`, `id`) ON DELETE CASCADE,
   CONSTRAINT `chk_common_area_bookings_range` CHECK (`starts_at` < `ends_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `common_areas`
+--
+
 DROP TABLE IF EXISTS `common_areas`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -703,11 +891,17 @@ CREATE TABLE `common_areas` (
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_common_areas_tenant_name` (`tenant_id`,`name`),
+  UNIQUE KEY `uq_common_areas_tenant_id` (`tenant_id`,`id`),
   CONSTRAINT `fk_common_areas_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
   CONSTRAINT `chk_common_areas_hours` CHECK (`opens_at` < `closes_at`),
   CONSTRAINT `chk_common_areas_max_hours` CHECK (`max_hours` between 1 and 24)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `contact_messages`
+--
+
 DROP TABLE IF EXISTS `contact_messages`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -729,25 +923,41 @@ CREATE TABLE `contact_messages` (
   KEY `idx_contact_messages_rate` (`tenant_id`,`ip_hash`,`created_at`),
   KEY `fk_contact_messages_consent` (`consent_id`),
   KEY `fk_contact_messages_read_by` (`read_by`),
-  CONSTRAINT `fk_contact_messages_consent` FOREIGN KEY (`consent_id`) REFERENCES `data_consents` (`id`),
+  KEY `fk_contact_messages_consent_id_tenant` (`tenant_id`,`consent_id`),
+  CONSTRAINT `fk_contact_messages_consent_id_tenant` FOREIGN KEY (`tenant_id`, `consent_id`) REFERENCES `data_consents` (`tenant_id`, `id`),
   CONSTRAINT `fk_contact_messages_read_by` FOREIGN KEY (`read_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_contact_messages_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `copropiedad_composition`
+--
+
 DROP TABLE IF EXISTS `copropiedad_composition`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `copropiedad_composition` (
   `tenant_id` bigint(20) unsigned NOT NULL,
-  `housing_type` enum('casa','torres_apartamento','mixto') NOT NULL,
-  `answers` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`answers`)),
-  `units` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`units`)),
+  `houses` smallint(5) unsigned DEFAULT NULL,
+  `towers` smallint(5) unsigned DEFAULT NULL,
+  `floors_per_tower` smallint(5) unsigned DEFAULT NULL,
+  `units_per_floor` smallint(5) unsigned DEFAULT NULL,
+  `commercial_properties` smallint(5) unsigned DEFAULT NULL,
+  `parking_spots` smallint(5) unsigned DEFAULT NULL,
+  `storage_units` smallint(5) unsigned DEFAULT NULL,
   `completed` tinyint(1) NOT NULL DEFAULT 0,
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`tenant_id`),
-  CONSTRAINT `fk_copropiedad_composition_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_copropiedad_composition_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_composition_answers_range` CHECK (coalesce(`houses`,1) between 1 and 5000 and coalesce(`towers`,1) between 1 and 5000 and coalesce(`floors_per_tower`,1) between 1 and 5000 and coalesce(`units_per_floor`,1) between 1 and 5000 and coalesce(`commercial_properties`,1) between 1 and 5000 and coalesce(`parking_spots`,0) <= 5000 and coalesce(`storage_units`,0) <= 5000)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `copropiedad_mail_settings`
+--
+
 DROP TABLE IF EXISTS `copropiedad_mail_settings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -765,6 +975,11 @@ CREATE TABLE `copropiedad_mail_settings` (
   CONSTRAINT `fk_copropiedad_mail_settings_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `copropiedad_settings`
+--
+
 DROP TABLE IF EXISTS `copropiedad_settings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -804,6 +1019,11 @@ CREATE TABLE `copropiedad_settings` (
   CONSTRAINT `chk_copropiedad_early_payment_day` CHECK (`early_payment_day` is null or `early_payment_day` between 0 and 28)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `data_consents`
+--
+
 DROP TABLE IF EXISTS `data_consents`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -823,17 +1043,25 @@ CREATE TABLE `data_consents` (
   `revoked_by` bigint(20) unsigned DEFAULT NULL,
   `revocation_note` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_data_consents_tenant_id` (`tenant_id`,`id`),
   KEY `idx_data_consents_tenant_granted` (`tenant_id`,`granted_at`),
   KEY `idx_data_consents_tenant_email` (`tenant_id`,`subject_email`),
   KEY `fk_data_consents_policy` (`data_policy_version_id`),
   KEY `fk_data_consents_authorization` (`authorization_version_id`),
   KEY `fk_data_consents_revoked_by` (`revoked_by`),
-  CONSTRAINT `fk_data_consents_authorization` FOREIGN KEY (`authorization_version_id`) REFERENCES `privacy_document_versions` (`id`),
-  CONSTRAINT `fk_data_consents_policy` FOREIGN KEY (`data_policy_version_id`) REFERENCES `privacy_document_versions` (`id`),
+  KEY `fk_data_consents_authorization_version_id_tenant` (`tenant_id`,`authorization_version_id`),
+  KEY `fk_data_consents_data_policy_version_id_tenant` (`tenant_id`,`data_policy_version_id`),
+  CONSTRAINT `fk_data_consents_authorization_version_id_tenant` FOREIGN KEY (`tenant_id`, `authorization_version_id`) REFERENCES `privacy_document_versions` (`tenant_id`, `id`),
+  CONSTRAINT `fk_data_consents_data_policy_version_id_tenant` FOREIGN KEY (`tenant_id`, `data_policy_version_id`) REFERENCES `privacy_document_versions` (`tenant_id`, `id`),
   CONSTRAINT `fk_data_consents_revoked_by` FOREIGN KEY (`revoked_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_data_consents_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `mail_oauth_connections`
+--
+
 DROP TABLE IF EXISTS `mail_oauth_connections`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -856,12 +1084,18 @@ CREATE TABLE `mail_oauth_connections` (
   UNIQUE KEY `uq_mail_oauth_owner` (`tenant_id`,`owner_scope`),
   KEY `fk_mail_oauth_user` (`user_id`),
   KEY `fk_mail_oauth_connected_by` (`connected_by`),
+  KEY `fk_mail_oauth_connections_user_id_tenant` (`tenant_id`,`user_id`),
   CONSTRAINT `fk_mail_oauth_connected_by` FOREIGN KEY (`connected_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_mail_oauth_connections_user_id_tenant` FOREIGN KEY (`tenant_id`, `user_id`) REFERENCES `admin_users` (`tenant_id`, `id`) ON DELETE CASCADE,
   CONSTRAINT `fk_mail_oauth_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
-  CONSTRAINT `fk_mail_oauth_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `chk_mail_oauth_owner` CHECK (`owner_scope` = 0 and `user_id` is null or `owner_scope` > 0 and `user_id` = `owner_scope`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `mail_oauth_states`
+--
+
 DROP TABLE IF EXISTS `mail_oauth_states`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -877,12 +1111,17 @@ CREATE TABLE `mail_oauth_states` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`state_hash`),
   KEY `idx_mail_oauth_states_expires` (`expires_at`),
-  KEY `fk_mail_oauth_states_tenant` (`tenant_id`),
   KEY `fk_mail_oauth_states_user` (`user_id`),
+  KEY `fk_mail_oauth_states_user_id_tenant` (`tenant_id`,`user_id`),
   CONSTRAINT `fk_mail_oauth_states_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_mail_oauth_states_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_mail_oauth_states_user_id_tenant` FOREIGN KEY (`tenant_id`, `user_id`) REFERENCES `admin_users` (`tenant_id`, `id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `privacy_document_versions`
+--
+
 DROP TABLE IF EXISTS `privacy_document_versions`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -897,11 +1136,17 @@ CREATE TABLE `privacy_document_versions` (
   `published_by` bigint(20) unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_privacy_document_version` (`tenant_id`,`document`,`version`),
+  UNIQUE KEY `uq_privacy_document_versions_tenant_id` (`tenant_id`,`id`),
   KEY `fk_privacy_versions_published_by` (`published_by`),
   CONSTRAINT `fk_privacy_versions_published_by` FOREIGN KEY (`published_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_privacy_versions_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `privacy_settings`
+--
+
 DROP TABLE IF EXISTS `privacy_settings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -919,6 +1164,11 @@ CREATE TABLE `privacy_settings` (
   CONSTRAINT `fk_privacy_settings_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `property_classified_images`
+--
+
 DROP TABLE IF EXISTS `property_classified_images`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -937,6 +1187,11 @@ CREATE TABLE `property_classified_images` (
   CONSTRAINT `fk_property_classified_images_listing` FOREIGN KEY (`listing_id`) REFERENCES `property_classifieds` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `property_classifieds`
+--
+
 DROP TABLE IF EXISTS `property_classifieds`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -967,11 +1222,17 @@ CREATE TABLE `property_classifieds` (
   KEY `idx_property_classifieds_user_created` (`user_id`,`created_at`),
   KEY `idx_property_classifieds_tenant_status` (`tenant_id`,`status`,`created_at`),
   KEY `fk_property_classifieds_reviewed_by` (`reviewed_by`),
+  KEY `fk_property_classifieds_user_id_tenant` (`tenant_id`,`user_id`),
   CONSTRAINT `fk_property_classifieds_reviewed_by` FOREIGN KEY (`reviewed_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_property_classifieds_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
-  CONSTRAINT `fk_property_classifieds_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_property_classifieds_user_id_tenant` FOREIGN KEY (`tenant_id`, `user_id`) REFERENCES `admin_users` (`tenant_id`, `id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `property_unit_assignments`
+--
+
 DROP TABLE IF EXISTS `property_unit_assignments`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -986,10 +1247,17 @@ CREATE TABLE `property_unit_assignments` (
   PRIMARY KEY (`unit_id`,`user_id`),
   KEY `idx_property_unit_assignments_user` (`user_id`),
   KEY `idx_property_unit_assignments_tenant_unit` (`tenant_id`,`unit_id`),
+  KEY `fk_property_unit_assignments_user_id_tenant` (`tenant_id`,`user_id`),
   CONSTRAINT `fk_property_unit_assignments_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
-  CONSTRAINT `fk_property_unit_assignments_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_property_unit_assignments_user_id_tenant` FOREIGN KEY (`tenant_id`, `user_id`) REFERENCES `admin_users` (`tenant_id`, `id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_unit_assignments_unit` FOREIGN KEY (`tenant_id`, `unit_id`) REFERENCES `property_units` (`tenant_id`, `id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `property_unit_relationship_history`
+--
+
 DROP TABLE IF EXISTS `property_unit_relationship_history`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -1023,15 +1291,43 @@ CREATE TABLE `property_unit_relationship_history` (
   CONSTRAINT `chk_unit_history_dates` CHECK (`ended_on` is null or `ended_on` >= `started_on`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `property_units`
+--
+
+DROP TABLE IF EXISTS `property_units`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `property_units` (
+  `tenant_id` bigint(20) unsigned NOT NULL,
+  `id` char(32) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `sort_order` int(10) unsigned NOT NULL,
+  `category` varchar(80) NOT NULL,
+  `name` varchar(160) NOT NULL,
+  `coefficient` decimal(7,4) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`tenant_id`,`id`),
+  UNIQUE KEY `uq_property_units_name` (`tenant_id`,`name`),
+  KEY `idx_property_units_order` (`tenant_id`,`sort_order`),
+  CONSTRAINT `fk_property_units_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_property_units_id` CHECK (`id` regexp '^[a-f0-9]{32}$'),
+  CONSTRAINT `chk_property_units_coefficient` CHECK (`coefficient` is null or `coefficient` between 0 and 100)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `public_site_content`
+--
+
 DROP TABLE IF EXISTS `public_site_content`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `public_site_content` (
   `tenant_id` bigint(20) unsigned NOT NULL,
-  `published_content` longtext DEFAULT NULL,
   `published_at` datetime DEFAULT NULL,
   `published_by` bigint(20) unsigned DEFAULT NULL,
-  `draft_content` longtext DEFAULT NULL,
   `draft_updated_at` datetime DEFAULT NULL,
   `draft_updated_by` bigint(20) unsigned DEFAULT NULL,
   PRIMARY KEY (`tenant_id`),
@@ -1039,11 +1335,33 @@ CREATE TABLE `public_site_content` (
   KEY `fk_public_site_draft_by` (`draft_updated_by`),
   CONSTRAINT `fk_public_site_draft_by` FOREIGN KEY (`draft_updated_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_public_site_published_by` FOREIGN KEY (`published_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_public_site_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
-  CONSTRAINT `chk_public_site_published_json` CHECK (`published_content` is null or json_valid(`published_content`)),
-  CONSTRAINT `chk_public_site_draft_json` CHECK (`draft_content` is null or json_valid(`draft_content`))
+  CONSTRAINT `fk_public_site_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `public_site_texts`
+--
+
+DROP TABLE IF EXISTS `public_site_texts`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `public_site_texts` (
+  `tenant_id` bigint(20) unsigned NOT NULL,
+  `version` enum('published','draft') NOT NULL,
+  `field_key` varchar(40) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `content` varchar(400) NOT NULL,
+  PRIMARY KEY (`tenant_id`,`version`,`field_key`),
+  CONSTRAINT `fk_public_site_texts_content` FOREIGN KEY (`tenant_id`) REFERENCES `public_site_content` (`tenant_id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_public_site_texts_key` CHECK (`field_key` regexp '^[a-z0-9_]+$'),
+  CONSTRAINT `chk_public_site_texts_content` CHECK (`content` <> '')
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `resident_conversation_messages`
+--
+
 DROP TABLE IF EXISTS `resident_conversation_messages`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -1064,6 +1382,11 @@ CREATE TABLE `resident_conversation_messages` (
   CONSTRAINT `fk_resident_conversation_messages_conversation` FOREIGN KEY (`conversation_id`) REFERENCES `resident_conversations` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `resident_conversations`
+--
+
 DROP TABLE IF EXISTS `resident_conversations`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -1086,10 +1409,15 @@ CREATE TABLE `resident_conversations` (
   KEY `fk_resident_conversations_resident` (`resident_id`),
   KEY `fk_resident_conversations_closed_by` (`closed_by`),
   CONSTRAINT `fk_resident_conversations_closed_by` FOREIGN KEY (`closed_by`) REFERENCES `admin_users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_resident_conversations_resident` FOREIGN KEY (`resident_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_resident_conversations_resident_id_tenant` FOREIGN KEY (`tenant_id`, `resident_id`) REFERENCES `admin_users` (`tenant_id`, `id`) ON DELETE CASCADE,
   CONSTRAINT `fk_resident_conversations_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `resident_profiles`
+--
+
 DROP TABLE IF EXISTS `resident_profiles`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -1108,11 +1436,18 @@ CREATE TABLE `resident_profiles` (
   UNIQUE KEY `uq_resident_profiles_document` (`tenant_id`,`document_type`,`document_number`),
   KEY `idx_resident_profiles_tenant_name` (`tenant_id`,`full_name`),
   KEY `idx_resident_profiles_type` (`resident_type_id`),
+  KEY `fk_resident_profiles_resident_type_id_tenant` (`tenant_id`,`resident_type_id`),
+  KEY `fk_resident_profiles_user_id_tenant` (`tenant_id`,`user_id`),
+  CONSTRAINT `fk_resident_profiles_resident_type_id_tenant` FOREIGN KEY (`tenant_id`, `resident_type_id`) REFERENCES `resident_types` (`tenant_id`, `id`),
   CONSTRAINT `fk_resident_profiles_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
-  CONSTRAINT `fk_resident_profiles_type` FOREIGN KEY (`resident_type_id`) REFERENCES `resident_types` (`id`),
-  CONSTRAINT `fk_resident_profiles_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_resident_profiles_user_id_tenant` FOREIGN KEY (`tenant_id`, `user_id`) REFERENCES `admin_users` (`tenant_id`, `id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `resident_types`
+--
+
 DROP TABLE IF EXISTS `resident_types`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -1127,9 +1462,15 @@ CREATE TABLE `resident_types` (
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_resident_types_name` (`tenant_id`,`name`),
+  UNIQUE KEY `uq_resident_types_tenant_id` (`tenant_id`,`id`),
   CONSTRAINT `fk_resident_types_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `tenant_modules`
+--
+
 DROP TABLE IF EXISTS `tenant_modules`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -1142,6 +1483,11 @@ CREATE TABLE `tenant_modules` (
   CONSTRAINT `fk_tenant_modules_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `tenants`
+--
+
 DROP TABLE IF EXISTS `tenants`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -1156,6 +1502,11 @@ CREATE TABLE `tenants` (
   UNIQUE KEY `uq_tenants_slug` (`slug`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `user_notices`
+--
+
 DROP TABLE IF EXISTS `user_notices`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -1173,9 +1524,14 @@ CREATE TABLE `user_notices` (
   KEY `idx_user_notices_tenant_user_read` (`tenant_id`,`user_id`,`read_at`,`created_at`),
   KEY `fk_user_notices_user` (`user_id`),
   CONSTRAINT `fk_user_notices_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_user_notices_user` FOREIGN KEY (`user_id`) REFERENCES `admin_users` (`id`) ON DELETE CASCADE
+  CONSTRAINT `fk_user_notices_user_id_tenant` FOREIGN KEY (`tenant_id`, `user_id`) REFERENCES `admin_users` (`tenant_id`, `id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `wompi_payment_settings`
+--
+
 DROP TABLE IF EXISTS `wompi_payment_settings`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8mb4 */;
@@ -1201,3 +1557,4 @@ CREATE TABLE `wompi_payment_settings` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
+-- Dump completed

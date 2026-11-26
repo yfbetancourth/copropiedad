@@ -584,3 +584,30 @@ invocación, `app.js` los emula; sin anchor positioning, ubica los menús por sc
   inactividad con que la aplicación cierra la sesión.
 - Un token CSRF inválido responde 403 con una página que explica qué pasó (419 no es estándar y Apache lo devolvía
   como 500).
+
+## Normalización de la base de datos (migraciones 043 a 048)
+
+Toda la información vive en tablas y columnas: no se guarda JSON ni listas separadas por comas.
+
+| Migración | Cambio |
+|---|---|
+| 043 | Inmuebles en `property_units` (antes JSON en `copropiedad_composition.units`). Llave `(tenant_id, id)` y llaves foráneas compuestas `RESTRICT` desde notas, cargos, paz y salvo, referencias de pago y vínculos. `unit_id` en `ascii_bin` en todas las tablas. |
+| 044 | Respuestas del asistente de conformación en columnas (`houses`, `towers`, … `storage_units`, NULL = sin responder). Se elimina `copropiedad_composition.housing_type`: el tipo vive solo en `copropiedad_settings`. |
+| 045 | Textos del sitio público en `public_site_texts` (una fila por texto cambiado, versión publicada o borrador). `public_site_content` queda con los metadatos; hay borrador cuando `draft_updated_at` no es NULL. |
+| 046 | Métodos de pago de Bold en `bold_payment_methods` (antes lista separada por comas). |
+| 047 | Llaves foráneas faltantes: `billing_statement_recipients.sent_by` y las propuestas de conciliación bancaria. |
+| 048 | 34 llaves foráneas compuestas `(tenant_id, columna) → padre (tenant_id, id)`: la base garantiza que cada registro y su padre sean del mismo conjunto. Quedan simples, a propósito, las de actor (`*_by`, `sender_id`: también las llena el Superadmin) y las `ON DELETE SET NULL`. |
+
+Desnormalizaciones intencionales que se conservan: las notas de cobro guardan una copia de los datos del conjunto, del
+inmueble y de los saldos (son documentos emitidos que no deben cambiar), el historial de vínculos guarda `unit_name` y
+`user_name`, y las tablas hijas repiten `tenant_id` para aislar cada conjunto.
+
+Las migraciones son idempotentes. Aplicar en orden, con respaldo previo:
+
+```powershell
+043..048 | ForEach-Object { Get-Content (Get-Item ".\database\migrations\0$($_)_*.sql") | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad }
+```
+
+**Modo SQL estricto.** `App\Core\Database` fija `STRICT_ALL_TABLES` (y `ERROR_FOR_DIVISION_BY_ZERO`, `NO_ZERO_DATE`…) en
+cada conexión: un valor que no cabe es un error y no se guarda recortado o vacío. XAMPP arranca MariaDB sin modo
+estricto; MariaDB de producción lo trae por defecto.
