@@ -6,11 +6,13 @@ namespace App\Modules\Configuration;
 
 use App\Core\Database;
 use App\Core\Tenant;
+use PDO;
 use PDOException;
 use RuntimeException;
 
 /**
- * Textos del sitio público de cada conjunto, con borrador y publicación (migración 035).
+ * Textos del sitio público de cada conjunto, con borrador y publicación (migraciones 035 y 045: una fila por texto
+ * cambiado en public_site_texts; los metadatos de publicación en public_site_content).
  *
  * Solo se guardan los textos que el conjunto cambió; un campo vacío vuelve al texto por defecto. En los textos,
  * {nombre} se reemplaza por el nombre del conjunto. Los textos se muestran siempre escapados: no admiten HTML.
@@ -195,12 +197,19 @@ final class PublicSiteService
         }
 
         $this->requireTable();
-        Database::connection()->prepare(
-            'INSERT INTO public_site_content (tenant_id, draft_content, draft_updated_at, draft_updated_by)
-             VALUES (?, ?, NOW(), ?)
-             ON DUPLICATE KEY UPDATE draft_content = VALUES(draft_content),
-                draft_updated_at = VALUES(draft_updated_at), draft_updated_by = VALUES(draft_updated_by)'
-        )->execute([Tenant::id(), self::encode($overrides), $actorId]);
+        $tenantId = Tenant::id();
+        $this->transaction(function (PDO $pdo) use ($tenantId, $overrides, $actorId): void {
+            $pdo->prepare(
+                'INSERT INTO public_site_content (tenant_id, draft_updated_at, draft_updated_by)
+                 VALUES (?, NOW(), ?)
+                 ON DUPLICATE KEY UPDATE draft_updated_at = VALUES(draft_updated_at), draft_updated_by = VALUES(draft_updated_by)'
+            )->execute([$tenantId, $actorId]);
+            $pdo->prepare("DELETE FROM public_site_texts WHERE tenant_id = ? AND version = 'draft'")->execute([$tenantId]);
+            $insert = $pdo->prepare("INSERT INTO public_site_texts (tenant_id, version, field_key, content) VALUES (?, 'draft', ?, ?)");
+            foreach ($overrides as $key => $value) {
+                $insert->execute([$tenantId, $key, $value]);
+            }
+        });
 
         return [];
     }
@@ -209,27 +218,65 @@ final class PublicSiteService
     public function publish(int $actorId): bool
     {
         $this->requireTable();
-        $statement = Database::connection()->prepare(
-            'UPDATE public_site_content
-                SET published_content = draft_content, published_at = NOW(), published_by = ?,
-                    draft_content = NULL, draft_updated_at = NULL, draft_updated_by = NULL
-              WHERE tenant_id = ? AND draft_content IS NOT NULL'
-        );
-        $statement->execute([$actorId, Tenant::id()]);
+        $tenantId = Tenant::id();
 
-        return $statement->rowCount() > 0;
+        return $this->transaction(function (PDO $pdo) use ($tenantId, $actorId): bool {
+            $draft = $pdo->prepare(
+                'SELECT 1 FROM public_site_content WHERE tenant_id = ? AND draft_updated_at IS NOT NULL FOR UPDATE'
+            );
+            $draft->execute([$tenantId]);
+            if ($draft->fetchColumn() === false) {
+                return false;
+            }
+            $pdo->prepare("DELETE FROM public_site_texts WHERE tenant_id = ? AND version = 'published'")->execute([$tenantId]);
+            $pdo->prepare("UPDATE public_site_texts SET version = 'published' WHERE tenant_id = ? AND version = 'draft'")->execute([$tenantId]);
+            $pdo->prepare(
+                'UPDATE public_site_content
+                    SET published_at = NOW(), published_by = ?, draft_updated_at = NULL, draft_updated_by = NULL
+                  WHERE tenant_id = ?'
+            )->execute([$actorId, $tenantId]);
+
+            return true;
+        });
     }
 
     public function discardDraft(): bool
     {
         $this->requireTable();
-        $statement = Database::connection()->prepare(
-            'UPDATE public_site_content SET draft_content = NULL, draft_updated_at = NULL, draft_updated_by = NULL
-              WHERE tenant_id = ? AND draft_content IS NOT NULL'
-        );
-        $statement->execute([Tenant::id()]);
+        $tenantId = Tenant::id();
 
-        return $statement->rowCount() > 0;
+        return $this->transaction(function (PDO $pdo) use ($tenantId): bool {
+            $pdo->prepare("DELETE FROM public_site_texts WHERE tenant_id = ? AND version = 'draft'")->execute([$tenantId]);
+            $statement = $pdo->prepare(
+                'UPDATE public_site_content SET draft_updated_at = NULL, draft_updated_by = NULL
+                  WHERE tenant_id = ? AND draft_updated_at IS NOT NULL'
+            );
+            $statement->execute([$tenantId]);
+
+            return $statement->rowCount() > 0;
+        });
+    }
+
+    /**
+     * @template T
+     * @param callable(PDO): T $work
+     * @return T
+     */
+    private function transaction(callable $work): mixed
+    {
+        $pdo = Database::connection();
+        $pdo->beginTransaction();
+        try {
+            $result = $work($pdo);
+            $pdo->commit();
+
+            return $result;
+        } catch (\Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $exception;
+        }
     }
 
     /** Reemplaza {nombre}. El resultado se debe escapar al mostrarlo. */
@@ -273,30 +320,6 @@ final class PublicSiteService
         return trim($value);
     }
 
-    private static function encode(array $overrides): string
-    {
-        return json_encode($overrides, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
-    }
-
-    /** @return array<string, string> */
-    private static function decode(mixed $json): array
-    {
-        if (!is_string($json) || $json === '') {
-            return [];
-        }
-        $data = json_decode($json, true);
-        if (!is_array($data)) {
-            return [];
-        }
-        $fields = self::fields();
-
-        return array_filter(
-            $data,
-            static fn (mixed $value, mixed $key): bool => is_string($key) && isset($fields[$key]) && is_string($value) && $value !== '',
-            ARRAY_FILTER_USE_BOTH
-        );
-    }
-
     /**
      * @return array{available: bool, published: array<string, string>, draft: ?array<string, string>,
      *               draft_updated_at: ?string, published_at: ?string}
@@ -304,27 +327,42 @@ final class PublicSiteService
     private function row(): array
     {
         $empty = ['available' => true, 'published' => [], 'draft' => null, 'draft_updated_at' => null, 'published_at' => null];
+        $pdo = Database::connection();
         try {
-            $statement = Database::connection()->prepare(
-                'SELECT published_content, published_at, draft_content, draft_updated_at FROM public_site_content WHERE tenant_id = ?'
-            );
+            $statement = $pdo->prepare('SELECT published_at, draft_updated_at FROM public_site_content WHERE tenant_id = ?');
             $statement->execute([Tenant::id()]);
+            $row = $statement->fetch();
+            $texts = $pdo->prepare('SELECT version, field_key, content FROM public_site_texts WHERE tenant_id = ?');
+            $texts->execute([Tenant::id()]);
         } catch (PDOException $exception) {
-            // Sin la migración 035 el sitio público sigue funcionando con los textos por defecto.
+            // Sin las migraciones 035/045 el sitio público sigue funcionando con los textos por defecto.
             if ($exception->getCode() === '42S02') {
                 return ['available' => false] + $empty;
             }
             throw $exception;
         }
-        $row = $statement->fetch();
         if (!is_array($row)) {
             return $empty;
         }
 
+        // Solo campos que siguen existiendo en SECTIONS: un campo retirado del código deja de mostrarse.
+        $fields = self::fields();
+        $byVersion = ['published' => [], 'draft' => []];
+        foreach ($texts->fetchAll() as $text) {
+            if (isset($fields[$text['field_key']])) {
+                $byVersion[$text['version']][$text['field_key']] = (string) $text['content'];
+            }
+        }
+        // En el orden de las secciones del formulario.
+        foreach ($byVersion as &$overrides) {
+            $overrides = array_intersect_key(array_replace(array_fill_keys(array_keys($fields), null), $overrides), $overrides);
+        }
+        unset($overrides);
+
         return [
             'available' => true,
-            'published' => self::decode($row['published_content']),
-            'draft' => $row['draft_content'] !== null ? self::decode($row['draft_content']) : null,
+            'published' => $byVersion['published'],
+            'draft' => $row['draft_updated_at'] !== null ? $byVersion['draft'] : null,
             'draft_updated_at' => $row['draft_updated_at'],
             'published_at' => $row['published_at'],
         ];
@@ -333,7 +371,7 @@ final class PublicSiteService
     private function requireTable(): void
     {
         if (!$this->row()['available']) {
-            throw new RuntimeException('Falta aplicar la migración 035 (sitio público). Pídele al administrador técnico que la aplique.');
+            throw new RuntimeException('Falta aplicar las migraciones 035 y 045 (sitio público). Pídele al administrador técnico que las aplique.');
         }
     }
 }

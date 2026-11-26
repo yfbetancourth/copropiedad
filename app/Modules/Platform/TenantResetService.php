@@ -108,7 +108,7 @@ final class TenantResetService
             'label' => 'Sitio público',
             'detail' => 'Imágenes de la galería y textos personalizados (publicados y borrador) de la página pública.',
             'requires' => [],
-            'counts' => [':gallery' => 'imágenes', 'public_site_content' => 'textos'],
+            'counts' => [':gallery' => 'imágenes', 'public_site_texts' => 'textos'],
         ],
         'residents' => [
             'label' => 'Cuentas de residentes',
