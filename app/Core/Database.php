@@ -9,6 +9,13 @@ use RuntimeException;
 
 final class Database
 {
+    /**
+     * Modo SQL estricto en cada conexión: un valor que no cabe (texto largo, ENUM desconocido, fecha inválida) es un
+     * error y no se guarda recortado o vacío con solo una advertencia. No depende de la configuración del servidor
+     * (XAMPP lo trae sin STRICT_*; MariaDB de producción sí lo trae por defecto).
+     */
+    public const SQL_MODE = 'STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_IN_DATE,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION';
+
     private static ?PDO $connection = null;
 
     public static function connection(): PDO
@@ -47,6 +54,7 @@ final class Database
             PDO::ATTR_EMULATE_PREPARES => false,
             PDO::ATTR_STRINGIFY_FETCHES => false,
             PDO::ATTR_PERSISTENT => false,
+            \Pdo\Mysql::ATTR_INIT_COMMAND => "SET SESSION sql_mode = '" . self::SQL_MODE . "'",
         ];
 
         if (!$isLocalHost && $sslCa === '') {
