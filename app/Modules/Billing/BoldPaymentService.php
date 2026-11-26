@@ -27,8 +27,9 @@ final class BoldPaymentService
 
     public function settings(): array
     {
-        $settingsQuery = Database::connection()->prepare(
-            'SELECT environment, api_key_ciphertext, payment_methods
+        $pdo = Database::connection();
+        $settingsQuery = $pdo->prepare(
+            'SELECT environment, api_key_ciphertext
              FROM bold_payment_settings WHERE tenant_id = ?'
         );
         $settingsQuery->execute([Tenant::id()]);
@@ -42,8 +43,11 @@ final class BoldPaymentService
             ];
         }
 
+        // Orden del ENUM = orden de PAYMENT_METHODS.
+        $methodsQuery = $pdo->prepare('SELECT method_code FROM bold_payment_methods WHERE tenant_id = ? ORDER BY method_code');
+        $methodsQuery->execute([Tenant::id()]);
         $methods = array_values(array_filter(
-            explode(',', (string) $row['payment_methods']),
+            array_map('strval', $methodsQuery->fetchAll(\PDO::FETCH_COLUMN)),
             static fn (string $method): bool => isset(self::PAYMENT_METHODS[$method])
         ));
 
@@ -146,18 +150,41 @@ final class BoldPaymentService
             throw new RuntimeException('Bold no tiene habilitado ninguno de los métodos seleccionados.');
         }
 
-        $ciphertext = SecretBox::encrypt($apiKey, self::SECRET_CONTEXT);
-        $methods = implode(',', array_keys($selectedMethods));
-        Database::connection()->prepare(
-            'INSERT INTO bold_payment_settings (tenant_id, environment, api_key_ciphertext, payment_methods)
-             VALUES (?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE
-                environment = VALUES(environment),
-                api_key_ciphertext = VALUES(api_key_ciphertext),
-                payment_methods = VALUES(payment_methods)'
-        )->execute([Tenant::id(), $environment, $ciphertext, $methods]);
+        $this->storeSettings($environment, SecretBox::encrypt($apiKey, self::SECRET_CONTEXT), array_keys($selectedMethods));
 
         return $unavailableMethods;
+    }
+
+    /**
+     * Guarda ambiente, llave cifrada y métodos (una fila por método) en una sola transacción.
+     *
+     * @param list<string> $methods códigos ya validados contra PAYMENT_METHODS
+     */
+    private function storeSettings(string $environment, string $ciphertext, array $methods): void
+    {
+        $tenantId = Tenant::id();
+        $pdo = Database::connection();
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare(
+                'INSERT INTO bold_payment_settings (tenant_id, environment, api_key_ciphertext)
+                 VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                    environment = VALUES(environment),
+                    api_key_ciphertext = VALUES(api_key_ciphertext)'
+            )->execute([$tenantId, $environment, $ciphertext]);
+            $pdo->prepare('DELETE FROM bold_payment_methods WHERE tenant_id = ?')->execute([$tenantId]);
+            $insert = $pdo->prepare('INSERT INTO bold_payment_methods (tenant_id, method_code) VALUES (?, ?)');
+            foreach ($methods as $method) {
+                $insert->execute([$tenantId, $method]);
+            }
+            $pdo->commit();
+        } catch (Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $exception;
+        }
     }
 
     public function payableStatements(int $userId): array

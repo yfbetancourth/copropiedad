@@ -126,11 +126,11 @@ final class BoldTerminalService
         $pdo = Database::connection();
         $pdo->prepare(
             'INSERT INTO bold_payment_settings
-                (tenant_id, environment, api_key_ciphertext, payment_methods, api_integrations_key_ciphertext,
+                (tenant_id, environment, api_key_ciphertext, api_integrations_key_ciphertext,
                  api_integrations_webhook_secret_ciphertext, api_integrations_terminal_model,
                  api_integrations_terminal_serial, api_integrations_terminal_name, api_integrations_payment_method,
                  api_integrations_environment)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 api_integrations_key_ciphertext = VALUES(api_integrations_key_ciphertext),
                 api_integrations_webhook_secret_ciphertext = VALUES(api_integrations_webhook_secret_ciphertext),
@@ -140,7 +140,7 @@ final class BoldTerminalService
                 api_integrations_payment_method = VALUES(api_integrations_payment_method),
                 api_integrations_environment = VALUES(api_integrations_environment)'
         )->execute([
-            Tenant::id(), $environment, $this->credential('api_key_ciphertext'), '', SecretBox::encrypt($apiKey, BoldPaymentService::SECRET_CONTEXT),
+            Tenant::id(), $environment, $this->credential('api_key_ciphertext'), SecretBox::encrypt($apiKey, BoldPaymentService::SECRET_CONTEXT),
             $webhookSecret === '' ? '' : SecretBox::encrypt($webhookSecret, BoldPaymentService::SECRET_CONTEXT), $terminalModel, $terminalSerial,
             (string) ($terminal['name'] ?? ''), $method, $environment,
         ]);
