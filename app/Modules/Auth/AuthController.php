@@ -161,12 +161,10 @@ final class AuthController
     {
         $user = Authorization::requireResident();
 
-        $compositionService = new \App\Modules\Configuration\CompositionService();
-        $composition = $compositionService->current();
+        $composition = (new \App\Modules\Configuration\CompositionService())->current();
         $unitsById = [];
         if (is_array($composition) && $composition['completed'] && is_array($composition['units'])) {
-            $composition = $compositionService->ensureUnitIds();
-            foreach ($composition['units'] ?? [] as $unit) {
+            foreach ($composition['units'] as $unit) {
                 if (is_array($unit) && is_string($unit['id'] ?? null)) {
                     $unitsById[$unit['id']] = $unit;
                 }

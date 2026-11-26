@@ -1044,7 +1044,7 @@ final class ConfigurationController
         if ($resetsStructure && $compositionService->unitIdsWithBillingHistory() !== []) {
             Http::flash(self::FLASH, 
                 'error',
-                'No se puede cambiar la caracterización: ya hay notas de cobro emitidas para los inmuebles actuales y su historial de cartera quedaría desconectado. Corrige nombres o coeficientes desde Conformación de la copropiedad.'
+                'No se puede cambiar la caracterización: los inmuebles actuales ya tienen cartera (notas de cobro, cargos o referencias de pago) y su historial de cartera quedaría desconectado. Corrige nombres o coeficientes desde Conformación de la copropiedad.'
             );
             Http::redirect('/configuracion/caracterizacion');
         }
@@ -1107,9 +1107,6 @@ final class ConfigurationController
 
         $compositionService = new CompositionService();
         $composition = $compositionService->current();
-        if (is_array($composition) && is_array($composition['units'])) {
-            $composition = $compositionService->ensureUnitIds();
-        }
         if (!is_array($composition) || $composition['housing_type'] !== $housingType) {
             $composition = null;
         }
@@ -1235,7 +1232,7 @@ final class ConfigurationController
                 Http::redirect('/configuracion/conformacion');
             }
             if ((new CompositionService())->unitIdsWithBillingHistory() !== []) {
-                Http::flash(self::FLASH, 'error', 'No se puede regenerar la estructura: ya hay notas de cobro emitidas para estos inmuebles. Agrega o corrige inmuebles directamente en la lista.');
+                Http::flash(self::FLASH, 'error', 'No se puede regenerar la estructura: estos inmuebles ya tienen cartera (notas de cobro, cargos o referencias de pago). Agrega o corrige inmuebles directamente en la lista.');
                 Http::redirect('/configuracion/conformacion');
             }
             if (!$this->confirmedReset($_POST['confirm_text'] ?? null)) {
@@ -1273,7 +1270,7 @@ final class ConfigurationController
             Http::redirect('/configuracion/conformacion');
         }
         if ($compositionService->unitIdsWithBillingHistory() !== []) {
-            Http::flash(self::FLASH, 'error', 'No se puede reiniciar: ya hay notas de cobro emitidas para estos inmuebles y su cartera quedaría desconectada. Corrige o agrega inmuebles directamente en la lista.');
+            Http::flash(self::FLASH, 'error', 'No se puede reiniciar: estos inmuebles ya tienen cartera (notas de cobro, cargos o referencias de pago) y quedaría desconectada. Corrige o agrega inmuebles directamente en la lista.');
             Http::redirect('/configuracion/conformacion');
         }
         if (!$this->confirmedReset($_POST['confirm_text'] ?? null)) {
@@ -1378,11 +1375,6 @@ final class ConfigurationController
             Http::flash(self::FLASH, 'error', 'Genera la estructura antes de guardarla.');
             Http::redirect('/configuracion/conformacion');
         }
-        $composition = $compositionService->ensureUnitIds();
-        if (!is_array($composition) || !is_array($composition['units'])) {
-            Http::flash(self::FLASH, 'error', 'No se pudo cargar la estructura actual. Recarga la pagina e intenta nuevamente.');
-            Http::redirect('/configuracion/conformacion');
-        }
 
         $submittedJson = $_POST['units_json'] ?? null;
         if (!is_string($submittedJson)) {
@@ -1455,10 +1447,10 @@ final class ConfigurationController
             $units[] = ['id' => $id, 'category' => $category, 'name' => $name, 'coefficient' => $coefficient === false ? '' : $coefficient];
         }
 
-        // Inmuebles con notas de cobro no se pueden quitar: su cartera quedaría sin inmueble.
+        // Inmuebles con cartera no se pueden quitar: sus notas, cargos o referencia de pago quedarían sin inmueble.
         foreach (array_diff_key($billingIds, $submittedIds) as $removedId => $_) {
             if (isset($existingIds[$removedId])) {
-                $errors[] = '«' . ($existingNames[$removedId] ?? 'Un inmueble') . '» tiene notas de cobro y no se puede quitar.';
+                $errors[] = '«' . ($existingNames[$removedId] ?? 'Un inmueble') . '» tiene cartera (notas de cobro, cargos o referencia de pago) y no se puede quitar.';
             }
         }
 
@@ -1480,7 +1472,15 @@ final class ConfigurationController
             Http::redirect('/configuracion/conformacion');
         }
 
-        $compositionService->saveUnits($units, true);
+        try {
+            $compositionService->saveUnits($units, true);
+        } catch (RuntimeException $exception) {
+            // Lo que la base rechaza y la validación anterior no detecta (p. ej. nombres que solo difieren en tildes).
+            Session::start();
+            $_SESSION['composition_draft'] = $submittedJson;
+            Http::flash(self::FLASH, 'error', 'No se guardó la estructura. Tus cambios siguen en pantalla; corrige: ' . $exception->getMessage());
+            Http::redirect('/configuracion/conformacion');
+        }
         Http::flash(self::FLASH, 'success', 'La estructura de ' . count($units) . ' inmuebles se guardó correctamente. Siguiente paso: asigna los inmuebles a sus usuarios.');
         Http::redirect('/configuracion/conformacion');
     }

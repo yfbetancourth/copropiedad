@@ -1363,7 +1363,6 @@ final class BillingService
         if (!is_array($composition) || !$composition['completed'] || !is_array($composition['units'])) {
             throw new RuntimeException('Finaliza primero la estructura de inmuebles en Configuración / Conformación.');
         }
-        $composition = (new CompositionService())->ensureUnitIds();
         $unitMap = [];
         foreach ($composition['units'] as $unit) {
             if (is_array($unit) && is_string($unit['id'] ?? null)) {

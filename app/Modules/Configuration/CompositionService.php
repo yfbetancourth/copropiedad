@@ -13,12 +13,16 @@ use RuntimeException;
 final class CompositionService
 {
     /**
-     * @return array{housing_type: string, answers: array<string, int>, units: ?array, completed: bool}|null
+     * Estructura del conjunto. units es null mientras el asistente no haya generado inmuebles; cada inmueble trae
+     * su coeficiente como texto con 4 decimales ('' si falta), igual que lo escribe el formulario.
+     *
+     * @return array{housing_type: string, answers: array<string, int>, units: ?list<array{id: string, category: string, name: string, coefficient: string}>, completed: bool}|null
      */
     public function current(): ?array
     {
-        $statement = Database::connection()->prepare(
-            'SELECT housing_type, answers, units, completed
+        $pdo = Database::connection();
+        $statement = $pdo->prepare(
+            'SELECT housing_type, answers, completed
              FROM copropiedad_composition
              WHERE tenant_id = ?'
         );
@@ -30,22 +34,57 @@ final class CompositionService
 
         try {
             $answers = json_decode((string) $row['answers'], true, 512, JSON_THROW_ON_ERROR);
-            $units = $row['units'] === null
-                ? null
-                : json_decode((string) $row['units'], true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new RuntimeException('No se pudo leer la estructura guardada de la copropiedad.', 0, $exception);
         }
-        if (!is_array($answers) || ($units !== null && !is_array($units))) {
+        if (!is_array($answers)) {
             throw new RuntimeException('La estructura guardada de la copropiedad tiene un formato invalido.');
+        }
+
+        $units = [];
+        foreach ($this->storedUnits() as $unit) {
+            $units[] = [
+                'id' => $unit['id'],
+                'category' => $unit['category'],
+                'name' => $unit['name'],
+                'coefficient' => $unit['coefficient'],
+            ];
         }
 
         return [
             'housing_type' => (string) $row['housing_type'],
             'answers' => $answers,
-            'units' => $units,
+            'units' => $units === [] ? null : $units,
             'completed' => (bool) $row['completed'],
         ];
+    }
+
+    /**
+     * Inmuebles guardados del conjunto en su orden de presentación, indexados por identificador.
+     *
+     * @return array<string, array{id: string, category: string, name: string, coefficient: string, sort_order: int}>
+     */
+    private function storedUnits(): array
+    {
+        $statement = Database::connection()->prepare(
+            'SELECT id, category, name, coefficient, sort_order
+             FROM property_units
+             WHERE tenant_id = ?
+             ORDER BY sort_order, id'
+        );
+        $statement->execute([Tenant::id()]);
+        $units = [];
+        foreach ($statement->fetchAll() as $row) {
+            $units[(string) $row['id']] = [
+                'id' => (string) $row['id'],
+                'category' => (string) $row['category'],
+                'name' => (string) $row['name'],
+                'coefficient' => $row['coefficient'] === null ? '' : (string) $row['coefficient'],
+                'sort_order' => (int) $row['sort_order'],
+            ];
+        }
+
+        return $units;
     }
 
     /**
@@ -58,16 +97,16 @@ final class CompositionService
         $pdo->beginTransaction();
         try {
             $pdo->prepare(
-                'INSERT INTO copropiedad_composition (tenant_id, housing_type, answers, units, completed)
-                 VALUES (?, ?, ?, NULL, 0)
+                'INSERT INTO copropiedad_composition (tenant_id, housing_type, answers, completed)
+                 VALUES (?, ?, ?, 0)
                  ON DUPLICATE KEY UPDATE
                     housing_type = VALUES(housing_type),
                     answers = VALUES(answers),
-                    units = NULL,
                     completed = 0'
             )->execute([Tenant::id(), $housingType, $encoded]);
             $pdo->prepare('DELETE FROM property_unit_assignments WHERE tenant_id = ?')->execute([Tenant::id()]);
             RelationshipHistory::closeAll($pdo, 'reinicio_conformacion', self::actorId());
+            $pdo->prepare('DELETE FROM property_units WHERE tenant_id = ?')->execute([Tenant::id()]);
             $pdo->commit();
         } catch (\Throwable $exception) {
             if ($pdo->inTransaction()) {
@@ -83,93 +122,107 @@ final class CompositionService
     public function saveUnits(array $units, bool $completed): void
     {
         $normalized = [];
-        $ids = [];
-        foreach ($units as $unit) {
+        foreach (array_values($units) as $position => $unit) {
             $id = $unit['id'] ?? '';
             if ($id === '') {
                 $id = bin2hex(random_bytes(16));
             }
-            if (!is_string($id) || preg_match('/^[a-f0-9]{32}$/D', $id) !== 1 || isset($ids[$id])) {
+            if (!is_string($id) || preg_match('/^[a-f0-9]{32}$/D', $id) !== 1 || isset($normalized[$id])) {
                 throw new RuntimeException('Los identificadores de los inmuebles no son validos.');
             }
-            $ids[$id] = true;
-            $normalized[] = [
+            $coefficient = (string) ($unit['coefficient'] ?? '');
+            if ($coefficient !== '' && preg_match('/^\d{1,3}(?:\.\d{1,4})?$/D', $coefficient) !== 1) {
+                throw new RuntimeException('El coeficiente de «' . $unit['name'] . '» no es valido.');
+            }
+            $normalized[$id] = [
                 'id' => $id,
-                'category' => $unit['category'],
-                'name' => $unit['name'],
-                'coefficient' => $unit['coefficient'] ?? '',
+                'category' => (string) $unit['category'],
+                'name' => (string) $unit['name'],
+                'coefficient' => $coefficient,
+                'sort_order' => $position + 1,
             ];
         }
 
-        $encoded = json_encode($normalized, JSON_THROW_ON_ERROR);
+        $tenantId = Tenant::id();
         $pdo = Database::connection();
-        $current = $this->current();
-        $previousIds = [];
-        foreach ($current['units'] ?? [] as $unit) {
-            if (is_array($unit) && is_string($unit['id'] ?? null)) {
-                $previousIds[$unit['id']] = true;
-            }
-        }
-
         $pdo->beginTransaction();
         try {
-            $pdo->prepare(
-                'UPDATE copropiedad_composition
-                 SET units = ?, completed = ?
-                 WHERE tenant_id = ?'
-            )->execute([$encoded, $completed ? 1 : 0, Tenant::id()]);
+            // Serializa los guardados simultáneos de la estructura del mismo conjunto.
+            $pdo->prepare('SELECT tenant_id FROM copropiedad_composition WHERE tenant_id = ? FOR UPDATE')->execute([$tenantId]);
+            $stored = $this->storedUnits();
 
-            $removeAssignment = $pdo->prepare(
-                'DELETE FROM property_unit_assignments WHERE tenant_id = ? AND unit_id = ?'
-            );
-            foreach (array_diff_key($previousIds, $ids) as $removedId => $_) {
-                $removeAssignment->execute([Tenant::id(), $removedId]);
-                RelationshipHistory::close($pdo, (string) $removedId, null, date('Y-m-d'), 'inmueble_eliminado', self::actorId());
+            $removed = array_keys(array_diff_key($stored, $normalized));
+            $removeAssignment = $pdo->prepare('DELETE FROM property_unit_assignments WHERE tenant_id = ? AND unit_id = ?');
+            foreach ($removed as $removedId) {
+                $removeAssignment->execute([$tenantId, $removedId]);
+                RelationshipHistory::close($pdo, $removedId, null, date('Y-m-d'), 'inmueble_eliminado', self::actorId());
             }
+            // La llave foránea de la cartera impide quitar un inmueble con notas, cargos o referencia de pago.
+            foreach (array_chunk($removed, 500) as $chunk) {
+                $pdo->prepare('DELETE FROM property_units WHERE tenant_id = ? AND id IN (' . implode(',', array_fill(0, count($chunk), '?')) . ')')
+                    ->execute([$tenantId, ...$chunk]);
+            }
+
+            // Libera primero los nombres que cambian: así un intercambio (A↔B) no choca con la llave única del nombre.
+            $renamed = [];
+            $changed = [];
+            $new = [];
+            foreach ($normalized as $id => $unit) {
+                $before = $stored[$id] ?? null;
+                if ($before === null) {
+                    $new[] = $unit;
+                } elseif (array_diff_assoc($unit, $before) !== []) {
+                    $changed[] = $unit;
+                    if ($before['name'] !== $unit['name']) {
+                        $renamed[] = $id;
+                    }
+                }
+            }
+            foreach (array_chunk($renamed, 500) as $chunk) {
+                $pdo->prepare("UPDATE property_units SET name = CONCAT('~', id) WHERE tenant_id = ? AND id IN (" . implode(',', array_fill(0, count($chunk), '?')) . ')')
+                    ->execute([$tenantId, ...$chunk]);
+            }
+            $update = $pdo->prepare(
+                'UPDATE property_units SET sort_order = ?, category = ?, name = ?, coefficient = ? WHERE tenant_id = ? AND id = ?'
+            );
+            foreach ($changed as $unit) {
+                $update->execute([$unit['sort_order'], $unit['category'], $unit['name'], self::coefficientValue($unit['coefficient']), $tenantId, $unit['id']]);
+            }
+            foreach (array_chunk($new, 500) as $chunk) {
+                $values = [];
+                foreach ($chunk as $unit) {
+                    array_push($values, $tenantId, $unit['id'], $unit['sort_order'], $unit['category'], $unit['name'], self::coefficientValue($unit['coefficient']));
+                }
+                $pdo->prepare(
+                    'INSERT INTO property_units (tenant_id, id, sort_order, category, name, coefficient) VALUES '
+                    . implode(',', array_fill(0, count($chunk), '(?, ?, ?, ?, ?, ?)'))
+                )->execute($values);
+            }
+
+            $pdo->prepare('UPDATE copropiedad_composition SET completed = ? WHERE tenant_id = ?')
+                ->execute([$completed ? 1 : 0, $tenantId]);
             $pdo->commit();
         } catch (\Throwable $exception) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
+            if ($exception instanceof \PDOException) {
+                $driverCode = (int) ($exception->errorInfo[1] ?? 0);
+                if ($driverCode === 1062) {
+                    throw new RuntimeException('Hay dos inmuebles con el mismo nombre (sin distinguir mayúsculas ni tildes).', 0, $exception);
+                }
+                if ($driverCode === 1451) {
+                    throw new RuntimeException('Un inmueble que intentas quitar tiene cartera o referencia de pago y no se puede quitar.', 0, $exception);
+                }
+            }
             throw $exception;
         }
     }
 
-    /**
-     * Add persistent identifiers to legacy property structures when needed.
-     */
-    public function ensureUnitIds(): ?array
+    /** '' (coeficiente pendiente) se guarda como NULL. */
+    private static function coefficientValue(string $coefficient): ?string
     {
-        $composition = $this->current();
-        if (!is_array($composition) || !is_array($composition['units'])) {
-            return $composition;
-        }
-
-        $units = $composition['units'];
-        $used = [];
-        $changed = false;
-        foreach ($units as &$unit) {
-            if (!is_array($unit)) {
-                throw new RuntimeException('La estructura guardada contiene un inmueble invalido.');
-            }
-            $id = $unit['id'] ?? null;
-            if (!is_string($id) || preg_match('/^[a-f0-9]{32}$/D', $id) !== 1 || isset($used[$id])) {
-                do {
-                    $id = bin2hex(random_bytes(16));
-                } while (isset($used[$id]));
-                $unit['id'] = $id;
-                $changed = true;
-            }
-            $used[$id] = true;
-        }
-        unset($unit);
-
-        if ($changed) {
-            $this->saveUnits($units, $composition['completed']);
-            $composition['units'] = $units;
-        }
-
-        return $composition;
+        return $coefficient === '' ? null : $coefficient;
     }
 
     /**
@@ -180,6 +233,7 @@ final class CompositionService
         $pdo = Database::connection();
         $pdo->prepare('DELETE FROM property_unit_assignments WHERE tenant_id = ?')->execute([Tenant::id()]);
         RelationshipHistory::closeAll($pdo, 'reinicio_conformacion', self::actorId());
+        $pdo->prepare('DELETE FROM property_units WHERE tenant_id = ?')->execute([Tenant::id()]);
         $pdo->prepare('DELETE FROM copropiedad_composition WHERE tenant_id = ?')->execute([Tenant::id()]);
     }
 
@@ -194,16 +248,20 @@ final class CompositionService
     }
 
     /**
-     * Inmuebles que ya tienen notas de cobro. Sus identificadores no pueden desaparecer de la estructura:
-     * la cartera y los pagos quedarían huérfanos.
+     * Inmuebles con cartera: notas de cobro, cargos mensuales o referencia de pago. No pueden desaparecer de la
+     * estructura (las llaves foráneas hacia property_units lo impiden); se consulta antes para avisar con claridad.
      *
      * @return array<string, true>
      */
     public function unitIdsWithBillingHistory(): array
     {
         try {
-            $statement = Database::connection()->prepare('SELECT DISTINCT unit_id FROM billing_statements WHERE tenant_id = ?');
-            $statement->execute([Tenant::id()]);
+            $statement = Database::connection()->prepare(
+                'SELECT unit_id FROM billing_statements WHERE tenant_id = ?
+                 UNION SELECT unit_id FROM billing_monthly_items WHERE tenant_id = ?
+                 UNION SELECT unit_id FROM billing_unit_references WHERE tenant_id = ?'
+            );
+            $statement->execute([Tenant::id(), Tenant::id(), Tenant::id()]);
             $ids = $statement->fetchAll(\PDO::FETCH_COLUMN);
         } catch (\PDOException) {
             return []; // El módulo de cartera aún no está migrado.

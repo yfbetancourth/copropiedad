@@ -159,9 +159,11 @@ final class TenantResetService
         ['classifieds', 'property_classifieds', 'DELETE FROM property_classifieds WHERE tenant_id = ?'],
         ['assignments', 'property_unit_relationship_history', 'DELETE FROM property_unit_relationship_history WHERE tenant_id = ?'],
         ['assignments', 'property_unit_assignments', 'DELETE FROM property_unit_assignments WHERE tenant_id = ?'],
-        ['composition', 'copropiedad_composition', 'DELETE FROM copropiedad_composition WHERE tenant_id = ?'],
         // Los inmuebles nuevos reciben referencias nuevas; las anteriores ya no corresponden a ninguno.
+        // Van antes que los inmuebles: su llave foránea apunta a property_units.
         ['composition', 'billing_unit_references', 'DELETE FROM billing_unit_references WHERE tenant_id = ?'],
+        ['composition', 'property_units', 'DELETE FROM property_units WHERE tenant_id = ?'],
+        ['composition', 'copropiedad_composition', 'DELETE FROM copropiedad_composition WHERE tenant_id = ?'],
         ['mail', 'copropiedad_mail_settings', 'DELETE FROM copropiedad_mail_settings WHERE tenant_id = ?'],
         // La cuenta conectada del conjunto; las personales se borran en cascada con su cuenta de usuario.
         ['mail', 'mail_oauth_connections', 'DELETE FROM mail_oauth_connections WHERE tenant_id = ? AND owner_scope = 0'],
@@ -368,9 +370,7 @@ final class TenantResetService
     private function countFor(string $source, int $tenantId, array $tables): ?int
     {
         $sql = match ($source) {
-            ':units' => isset($tables['copropiedad_composition'])
-                ? 'SELECT COALESCE(SUM(JSON_LENGTH(units)), 0) FROM copropiedad_composition WHERE tenant_id = ?'
-                : null,
+            ':units' => isset($tables['property_units']) ? 'SELECT COUNT(*) FROM property_units WHERE tenant_id = ?' : null,
             ':residents' => "SELECT COUNT(*) FROM admin_users AS users JOIN admin_roles AS roles ON roles.id = users.role_id
                              WHERE users.tenant_id = ? AND roles.kind = 'resident'",
             ':staff' => "SELECT COUNT(*) FROM admin_users AS users JOIN admin_roles AS roles ON roles.id = users.role_id

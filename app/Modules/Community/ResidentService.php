@@ -343,8 +343,6 @@ final class ResidentService
         if (($links[$unitId] ?? null) === 'inquilino') {
             return null;
         }
-        (new CompositionService())->ensureUnitIds(); // fuera de la transacción: puede reescribir la estructura
-
         return $unitId;
     }
 

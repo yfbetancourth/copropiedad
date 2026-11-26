@@ -20,8 +20,7 @@ final class PropertyAssignmentService
         $units = [];
         $composition = (new CompositionService())->current();
         if (is_array($composition) && $composition['completed'] && is_array($composition['units'])) {
-            $composition = (new CompositionService())->ensureUnitIds();
-            $units = $composition['units'] ?? [];
+            $units = $composition['units'];
         }
 
         $usersStatement = Database::connection()->prepare(
@@ -129,10 +128,6 @@ final class PropertyAssignmentService
         $composition = (new CompositionService())->current();
         if (!is_array($composition) || !$composition['completed'] || !is_array($composition['units'])) {
             throw new RuntimeException('Primero finaliza la estructura de inmuebles en la seccion de conformacion.');
-        }
-        $composition = (new CompositionService())->ensureUnitIds();
-        if (!is_array($composition) || !is_array($composition['units'])) {
-            throw new RuntimeException('No se pudo leer la estructura de inmuebles actual.');
         }
 
         $unitNames = [];
@@ -299,8 +294,7 @@ final class PropertyAssignmentService
         $units = [];
         $composition = (new CompositionService())->current();
         if (is_array($composition) && is_array($composition['units'])) {
-            $composition = (new CompositionService())->ensureUnitIds();
-            $units = array_values(array_filter($composition['units'] ?? [], 'is_array'));
+            $units = array_values(array_filter($composition['units'], 'is_array'));
         }
 
         $selectedUnit = null;
