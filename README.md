@@ -167,7 +167,7 @@ Get-Content .\database\migrations\023_create_tenants.sql | & C:\xampp84\mysql\bi
 **Cómo se identifica el conjunto.** Por el subdominio, configurado en `.env`:
 
 - `APP_BASE_DOMAIN=midominio.com`: `midominio.com/admin` es la **consola del Superadmin**; `{slug}.midominio.com` es el conjunto (página pública, `/usuario` y `/admin`).
-- `APP_DEFAULT_TENANT=principal`: solo fuera de producción, el conjunto que se abre con un host que no es del dominio base (por ejemplo `http://localhost/Copropiedad/public`).
+- En local (configuración actual): `APP_BASE_DOMAIN=localhost`. La consola del Superadmin queda en `http://localhost/Copropiedad/public/admin` (también `http://localhost/Copropiedad/`) y cada conjunto en su copia propia, `http://localhost/Copropiedad/conjuntos/{slug}/public`. Alternativa sin copias: `APP_BASE_DOMAIN=localtest.me`, que resuelve cualquier subdominio a la máquina (`http://principal.localtest.me/Copropiedad/public/`).
 - En local, `localtest.me` resuelve cualquier subdominio a la máquina: `http://localtest.me/Copropiedad/public/admin` (consola) y `http://principal.localtest.me/Copropiedad/public/` (conjunto), sin tocar el archivo hosts.
 - En producción se necesita un DNS comodín (`*.midominio.com`) y un certificado SSL comodín. Los enlaces de correo, el retorno y el webhook de Bold usan el subdominio de cada conjunto: registra en Bold la URL que muestra *Métodos de pago* de cada conjunto.
 
