@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mapa de navegación de la aplicación</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f8f9fa;
+      --color-paper-2: #e9ecef;
+      --color-ink:     #212529;
+      --color-muted:   #5c636a;
+      --color-rule:    #dee2e6;
+      --color-accent:  #0b69f6;
+      --font-sans:     'Inter', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1240px; width: 100%; min-width: 0; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+    svg { width: 100%; min-width: 1040px; display: block; }
+    .catalog { margin-top: 2.5rem; border-top: 1px solid var(--color-rule); padding-top: 1.5rem; }
+    .catalog h2 { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 1rem; }
+    .catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1.25rem 2rem; }
+    .catalog h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem; }
+    .catalog h3 span { font-family: var(--font-mono); font-weight: 400; color: var(--color-muted); font-size: 0.75rem; }
+    .catalog ul { list-style: none; font-family: var(--font-mono); font-size: 0.72rem; line-height: 1.6; color: var(--color-ink); overflow-wrap: anywhere; }
+    .catalog li.core { color: var(--color-accent); }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Navegabilidad · Copropiedad</p>
+    <h1>Mapa de navegación de la aplicación</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1272 872" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="nav-title nav-desc">
+        <title id="nav-title">Mapa de navegación de la aplicación</title>
+        <desc id="nav-desc">Mapa de navegación de Copropiedad: en el dominio de cada conjunto el visitante llega al sitio público, puede pagar con enlace en la pasarela Bold o Wompi, e inicia sesión; según su rol entra al panel del conjunto con sus nueve secciones o al portal del residente. En el dominio principal el Superadmin inicia sesión y llega a la consola de clientes.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5c636a"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#0b69f6"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1d4e89"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#f8f9fa"/>
+
+        <!-- Zonas -->
+        <rect x="40" y="64" width="1192" height="508" rx="8" fill="rgba(33,37,41,0.02)" stroke="rgba(33,37,41,0.10)" stroke-width="0.8"/>
+        <rect x="52" y="68" width="237" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="170.5" y="77" fill="#5f6b78" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">DOMINIO DEL CONJUNTO · {CONJUNTO}.DOMINIO</text>
+        <rect x="40" y="604" width="1192" height="172" rx="8" fill="rgba(33,37,41,0.02)" stroke="rgba(33,37,41,0.10)" stroke-width="0.8"/>
+        <rect x="52" y="608" width="178" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="141" y="617" fill="#5f6b78" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">DOMINIO PRINCIPAL · SUPERADMIN</text>
+
+        <!-- Flechas (antes que las cajas) -->
+        <path d="M 184,182 H 230" fill="none" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 536,182 H 598" fill="none" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 824,164 H 878" fill="none" stroke="#0b69f6" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+        <path d="M 824,200 H 844 Q 852,200 852,208 V 452 Q 852,460 860,460 H 878" fill="none" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 368,260 V 326" fill="none" stroke="#1d4e89" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <path d="M 400,326 V 262" fill="none" stroke="#1d4e89" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow-link)"/>
+        <path d="M 184,694 H 230" fill="none" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 456,694 H 598" fill="none" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- Etiquetas de flecha -->
+        <rect x="539" y="163" width="56" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="567" y="172" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">INGRESAR</text>
+        <rect x="823" y="145" width="56" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="851" y="154" fill="#0b69f6" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">PERSONAL</text>
+        <rect x="784" y="327" width="62" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="842" y="336" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.08em">RESIDENTE</text>
+        <rect x="330" y="287" width="32" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="358" y="296" fill="#1d4e89" font-size="8" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.08em">PAGA</text>
+        <rect x="406" y="287" width="50" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="410" y="296" fill="#1d4e89" font-size="8" font-family="'Geist Mono', monospace" text-anchor="start" letter-spacing="0.08em">RETORNO</text>
+        <rect x="481.5" y="675" width="91" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="527" y="684" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SIN SUBDOMINIO</text>
+
+        <!-- Visitante -->
+        <rect x="56" y="154" width="128" height="56" rx="6" fill="#f8f9fa"/>
+        <rect x="56" y="154" width="128" height="56" rx="6" fill="rgba(92,99,106,0.10)" stroke="#5f6b78" stroke-width="1"/>
+        <text x="72" y="174" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ENTRADA</text>
+        <text x="72" y="194" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Visitante</text>
+
+        <!-- Sitio público -->
+        <rect x="232" y="104" width="304" height="156" rx="6" fill="#f8f9fa"/>
+        <rect x="232" y="104" width="304" height="156" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <rect x="233" y="105" width="302" height="39" rx="5" fill="rgba(33,37,41,0.04)"/>
+        <line x1="232" y1="144" x2="536" y2="144" stroke="rgba(33,37,41,0.22)" stroke-width="1"/>
+        <text x="248" y="120" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">PÚBLICO · SIN SESIÓN</text>
+        <text x="248" y="136" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Sitio público</text>
+        <text x="248" y="164" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Portada y contacto</text>
+        <text x="520" y="164" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/</text>
+        <text x="248" y="184" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Clasificados</text>
+        <text x="520" y="184" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/clasificados</text>
+        <text x="248" y="204" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Datos, autorización, cookies</text>
+        <text x="520" y="204" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/politica-de-…</text>
+        <text x="248" y="224" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Pagar con enlace del correo</text>
+        <text x="520" y="224" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/pagar</text>
+        <text x="248" y="244" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Verificar paz y salvo</text>
+        <text x="520" y="244" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/verificar-paz-y-salvo</text>
+
+        <!-- Pasarela externa -->
+        <rect x="232" y="328" width="304" height="56" rx="6" fill="#f8f9fa"/>
+        <rect x="232" y="328" width="304" height="56" rx="6" fill="rgba(33,37,41,0.03)" stroke="rgba(33,37,41,0.30)" stroke-width="1"/>
+        <text x="248" y="348" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">EXTERNO</text>
+        <text x="248" y="368" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Pasarela Bold · Wompi</text>
+        <text x="520" y="368" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/pagar/resultado</text>
+
+        <!-- Acceso -->
+        <rect x="600" y="124" width="224" height="116" rx="6" fill="#f8f9fa"/>
+        <rect x="600" y="124" width="224" height="116" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <rect x="601" y="125" width="222" height="39" rx="5" fill="rgba(33,37,41,0.04)"/>
+        <line x1="600" y1="164" x2="824" y2="164" stroke="rgba(33,37,41,0.22)" stroke-width="1"/>
+        <text x="616" y="140" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ACCESO</text>
+        <text x="616" y="156" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Iniciar sesión</text>
+        <text x="616" y="184" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Entrar</text>
+        <text x="808" y="184" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/login</text>
+        <text x="616" y="204" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Recuperar</text>
+        <text x="808" y="204" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/forgot-password</text>
+        <text x="616" y="224" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Restablecer</text>
+        <text x="808" y="224" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/reset-password</text>
+
+        <!-- Panel del conjunto (foco) -->
+        <rect x="880" y="88" width="336" height="236" rx="6" fill="#f8f9fa"/>
+        <rect x="880" y="88" width="336" height="236" rx="6" fill="rgba(11,105,246,0.04)" stroke="#0b69f6" stroke-width="1"/>
+        <rect x="881" y="89" width="334" height="39" rx="5" fill="rgba(11,105,246,0.10)"/>
+        <line x1="880" y1="128" x2="1216" y2="128" stroke="rgba(11,105,246,0.40)" stroke-width="1"/>
+        <text x="896" y="104" fill="#0b69f6" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">PANEL DEL CONJUNTO · SEGÚN PERMISOS DEL ROL</text>
+        <text x="896" y="120" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Administración</text>
+        <text x="896" y="148" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Bienvenida</text>
+        <text x="1200" y="148" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/admin</text>
+        <text x="896" y="168" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Financiero · 7 opciones</text>
+        <text x="1200" y="168" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/cartera/…</text>
+        <text x="896" y="188" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Pagos · métodos de pago</text>
+        <text x="1200" y="188" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/configuracion/…</text>
+        <text x="896" y="208" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Comunidad · 5</text>
+        <text x="1200" y="208" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/comunidad · /zonas-comunes</text>
+        <text x="896" y="228" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Comunicación · 4</text>
+        <text x="1200" y="228" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/comunicacion · /mensajes</text>
+        <text x="896" y="248" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Conformación · 4</text>
+        <text x="1200" y="248" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/configuracion · /inmuebles</text>
+        <text x="896" y="268" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Administración · 4</text>
+        <text x="1200" y="268" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/configuracion/…</text>
+        <text x="896" y="288" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Personalización · 4</text>
+        <text x="1200" y="288" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/configuracion/…</text>
+        <text x="896" y="308" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Mi cuenta · 2</text>
+        <text x="1200" y="308" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/mi-cuenta</text>
+
+        <!-- Portal del residente -->
+        <rect x="880" y="372" width="336" height="156" rx="6" fill="#f8f9fa"/>
+        <rect x="880" y="372" width="336" height="156" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <rect x="881" y="373" width="334" height="39" rx="5" fill="rgba(33,37,41,0.04)"/>
+        <line x1="880" y1="412" x2="1216" y2="412" stroke="rgba(33,37,41,0.22)" stroke-width="1"/>
+        <text x="896" y="388" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">PORTAL DEL RESIDENTE</text>
+        <text x="896" y="404" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Mi conjunto</text>
+        <text x="896" y="432" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Bienvenida e inmuebles</text>
+        <text x="1200" y="432" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/usuario</text>
+        <text x="896" y="452" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Pagar y reportar pagos</text>
+        <text x="1200" y="452" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/usuario/pagos</text>
+        <text x="896" y="472" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Escribir a la administración</text>
+        <text x="1200" y="472" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/usuario/comunicacion</text>
+        <text x="896" y="492" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Comunicados</text>
+        <text x="1200" y="492" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/usuario/mensajes</text>
+        <text x="896" y="512" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Zonas comunes</text>
+        <text x="1200" y="512" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/usuario/zonas-comunes</text>
+
+        <!-- Superadmin -->
+        <rect x="56" y="666" width="128" height="56" rx="6" fill="#f8f9fa"/>
+        <rect x="56" y="666" width="128" height="56" rx="6" fill="rgba(92,99,106,0.10)" stroke="#5f6b78" stroke-width="1"/>
+        <text x="72" y="686" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ENTRADA</text>
+        <text x="72" y="706" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Superadmin</text>
+        <rect x="232" y="666" width="224" height="56" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <text x="248" y="686" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ACCESO</text>
+        <text x="248" y="706" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Iniciar sesión</text>
+        <text x="440" y="706" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/login</text>
+        <rect x="600" y="636" width="224" height="116" rx="6" fill="#f8f9fa"/>
+        <rect x="600" y="636" width="224" height="116" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <rect x="601" y="637" width="222" height="39" rx="5" fill="rgba(33,37,41,0.04)"/>
+        <line x1="600" y1="676" x2="824" y2="676" stroke="rgba(33,37,41,0.22)" stroke-width="1"/>
+        <text x="616" y="652" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">CONSOLA · /admin</text>
+        <text x="616" y="668" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Clientes</text>
+        <text x="616" y="696" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Conjuntos</text>
+        <text x="808" y="696" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/clientes</text>
+        <text x="616" y="716" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Nuevo conjunto</text>
+        <text x="808" y="716" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/clientes/nuevo</text>
+        <text x="616" y="736" fill="#212529" font-size="11" font-family="'Inter', sans-serif">Editar</text>
+        <text x="808" y="736" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">/clientes/editar</text>
+        <text x="880" y="684" fill="#212529" font-size="15" font-style="italic" font-family="'Instrument Serif', serif">Sin subdominio no hay datos</text>
+        <text x="880" y="704" fill="#212529" font-size="15" font-style="italic" font-family="'Instrument Serif', serif">de ningún conjunto: solo existe la</text>
+        <text x="880" y="724" fill="#212529" font-size="15" font-style="italic" font-family="'Instrument Serif', serif">consola para crear y administrar</text>
+        <text x="880" y="744" fill="#212529" font-size="15" font-style="italic" font-family="'Instrument Serif', serif">los conjuntos clientes.</text>
+
+        <!-- Leyenda -->
+        <line x1="40" y1="800" x2="1232" y2="800" stroke="rgba(33,37,41,0.10)" stroke-width="0.8"/>
+        <text x="40" y="818" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEYENDA</text>
+        <rect x="40" y="830" width="20" height="14" rx="3" fill="rgba(11,105,246,0.04)" stroke="#0b69f6"/>
+        <text x="68" y="841" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Área principal de trabajo</text>
+        <rect x="212" y="830" width="20" height="14" rx="3" fill="rgba(92,99,106,0.10)" stroke="#5f6b78"/>
+        <text x="240" y="841" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Quién entra</text>
+        <line x1="336" y1="837" x2="364" y2="837" stroke="#1d4e89" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <text x="372" y="841" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Salida a un servicio externo (punteada: retorno)</text>
+        <text x="640" y="841" fill="#5c636a" font-size="9" font-style="italic" font-family="'Inter', sans-serif">Las opciones del panel se muestran según los permisos del rol; los módulos apagados se ocultan.</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

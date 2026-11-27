@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modelo de datos · entidades centrales</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f8f9fa;
+      --color-paper-2: #e9ecef;
+      --color-ink:     #212529;
+      --color-muted:   #5c636a;
+      --color-rule:    #dee2e6;
+      --color-accent:  #0b69f6;
+      --font-sans:     'Inter', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1240px; width: 100%; min-width: 0; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+    svg { width: 100%; min-width: 1040px; display: block; }
+    .catalog { margin-top: 2.5rem; border-top: 1px solid var(--color-rule); padding-top: 1.5rem; }
+    .catalog h2 { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 1rem; }
+    .catalog-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 1.25rem 2rem; }
+    .catalog h3 { font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem; }
+    .catalog h3 span { font-family: var(--font-mono); font-weight: 400; color: var(--color-muted); font-size: 0.75rem; }
+    .catalog ul { list-style: none; font-family: var(--font-mono); font-size: 0.72rem; line-height: 1.6; color: var(--color-ink); overflow-wrap: anywhere; }
+    .catalog li.core { color: var(--color-accent); }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Entidad-relación · Copropiedad</p>
+    <h1>Modelo de datos · entidades centrales</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1256 980" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="er-title er-desc">
+        <title id="er-title">Modelo de datos · entidades centrales</title>
+        <desc id="er-desc">Modelo entidad-relación de Copropiedad: el conjunto es la raíz de las 52 tablas; el rol agrupa usuarios, la asignación une usuarios con unidades, cada unidad recibe estados de cuenta, y cada estado de cuenta tiene líneas, pagos y reportes de pago; las áreas comunes reciben reservas de los usuarios.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5c636a"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#0b69f6"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1d4e89"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#f8f9fa"/>
+
+        <!-- Zonas -->
+        <rect x="40" y="152" width="568" height="224" rx="8" fill="rgba(33,37,41,0.02)" stroke="rgba(33,37,41,0.10)" stroke-width="0.8"/>
+        <rect x="52" y="156" width="48" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="76" y="165" fill="#5f6b78" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">ACCESO</text>
+        <rect x="648" y="152" width="568" height="224" rx="8" fill="rgba(33,37,41,0.02)" stroke="rgba(33,37,41,0.10)" stroke-width="0.8"/>
+        <rect x="660" y="156" width="64" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="692" y="165" fill="#5f6b78" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">INMUEBLES</text>
+        <rect x="40" y="416" width="568" height="228" rx="8" fill="rgba(33,37,41,0.02)" stroke="rgba(33,37,41,0.10)" stroke-width="0.8"/>
+        <rect x="52" y="420" width="86" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="95" y="429" fill="#5f6b78" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">ZONAS COMUNES</text>
+        <rect x="648" y="416" width="568" height="468" rx="8" fill="rgba(33,37,41,0.02)" stroke="rgba(33,37,41,0.10)" stroke-width="0.8"/>
+        <rect x="660" y="420" width="53" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="686.5" y="429" fill="#5f6b78" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">CARTERA</text>
+
+        <!-- Relaciones (antes que las entidades) -->
+        <path d="M 288,252 H 360" fill="none" stroke="#5c636a" stroke-width="1"/>
+        <path d="M 592,252 H 664" fill="none" stroke="#5c636a" stroke-width="1"/>
+        <path d="M 896,252 H 968" fill="none" stroke="#5c636a" stroke-width="1"/>
+        <path d="M 1084,340 V 448" fill="none" stroke="#5c636a" stroke-width="1"/>
+        <path d="M 476,360 V 448" fill="none" stroke="#5c636a" stroke-width="1"/>
+        <path d="M 288,536 H 360" fill="none" stroke="#5c636a" stroke-width="1"/>
+        <path d="M 968,504 H 896" fill="none" stroke="#5c636a" stroke-width="1"/>
+        <path d="M 968,572 H 940 Q 932,572 932,580 V 772 Q 932,780 924,780 H 896" fill="none" stroke="#5c636a" stroke-width="1"/>
+        <path d="M 1084,644 V 692" fill="none" stroke="#5c636a" stroke-width="1"/>
+        <path d="M 780,644 V 692" fill="none" stroke="#5c636a" stroke-width="1"/>
+
+        <!-- Cardinalidad (sobre la línea horizontal o a la derecha de la vertical) -->
+        <rect x="292.5" y="235" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="300" y="244" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">1</text>
+        <rect x="340.5" y="235" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="348" y="244" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">N</text>
+        <rect x="596.5" y="235" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="604" y="244" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">1</text>
+        <rect x="644.5" y="235" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="652" y="244" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">N</text>
+        <rect x="900.5" y="235" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="908" y="244" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">N</text>
+        <rect x="948.5" y="235" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="956" y="244" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">1</text>
+        <rect x="1090" y="351" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="1094" y="360" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="start" letter-spacing="0.08em">1</text>
+        <rect x="1090" y="431" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="1094" y="440" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="start" letter-spacing="0.08em">N</text>
+        <rect x="482" y="371" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="486" y="380" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="start" letter-spacing="0.08em">1</text>
+        <rect x="482" y="431" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="486" y="440" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="start" letter-spacing="0.08em">N</text>
+        <rect x="292.5" y="519" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="300" y="528" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">1</text>
+        <rect x="340.5" y="519" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="348" y="528" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">N</text>
+        <rect x="948.5" y="487" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="956" y="496" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">1</text>
+        <rect x="900.5" y="487" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="908" y="496" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">N</text>
+        <rect x="946.5" y="555" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="954" y="564" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">1</text>
+        <rect x="900.5" y="763" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="908" y="772" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">N</text>
+        <rect x="1090" y="653" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="1094" y="662" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="start" letter-spacing="0.08em">1</text>
+        <rect x="1090" y="679" width="15" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="1094" y="688" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="start" letter-spacing="0.08em">N</text>
+        <rect x="786" y="653" width="35" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="790" y="662" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="start" letter-spacing="0.08em">0..1</text>
+        <rect x="786" y="679" width="35" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="790" y="688" fill="#5c636a" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="start" letter-spacing="0.08em">0..1</text>
+
+        <!-- Conjunto: franja raíz; todas las tablas llevan tenant_id -->
+        <rect x="40" y="64" width="1176" height="56" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <text x="56" y="84" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ENTIDAD · RAÍZ</text>
+        <text x="56" y="104" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Conjunto</text>
+        <text x="136" y="104" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace">tenants · # id · slug · name · status</text>
+        <text x="1200" y="104" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">1 : N con las 52 tablas · → tenant_id · FK compuestas (tenant_id, id)</text>
+
+        <!-- Entidades -->
+        <!-- Rol · admin_roles -->
+        <rect x="56" y="184" width="232" height="136" rx="6" fill="#f8f9fa"/>
+        <rect x="56" y="184" width="232" height="136" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <rect x="57" y="185" width="230" height="39" rx="5" fill="rgba(33,37,41,0.04)"/>
+        <line x1="56" y1="224" x2="288" y2="224" stroke="rgba(33,37,41,0.22)" stroke-width="1"/>
+        <text x="72" y="200" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ENTIDAD</text>
+        <text x="72" y="216" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Rol</text>
+        <text x="72" y="244" fill="#212529" font-size="10" font-family="'Geist Mono', monospace"># id</text>
+        <text x="272" y="244" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="72" y="264" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">name</text>
+        <text x="272" y="264" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">varchar(64)</text>
+        <text x="72" y="284" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">kind</text>
+        <text x="272" y="284" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">enum staff·resident</text>
+        <text x="72" y="304" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">is_system</text>
+        <text x="272" y="304" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bool</text>
+        <!-- Usuario · admin_users -->
+        <rect x="360" y="184" width="232" height="176" rx="6" fill="#f8f9fa"/>
+        <rect x="360" y="184" width="232" height="176" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <rect x="361" y="185" width="230" height="39" rx="5" fill="rgba(33,37,41,0.04)"/>
+        <line x1="360" y1="224" x2="592" y2="224" stroke="rgba(33,37,41,0.22)" stroke-width="1"/>
+        <text x="376" y="200" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ENTIDAD</text>
+        <text x="376" y="216" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Usuario</text>
+        <text x="376" y="244" fill="#212529" font-size="10" font-family="'Geist Mono', monospace"># id</text>
+        <text x="576" y="244" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="376" y="264" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">→ role_id</text>
+        <text x="576" y="264" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="376" y="284" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">username</text>
+        <text x="576" y="284" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">varchar(64)</text>
+        <text x="376" y="304" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">email</text>
+        <text x="576" y="304" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">varchar(254)</text>
+        <text x="376" y="324" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">is_active</text>
+        <text x="576" y="324" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bool</text>
+        <text x="376" y="344" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">locked_until</text>
+        <text x="576" y="344" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">datetime</text>
+        <!-- Asignación · property_unit_assignments -->
+        <rect x="664" y="184" width="232" height="156" rx="6" fill="#f8f9fa"/>
+        <rect x="664" y="184" width="232" height="156" rx="6" fill="rgba(33,37,41,0.03)" stroke="#5c636a" stroke-width="1" stroke-dasharray="4,3"/>
+        <rect x="665" y="185" width="230" height="39" rx="5" fill="rgba(33,37,41,0.06)"/>
+        <line x1="664" y1="224" x2="896" y2="224" stroke="rgba(33,37,41,0.22)" stroke-width="1"/>
+        <text x="680" y="200" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">UNIÓN</text>
+        <text x="680" y="216" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Asignación</text>
+        <text x="680" y="244" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">→ unit_id</text>
+        <text x="880" y="244" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">char(32)</text>
+        <text x="680" y="264" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">→ user_id</text>
+        <text x="880" y="264" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="680" y="284" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">relation_type</text>
+        <text x="880" y="284" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">enum</text>
+        <text x="680" y="304" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">resides</text>
+        <text x="880" y="304" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bool</text>
+        <text x="680" y="324" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">started_on</text>
+        <text x="880" y="324" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">date</text>
+        <!-- Unidad · property_units -->
+        <rect x="968" y="184" width="232" height="156" rx="6" fill="#f8f9fa"/>
+        <rect x="968" y="184" width="232" height="156" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <rect x="969" y="185" width="230" height="39" rx="5" fill="rgba(33,37,41,0.04)"/>
+        <line x1="968" y1="224" x2="1200" y2="224" stroke="rgba(33,37,41,0.22)" stroke-width="1"/>
+        <text x="984" y="200" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ENTIDAD</text>
+        <text x="984" y="216" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Unidad</text>
+        <text x="984" y="244" fill="#212529" font-size="10" font-family="'Geist Mono', monospace"># id</text>
+        <text x="1184" y="244" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">char(32)</text>
+        <text x="984" y="264" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">category</text>
+        <text x="1184" y="264" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">varchar(80)</text>
+        <text x="984" y="284" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">name</text>
+        <text x="1184" y="284" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">varchar(160)</text>
+        <text x="984" y="304" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">coefficient</text>
+        <text x="1184" y="304" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">decimal(7,4)</text>
+        <text x="984" y="324" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">sort_order</text>
+        <text x="1184" y="324" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">int</text>
+        <!-- Área común · common_areas -->
+        <rect x="56" y="448" width="232" height="176" rx="6" fill="#f8f9fa"/>
+        <rect x="56" y="448" width="232" height="176" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <rect x="57" y="449" width="230" height="39" rx="5" fill="rgba(33,37,41,0.04)"/>
+        <line x1="56" y1="488" x2="288" y2="488" stroke="rgba(33,37,41,0.22)" stroke-width="1"/>
+        <text x="72" y="464" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ENTIDAD</text>
+        <text x="72" y="480" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Área común</text>
+        <text x="72" y="508" fill="#212529" font-size="10" font-family="'Geist Mono', monospace"># id</text>
+        <text x="272" y="508" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="72" y="528" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">name</text>
+        <text x="272" y="528" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">varchar(120)</text>
+        <text x="72" y="548" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">capacity</text>
+        <text x="272" y="548" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">smallint</text>
+        <text x="72" y="568" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">opens_at · closes_at</text>
+        <text x="272" y="568" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">time</text>
+        <text x="72" y="588" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">max_hours</text>
+        <text x="272" y="588" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">tinyint</text>
+        <text x="72" y="608" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">is_active</text>
+        <text x="272" y="608" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bool</text>
+        <!-- Reserva · common_area_bookings -->
+        <rect x="360" y="448" width="232" height="176" rx="6" fill="#f8f9fa"/>
+        <rect x="360" y="448" width="232" height="176" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <rect x="361" y="449" width="230" height="39" rx="5" fill="rgba(33,37,41,0.04)"/>
+        <line x1="360" y1="488" x2="592" y2="488" stroke="rgba(33,37,41,0.22)" stroke-width="1"/>
+        <text x="376" y="464" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ENTIDAD</text>
+        <text x="376" y="480" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Reserva</text>
+        <text x="376" y="508" fill="#212529" font-size="10" font-family="'Geist Mono', monospace"># id</text>
+        <text x="576" y="508" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="376" y="528" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">→ area_id</text>
+        <text x="576" y="528" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="376" y="548" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">→ user_id</text>
+        <text x="576" y="548" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="376" y="568" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">starts_at · ends_at</text>
+        <text x="576" y="568" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">datetime</text>
+        <text x="376" y="588" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">guests</text>
+        <text x="576" y="588" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">smallint</text>
+        <text x="376" y="608" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">status</text>
+        <text x="576" y="608" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">enum</text>
+        <!-- Reporte de pago · billing_payment_reports -->
+        <rect x="664" y="448" width="232" height="196" rx="6" fill="#f8f9fa"/>
+        <rect x="664" y="448" width="232" height="196" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <rect x="665" y="449" width="230" height="39" rx="5" fill="rgba(33,37,41,0.04)"/>
+        <line x1="664" y1="488" x2="896" y2="488" stroke="rgba(33,37,41,0.22)" stroke-width="1"/>
+        <text x="680" y="464" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ENTIDAD</text>
+        <text x="680" y="480" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Reporte de pago</text>
+        <text x="680" y="508" fill="#212529" font-size="10" font-family="'Geist Mono', monospace"># id</text>
+        <text x="880" y="508" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="680" y="528" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">→ statement_id</text>
+        <text x="880" y="528" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="680" y="548" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">→ user_id</text>
+        <text x="880" y="548" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="680" y="568" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">→ payment_id</text>
+        <text x="880" y="568" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="680" y="588" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">amount</text>
+        <text x="880" y="588" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">decimal(15,2)</text>
+        <text x="680" y="608" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">method</text>
+        <text x="880" y="608" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">enum</text>
+        <text x="680" y="628" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">status</text>
+        <text x="880" y="628" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">enum</text>
+        <!-- Estado de cuenta · billing_statements -->
+        <rect x="968" y="448" width="232" height="196" rx="6" fill="#f8f9fa"/>
+        <rect x="968" y="448" width="232" height="196" rx="6" fill="rgba(11,105,246,0.04)" stroke="#0b69f6" stroke-width="1"/>
+        <rect x="969" y="449" width="230" height="39" rx="5" fill="rgba(11,105,246,0.10)"/>
+        <line x1="968" y1="488" x2="1200" y2="488" stroke="rgba(11,105,246,0.40)" stroke-width="1"/>
+        <text x="984" y="464" fill="#0b69f6" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ENTIDAD · CENTRAL</text>
+        <text x="984" y="480" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Estado de cuenta</text>
+        <text x="984" y="508" fill="#212529" font-size="10" font-family="'Geist Mono', monospace"># id</text>
+        <text x="1184" y="508" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="984" y="528" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">→ unit_id</text>
+        <text x="1184" y="528" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">char(32)</text>
+        <text x="984" y="548" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">→ previous_statement_id</text>
+        <text x="1184" y="548" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="984" y="568" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">period</text>
+        <text x="1184" y="568" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">char(7)</text>
+        <text x="984" y="588" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">total_due</text>
+        <text x="1184" y="588" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">decimal(15,2)</text>
+        <text x="984" y="608" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">payment_due_date</text>
+        <text x="1184" y="608" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">date</text>
+        <text x="984" y="628" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">→ issued_by</text>
+        <text x="1184" y="628" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <!-- Pago · billing_payments -->
+        <rect x="664" y="692" width="232" height="176" rx="6" fill="#f8f9fa"/>
+        <rect x="664" y="692" width="232" height="176" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <rect x="665" y="693" width="230" height="39" rx="5" fill="rgba(33,37,41,0.04)"/>
+        <line x1="664" y1="732" x2="896" y2="732" stroke="rgba(33,37,41,0.22)" stroke-width="1"/>
+        <text x="680" y="708" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ENTIDAD</text>
+        <text x="680" y="724" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Pago</text>
+        <text x="680" y="752" fill="#212529" font-size="10" font-family="'Geist Mono', monospace"># id</text>
+        <text x="880" y="752" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="680" y="772" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">→ statement_id</text>
+        <text x="880" y="772" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="680" y="792" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">amount</text>
+        <text x="880" y="792" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">decimal(15,2)</text>
+        <text x="680" y="812" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">received_on</text>
+        <text x="880" y="812" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">date</text>
+        <text x="680" y="832" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">reference</text>
+        <text x="880" y="832" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">varchar(80)</text>
+        <text x="680" y="852" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">voided_at</text>
+        <text x="880" y="852" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">datetime</text>
+        <!-- Línea de cobro · billing_statement_lines -->
+        <rect x="968" y="692" width="232" height="156" rx="6" fill="#f8f9fa"/>
+        <rect x="968" y="692" width="232" height="156" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <rect x="969" y="693" width="230" height="39" rx="5" fill="rgba(33,37,41,0.04)"/>
+        <line x1="968" y1="732" x2="1200" y2="732" stroke="rgba(33,37,41,0.22)" stroke-width="1"/>
+        <text x="984" y="708" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ENTIDAD</text>
+        <text x="984" y="724" fill="#212529" font-size="14" font-weight="600" font-family="'Inter', sans-serif">Línea de cobro</text>
+        <text x="984" y="752" fill="#212529" font-size="10" font-family="'Geist Mono', monospace"># id</text>
+        <text x="1184" y="752" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="984" y="772" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">→ statement_id</text>
+        <text x="1184" y="772" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">bigint</text>
+        <text x="984" y="792" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">category</text>
+        <text x="1184" y="792" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">enum</text>
+        <text x="984" y="812" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">description</text>
+        <text x="1184" y="812" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">varchar(160)</text>
+        <text x="984" y="832" fill="#212529" font-size="10" font-family="'Geist Mono', monospace">amount</text>
+        <text x="1184" y="832" fill="#5c636a" font-size="10" font-family="'Geist Mono', monospace" text-anchor="end">decimal(15,2)</text>
+
+        <!-- Nota editorial en el hueco bajo Zonas comunes -->
+        <text x="56" y="700" fill="#212529" font-size="15" font-style="italic" font-family="'Instrument Serif', serif">El estado de cuenta es el centro de la cartera:</text>
+        <text x="56" y="720" fill="#212529" font-size="15" font-style="italic" font-family="'Instrument Serif', serif">14 tablas lo referencian (pagos, enlaces, Bold, Wompi,</text>
+        <text x="56" y="740" fill="#212529" font-size="15" font-style="italic" font-family="'Instrument Serif', serif">consignaciones, paz y salvo). Usuario aparece en 49 llaves.</text>
+        <text x="56" y="772" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace">Se dibujan 10 de las 52 tablas; el catálogo completo va abajo.</text>
+        <text x="56" y="788" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace">Las llaves a Usuario de auditoría (issued_by, reviewed_by…) no se trazan.</text>
+
+        <!-- Leyenda -->
+        <line x1="40" y1="908" x2="1216" y2="908" stroke="rgba(33,37,41,0.10)" stroke-width="0.8"/>
+        <text x="40" y="926" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEYENDA</text>
+        <rect x="40" y="938" width="20" height="14" rx="3" fill="#ffffff" stroke="#212529"/>
+        <text x="68" y="949" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Entidad</text>
+        <rect x="140" y="938" width="20" height="14" rx="3" fill="rgba(33,37,41,0.03)" stroke="#5c636a" stroke-dasharray="4,3"/>
+        <text x="168" y="949" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Tabla de unión (usuario ↔ unidad)</text>
+        <rect x="380" y="938" width="20" height="14" rx="3" fill="rgba(11,105,246,0.04)" stroke="#0b69f6"/>
+        <text x="408" y="949" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Entidad central</text>
+        <text x="540" y="949" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace"># llave primaria   → llave foránea   1 · N · 0..1 cardinalidad</text>
+      </svg>
+    </div>
+
+    <section class="catalog" aria-labelledby="catalogo">
+      <h2 id="catalogo">Las 52 tablas por módulo · en azul las dibujadas arriba</h2>
+      <div class="catalog-grid">
+        <div>
+          <h3>Conjunto y plataforma <span>· 2</span></h3>
+          <ul>
+            <li class="core">tenants</li>
+            <li>tenant_modules</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Acceso y usuarios <span>· 8</span></h3>
+          <ul>
+            <li>admin_users</li>
+            <li>admin_roles</li>
+            <li>admin_role_permissions</li>
+            <li>admin_password_reset_tokens</li>
+            <li>admin_user_mail_settings</li>
+            <li>user_notices</li>
+            <li>mail_oauth_connections</li>
+            <li>mail_oauth_states</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Inmuebles <span>· 4</span></h3>
+          <ul>
+            <li>property_units</li>
+            <li>property_unit_assignments</li>
+            <li>property_unit_relationship_history</li>
+            <li>copropiedad_composition</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Cartera <span>· 20</span></h3>
+          <ul>
+            <li>billing_statements</li>
+            <li>billing_statement_lines</li>
+            <li>billing_payments</li>
+            <li>billing_payment_reports</li>
+            <li>billing_statement_recipients</li>
+            <li>billing_statement_user_reads</li>
+            <li>billing_monthly_items</li>
+            <li>billing_unit_references</li>
+            <li>billing_payment_links</li>
+            <li>billing_online_payments</li>
+            <li>billing_wompi_payments</li>
+            <li>billing_bold_terminal_payments</li>
+            <li>billing_bank_imports</li>
+            <li>billing_bank_movements</li>
+            <li>billing_unidentified_deposits</li>
+            <li>billing_deposit_claims</li>
+            <li>billing_clearances</li>
+            <li>bold_payment_settings</li>
+            <li>bold_payment_methods</li>
+            <li>wompi_payment_settings</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Zonas comunes <span>· 2</span></h3>
+          <ul>
+            <li>common_areas</li>
+            <li>common_area_bookings</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Comunidad <span>· 4</span></h3>
+          <ul>
+            <li>resident_profiles</li>
+            <li>resident_types</li>
+            <li>property_classifieds</li>
+            <li>property_classified_images</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Comunicación <span>· 5</span></h3>
+          <ul>
+            <li>admin_messages</li>
+            <li>admin_message_recipients</li>
+            <li>resident_conversations</li>
+            <li>resident_conversation_messages</li>
+            <li>contact_messages</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Configuración y sitio público <span>· 4</span></h3>
+          <ul>
+            <li>copropiedad_settings</li>
+            <li>copropiedad_mail_settings</li>
+            <li>public_site_content</li>
+            <li>public_site_texts</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Privacidad <span>· 3</span></h3>
+          <ul>
+            <li>privacy_settings</li>
+            <li>privacy_document_versions</li>
+            <li>data_consents</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

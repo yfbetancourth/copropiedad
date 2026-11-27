@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mejoras pendientes · Impacto × Esfuerzo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f8f9fa;
+      --color-ink:     #212529;
+      --color-muted:   #5c636a;
+      --color-accent:  #0b69f6;
+      --font-sans:     'Inter', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1000px; width: 100%; min-width: 0; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Impacto × Esfuerzo · Copropiedad</p>
+    <h1>Mejoras pendientes · Impacto × Esfuerzo</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="impacto-esfuerzo-title impacto-esfuerzo-desc">
+        <title id="impacto-esfuerzo-title">Mejoras pendientes · Impacto × Esfuerzo</title>
+        <desc id="impacto-esfuerzo-desc">Matriz de impacto contra esfuerzo con once mejoras pendientes de Copropiedad; activar OPcache, fusionar a main y automatizar respaldos tienen alto impacto con poco esfuerzo, y las pruebas automáticas son el gran proyecto siguiente.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5c636a"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#0b69f6"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1d4e89"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#f8f9fa"/>
+
+        <!-- Fondo apenas teñido solo en «Hacer ya» (alto impacto, poco esfuerzo) -->
+        <rect x="120" y="80" width="360" height="220" fill="rgba(11,105,246,0.03)"/>
+
+        <!-- Ejes: esfuerzo crece a la derecha, impacto hacia arriba -->
+        <line x1="120" y1="300" x2="848" y2="300" stroke="#5c636a" stroke-width="1" marker-end="url(#arrow)"/>
+        <line x1="480" y1="520" x2="480" y2="72" stroke="#5c636a" stroke-width="1" marker-end="url(#arrow)"/>
+
+        <!-- Etiquetas de eje: una palabra en cada punta -->
+        <text x="860" y="303" fill="#212529" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em" dominant-baseline="middle">ESFUERZO</text>
+        <text x="480" y="60" fill="#212529" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.18em">IMPACTO</text>
+
+        <!-- Nombres de los cuadrantes -->
+        <text x="136" y="100" fill="#0b69f6" font-size="9" font-weight="600" font-family="'Geist Mono', monospace" letter-spacing="0.18em">HACER YA</text>
+        <text x="836" y="100" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.18em">PROYECTOS GRANDES</text>
+        <text x="136" y="512" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" letter-spacing="0.18em">VICTORIAS RÁPIDAS</text>
+        <text x="836" y="512" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.18em">DESPUÉS</text>
+
+        <!-- Hacer ya (alto impacto, poco esfuerzo) -->
+        <circle cx="192" cy="212" r="6" fill="#0b69f6"/>
+        <text x="204" y="216" fill="#212529" font-size="11" font-weight="600" font-family="'Inter', sans-serif">Activar OPcache</text>
+
+        <circle cx="228" cy="148" r="4" fill="#212529"/>
+        <text x="240" y="152" fill="#5c636a" font-size="11" font-family="'Inter', sans-serif">Fusionar develop → main</text>
+
+        <circle cx="300" cy="180" r="4" fill="#212529"/>
+        <text x="312" y="184" fill="#5c636a" font-size="11" font-family="'Inter', sans-serif">Respaldos automáticos</text>
+
+        <!-- Proyectos grandes (alto impacto, mucho esfuerzo) -->
+        <circle cx="624" cy="168" r="4" fill="#212529"/>
+        <text x="636" y="172" fill="#5c636a" font-size="11" font-family="'Inter', sans-serif">Pruebas automáticas (CI)</text>
+
+        <circle cx="660" cy="232" r="4" fill="#212529"/>
+        <text x="672" y="236" fill="#5c636a" font-size="11" font-family="'Inter', sans-serif">Rediseñar sitio público</text>
+
+        <circle cx="552" cy="264" r="4" fill="#212529"/>
+        <text x="564" y="268" fill="#5c636a" font-size="11" font-family="'Inter', sans-serif">Caché de datos (APCu)</text>
+
+        <!-- Victorias rápidas (poco impacto, poco esfuerzo) -->
+        <circle cx="300" cy="324" r="4" fill="#212529"/>
+        <text x="288" y="328" fill="#5c636a" font-size="11" font-family="'Inter', sans-serif" text-anchor="end">Probar vistas del Superadmin</text>
+
+        <circle cx="156" cy="356" r="4" fill="#212529"/>
+        <text x="168" y="360" fill="#5c636a" font-size="11" font-family="'Inter', sans-serif">Regla de firewall</text>
+
+        <circle cx="264" cy="388" r="4" fill="#212529"/>
+        <text x="276" y="392" fill="#5c636a" font-size="11" font-family="'Inter', sans-serif">Tildes en los textos</text>
+
+        <circle cx="192" cy="424" r="4" fill="#212529"/>
+        <text x="204" y="428" fill="#5c636a" font-size="11" font-family="'Inter', sans-serif">Exportar diagramas a PNG</text>
+
+        <circle cx="444" cy="456" r="4" fill="#212529"/>
+        <text x="432" y="460" fill="#5c636a" font-size="11" font-family="'Inter', sans-serif" text-anchor="end">Retirar polyfills</text>
+
+        <!-- Leyenda -->
+        <line x1="40" y1="540" x2="920" y2="540" stroke="rgba(33,37,41,0.10)" stroke-width="0.8"/>
+        <text x="40" y="556" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEYENDA</text>
+
+        <circle cx="52" cy="576" r="6" fill="#0b69f6"/>
+        <text x="68" y="580" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Empezar mañana</text>
+
+        <circle cx="196" cy="576" r="4" fill="#212529"/>
+        <text x="208" y="580" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Mejora candidata</text>
+
+        <text x="340" y="580" fill="#5c636a" font-size="9" font-style="italic" font-family="'Inter', sans-serif">Posición estimada por el equipo técnico; el color marca solo la acción para empezar.</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,24 @@
+#!/bin/sh
+# Mantiene docs/diagramas/arbol-archivos.html al día con el árbol de archivos del proyecto.
+# Se activa una vez por clon con:  git config core.hooksPath .githooks
+# Si el árbol cambió (carpetas o archivos agregados, movidos o borrados), regenera el diagrama y lo incluye en el
+# mismo commit. Si no encuentra PHP, avisa y deja pasar el commit: el diagrama se puede regenerar a mano con
+#   php bin/build-file-tree-diagram.php
+
+# Primero el PHP 8.4 del proyecto (XAMPP 8.4); el del PATH solo como respaldo (en este equipo es un XAMPP 8.2 antiguo).
+if [ -x /c/xampp84/php/php.exe ]; then
+    PHP=/c/xampp84/php/php.exe
+else
+    PHP=$(command -v php 2>/dev/null)
+fi
+if [ -z "$PHP" ]; then
+    echo "pre-commit: no se encontró PHP; el diagrama del árbol de archivos no se actualizó." >&2
+    exit 0
+fi
+
+ROOT=$(git rev-parse --show-toplevel) || exit 1
+"$PHP" "$ROOT/bin/build-file-tree-diagram.php" >/dev/null || {
+    echo "pre-commit: no se pudo generar el diagrama del árbol de archivos." >&2
+    exit 1
+}
+git add "$ROOT/docs/diagramas/arbol-archivos.html"

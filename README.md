@@ -646,3 +646,21 @@ borrador, se revisa en la vista previa y el público la ve al publicar.
 ```powershell
 Get-Content .\database\migrations\049_add_public_site_palette.sql | & C:\xampp84\mysql\bin\mysql.exe --protocol=tcp -h 127.0.0.1 -u root copropiedad
 ```
+
+## Diagramas del proyecto (`docs/diagramas/`)
+
+Generados con la skill diagram-design y la marca de PowerTech (perfil `powertech`, archivo `.diagram-design`):
+`arquitectura.html`, `impacto-esfuerzo.html`, `flujo-peticion.html`, `arbol-archivos.html`,
+`entidad-relacion.html` (las 10 entidades centrales en 4 zonas, más el catálogo de las 52 tablas por módulo) y
+`navegabilidad.html` (sitio público, acceso, panel del conjunto, portal del residente y consola del Superadmin).
+Apache no sirve `docs/`: se abren directamente desde el disco.
+
+El **árbol de archivos se mantiene solo**: `bin/build-file-tree-diagram.php` lo calcula desde `git ls-files` (raíz,
+hasta 5 carpetas principales y las subcarpetas de la más grande; las carpetas sin versionar en un nodo punteado) y el
+hook `.githooks/pre-commit` lo regenera y lo agrega a cada commit cuando el árbol cambió. Se activa una vez por clon:
+
+```powershell
+git config core.hooksPath .githooks
+```
+
+A mano: `php bin/build-file-tree-diagram.php` (o `--check` para saber si está desactualizado, útil en CI).

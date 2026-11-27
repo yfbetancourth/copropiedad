@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cómo se atiende una petición</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f8f9fa;
+      --color-ink:     #212529;
+      --color-muted:   #5c636a;
+      --color-accent:  #0b69f6;
+      --font-sans:     'Inter', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1000px; width: 100%; min-width: 0; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+    svg { width: 100%; min-width: 960px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Diagrama de flujo · Copropiedad</p>
+    <h1>Cómo se atiende una petición</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 960 808" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="flujo-peticion-title flujo-peticion-desc">
+        <title id="flujo-peticion-title">Cómo se atiende una petición</title>
+        <desc id="flujo-peticion-desc">Diagrama de flujo de una petición: se valida el conjunto, las rutas públicas saltan la sesión, las privadas exigen sesión vigente y permiso, y todo formulario exige un token CSRF válido antes de llegar al controlador; cada rechazo termina en 404, en el login o en 403.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5c636a"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#0b69f6"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1d4e89"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#f8f9fa"/>
+
+        <!-- Flechas (antes que las figuras) -->
+        <!-- Entrada -->
+        <line x1="400" y1="32" x2="400" y2="72" stroke="#1d4e89" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <!-- D1 → No: rechazo 404 -->
+        <line x1="496" y1="116" x2="600" y2="116" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- D1 → Sí -->
+        <line x1="400" y1="160" x2="400" y2="192" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- D2 → Sí (ruta pública): baja por la izquierda hasta el control de CSRF -->
+        <path d="M 304,236 H 216 Q 208,236 208,244 V 588 Q 208,596 216,596 H 304" fill="none" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- D2 → No (ruta privada) -->
+        <line x1="400" y1="280" x2="400" y2="312" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- D3 → No: login -->
+        <line x1="496" y1="356" x2="600" y2="356" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- D3 → Sí -->
+        <line x1="400" y1="400" x2="400" y2="432" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- D4 → No: rechazo 403 (entra por arriba) -->
+        <path d="M 496,476 H 672 Q 680,476 680,484 V 512" fill="none" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- D4 → Sí -->
+        <line x1="400" y1="520" x2="400" y2="552" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- D5 → No: rechazo 403 (entra por abajo) -->
+        <path d="M 496,596 H 672 Q 680,596 680,588 V 560" fill="none" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- D5 → Sí: controlador (camino feliz) -->
+        <line x1="400" y1="640" x2="400" y2="672" stroke="#0b69f6" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+
+        <!-- Etiquetas de flecha -->
+        <rect x="412" y="40" width="80" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="452" y="49" fill="#1d4e89" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PETICIÓN HTTP</text>
+
+        <rect x="536" y="96" width="24" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="548" y="105" fill="#5f6b78" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">NO</text>
+
+        <rect x="408" y="170" width="24" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="420" y="179" fill="#5f6b78" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">SÍ</text>
+
+        <rect x="244" y="216" width="24" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="256" y="225" fill="#5f6b78" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">SÍ</text>
+
+        <rect x="408" y="290" width="24" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="420" y="299" fill="#5f6b78" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">NO</text>
+
+        <rect x="536" y="336" width="24" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="548" y="345" fill="#5f6b78" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">NO</text>
+
+        <rect x="408" y="410" width="24" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="420" y="419" fill="#5f6b78" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">SÍ</text>
+
+        <rect x="536" y="456" width="24" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="548" y="465" fill="#5f6b78" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">NO</text>
+
+        <rect x="408" y="530" width="24" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="420" y="539" fill="#5f6b78" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">SÍ</text>
+
+        <rect x="536" y="576" width="24" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="548" y="585" fill="#5f6b78" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">NO</text>
+
+        <rect x="408" y="650" width="24" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="420" y="659" fill="#0b69f6" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">SÍ</text>
+
+        <!-- D1: ¿El host es un conjunto activo? -->
+        <polygon points="400,72 496,116 400,160 304,116" fill="#f8f9fa"/>
+        <polygon points="400,72 496,116 400,160 304,116" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <text x="400" y="114" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">¿El host es un</text>
+        <text x="400" y="128" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">conjunto activo?</text>
+
+        <!-- Fin: rechazo 404 -->
+        <rect x="600" y="92" width="160" height="48" rx="20" fill="#f8f9fa"/>
+        <rect x="600" y="92" width="160" height="48" rx="20" fill="rgba(33,37,41,0.03)" stroke="rgba(33,37,41,0.30)" stroke-width="1"/>
+        <text x="680" y="114" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Rechazo 404</text>
+        <text x="680" y="128" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">host desconocido</text>
+
+        <!-- D2: ¿Ruta pública? -->
+        <polygon points="400,192 496,236 400,280 304,236" fill="#f8f9fa"/>
+        <polygon points="400,192 496,236 400,280 304,236" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <text x="400" y="234" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">¿Es una ruta</text>
+        <text x="400" y="248" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">pública?</text>
+
+        <!-- D3: ¿Sesión vigente? -->
+        <polygon points="400,312 496,356 400,400 304,356" fill="#f8f9fa"/>
+        <polygon points="400,312 496,356 400,400 304,356" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <text x="400" y="354" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">¿Sesión vigente</text>
+        <text x="400" y="368" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">y del conjunto?</text>
+
+        <!-- Fin: login -->
+        <rect x="600" y="332" width="160" height="48" rx="20" fill="#f8f9fa"/>
+        <rect x="600" y="332" width="160" height="48" rx="20" fill="rgba(33,37,41,0.03)" stroke="rgba(33,37,41,0.30)" stroke-width="1"/>
+        <text x="680" y="354" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Ir al login</text>
+        <text x="680" y="368" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">inactiva &gt; 30 min</text>
+
+        <!-- D4: ¿Permiso? -->
+        <polygon points="400,432 496,476 400,520 304,476" fill="#f8f9fa"/>
+        <polygon points="400,432 496,476 400,520 304,476" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <text x="400" y="474" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">¿Su rol tiene</text>
+        <text x="400" y="488" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">el permiso?</text>
+
+        <!-- Fin: rechazo 403 (compartido por permiso y CSRF) -->
+        <rect x="600" y="512" width="160" height="48" rx="20" fill="#f8f9fa"/>
+        <rect x="600" y="512" width="160" height="48" rx="20" fill="rgba(33,37,41,0.03)" stroke="rgba(33,37,41,0.30)" stroke-width="1"/>
+        <text x="680" y="534" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Rechazo 403</text>
+        <text x="680" y="548" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">sin cambios guardados</text>
+
+        <!-- D5: ¿GET, o POST con CSRF válido? (el token solo se exige en formularios) -->
+        <polygon points="400,552 496,596 400,640 304,596" fill="#f8f9fa"/>
+        <polygon points="400,552 496,596 400,640 304,596" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <text x="400" y="594" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">¿Es GET o trae</text>
+        <text x="400" y="608" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">CSRF válido?</text>
+
+        <!-- Paso final (focal): controlador y respuesta -->
+        <rect x="292" y="672" width="216" height="52" rx="6" fill="#f8f9fa"/>
+        <rect x="292" y="672" width="216" height="52" rx="6" fill="rgba(11,105,246,0.08)" stroke="#0b69f6" stroke-width="1"/>
+        <text x="400" y="696" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Controlador y respuesta</text>
+        <text x="400" y="712" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">módulo · vista · CSP</text>
+
+        <!-- Leyenda -->
+        <line x1="40" y1="748" x2="920" y2="748" stroke="rgba(33,37,41,0.10)" stroke-width="0.8"/>
+        <text x="40" y="764" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEYENDA · LA FORMA INDICA EL TIPO</text>
+
+        <rect x="40" y="776" width="24" height="12" rx="6" fill="rgba(33,37,41,0.03)" stroke="rgba(33,37,41,0.30)" stroke-width="1"/>
+        <text x="72" y="786" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Fin (óvalo)</text>
+
+        <rect x="176" y="776" width="24" height="12" rx="2" fill="rgba(11,105,246,0.08)" stroke="#0b69f6" stroke-width="1"/>
+        <text x="208" y="786" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Paso (rectángulo)</text>
+
+        <polygon points="344,782 356,776 368,782 356,788" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <text x="380" y="786" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Decisión (rombo)</text>
+
+        <line x1="508" y1="782" x2="536" y2="782" stroke="#0b69f6" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <text x="544" y="786" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Camino feliz</text>
+
+        <line x1="652" y1="782" x2="680" y2="782" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="688" y="786" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Rama</text>
+
+        <line x1="752" y1="782" x2="780" y2="782" stroke="#1d4e89" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <text x="788" y="786" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Entrada HTTP</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

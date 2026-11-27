@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arquitectura de Copropiedad</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f8f9fa;
+      --color-ink:     #212529;
+      --color-muted:   #5c636a;
+      --color-accent:  #0b69f6;
+      --font-sans:     'Inter', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1320px; width: 100%; min-width: 0; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+    svg { width: 100%; min-width: 1280px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Arquitectura · Copropiedad</p>
+    <h1>Arquitectura de Copropiedad</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1280 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="arquitectura-title arquitectura-desc">
+        <title id="arquitectura-title">Arquitectura de Copropiedad</title>
+        <desc id="arquitectura-desc">Arquitectura de la aplicación: el navegador llama por HTTPS al front controller en PHP, que enruta a los módulos de negocio; estos leen y escriben en MariaDB y en archivos privados, y llaman a las pasarelas de pago y al correo; la caché existe solo en el navegador y OPcache está desactivado.</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5c636a"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#0b69f6"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1d4e89"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#f8f9fa"/>
+
+        <!-- Zonas (antes que flechas y nodos) -->
+        <rect x="40" y="40" width="256" height="300" rx="8" fill="rgba(33,37,41,0.02)" stroke="rgba(33,37,41,0.10)" stroke-width="0.8"/>
+        <rect x="140" y="44" width="56" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="168" y="53" fill="#5f6b78" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">CLIENTE</text>
+
+        <rect x="336" y="40" width="480" height="300" rx="8" fill="rgba(33,37,41,0.02)" stroke="rgba(33,37,41,0.10)" stroke-width="0.8"/>
+        <rect x="476" y="44" width="200" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="576" y="53" fill="#5f6b78" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">SERVIDOR · APACHE + PHP 8.4</text>
+
+        <rect x="880" y="40" width="360" height="360" rx="8" fill="rgba(33,37,41,0.02)" stroke="rgba(33,37,41,0.10)" stroke-width="0.8"/>
+        <rect x="1036" y="44" width="48" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="1060" y="53" fill="#5f6b78" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">DATOS</text>
+
+        <!-- Flechas (detrás de las cajas) -->
+        <!-- Navegador → Front controller (HTTPS) -->
+        <line x1="264" y1="132" x2="368" y2="132" stroke="#1d4e89" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <!-- Navegador ↔ caché HTTP (recursos versionados) -->
+        <line x1="168" y1="164" x2="168" y2="244" stroke="#5c636a" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <!-- Front controller → Módulos (flujo principal) -->
+        <line x1="544" y1="132" x2="600" y2="132" stroke="#0b69f6" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <!-- Front controller → OPcache (desactivado) -->
+        <line x1="456" y1="164" x2="456" y2="244" stroke="#5c636a" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <!-- Módulos → MariaDB -->
+        <line x1="784" y1="116" x2="944" y2="116" fill="none" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- Módulos → Archivos privados -->
+        <path d="M 784,148 H 840 Q 848,148 848,156 V 252 Q 848,260 856,260 H 944" fill="none" stroke="#5c636a" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <!-- Módulos → Pasarelas (HTTPS) -->
+        <line x1="660" y1="164" x2="660" y2="440" stroke="#1d4e89" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <!-- Módulos → Correo (HTTPS) -->
+        <path d="M 724,164 V 372 Q 724,380 732,380 H 860 Q 868,380 868,388 V 440" fill="none" stroke="#1d4e89" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+
+        <!-- Etiquetas de flecha (máscara opaca, separadas de su línea) -->
+        <rect x="292" y="112" width="48" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="316" y="121" fill="#1d4e89" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">HTTPS</text>
+
+        <rect x="176" y="198" width="48" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="200" y="207" fill="#5f6b78" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">ASSETS</text>
+
+        <rect x="552" y="112" width="40" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="572" y="121" fill="#0b69f6" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">RUTA</text>
+
+        <rect x="464" y="198" width="64" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="496" y="207" fill="#5f6b78" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">BYTECODE</text>
+
+        <rect x="884" y="96" width="48" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="908" y="105" fill="#5f6b78" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PDO</text>
+
+        <rect x="868" y="240" width="64" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="900" y="249" fill="#5f6b78" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">ARCHIVOS</text>
+
+        <rect x="604" y="396" width="48" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="628" y="405" fill="#1d4e89" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PAGOS</text>
+
+        <rect x="732" y="352" width="40" height="12" rx="2" fill="#f8f9fa"/>
+        <text x="752" y="361" fill="#1d4e89" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">ENVÍO</text>
+
+        <!-- Nodo: Navegador (entrada) -->
+        <rect x="72" y="100" width="192" height="64" rx="6" fill="#f8f9fa"/>
+        <rect x="72" y="100" width="192" height="64" rx="6" fill="rgba(92,99,106,0.10)" stroke="#5f6b78" stroke-width="1"/>
+        <rect x="80" y="108" width="28" height="12" rx="2" fill="transparent" stroke="rgba(95,107,120,0.40)" stroke-width="0.8"/>
+        <text x="94" y="117" fill="#5f6b78" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">WEB</text>
+        <text x="168" y="136" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Navegador</text>
+        <text x="168" y="152" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">panel · portal · sitio</text>
+
+        <!-- Nodo: Caché HTTP del navegador -->
+        <rect x="72" y="244" width="192" height="64" rx="6" fill="#f8f9fa"/>
+        <rect x="72" y="244" width="192" height="64" rx="6" fill="rgba(33,37,41,0.05)" stroke="#5c636a" stroke-width="1"/>
+        <rect x="80" y="252" width="36" height="12" rx="2" fill="transparent" stroke="rgba(92,99,106,0.50)" stroke-width="0.8"/>
+        <text x="98" y="261" fill="#5c636a" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CACHE</text>
+        <text x="168" y="280" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Caché HTTP</text>
+        <text x="168" y="296" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">assets ?v= · fotos 15 min</text>
+
+        <!-- Nodo: Front controller -->
+        <rect x="368" y="100" width="176" height="64" rx="6" fill="#f8f9fa"/>
+        <rect x="368" y="100" width="176" height="64" rx="6" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <rect x="376" y="108" width="28" height="12" rx="2" fill="transparent" stroke="rgba(33,37,41,0.40)" stroke-width="0.8"/>
+        <text x="390" y="117" fill="#212529" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">PHP</text>
+        <text x="456" y="136" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Front controller</text>
+        <text x="456" y="152" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">index.php · CSP · tenant</text>
+
+        <!-- Nodo: OPcache (desactivado) -->
+        <rect x="368" y="244" width="176" height="64" rx="6" fill="#f8f9fa"/>
+        <rect x="368" y="244" width="176" height="64" rx="6" fill="rgba(33,37,41,0.02)" stroke="rgba(33,37,41,0.20)" stroke-width="1" stroke-dasharray="4,3"/>
+        <rect x="376" y="252" width="36" height="12" rx="2" fill="transparent" stroke="rgba(33,37,41,0.20)" stroke-width="0.8"/>
+        <text x="394" y="261" fill="#5f6b78" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CACHE</text>
+        <text x="456" y="280" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">OPcache</text>
+        <text x="456" y="296" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">desactivado hoy</text>
+
+        <!-- Nodo: Módulos de negocio (focal) -->
+        <rect x="600" y="100" width="184" height="64" rx="6" fill="#f8f9fa"/>
+        <rect x="600" y="100" width="184" height="64" rx="6" fill="rgba(11,105,246,0.08)" stroke="#0b69f6" stroke-width="1"/>
+        <rect x="608" y="108" width="28" height="12" rx="2" fill="transparent" stroke="rgba(11,105,246,0.50)" stroke-width="0.8"/>
+        <text x="622" y="117" fill="#0b69f6" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">APP</text>
+        <text x="692" y="136" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Módulos de negocio</text>
+        <text x="692" y="152" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">controladores + servicios</text>
+
+        <!-- Nodo: MariaDB -->
+        <rect x="944" y="84" width="232" height="64" rx="6" fill="#f8f9fa"/>
+        <rect x="944" y="84" width="232" height="64" rx="6" fill="rgba(33,37,41,0.05)" stroke="#5c636a" stroke-width="1"/>
+        <rect x="952" y="92" width="24" height="12" rx="2" fill="transparent" stroke="rgba(92,99,106,0.50)" stroke-width="0.8"/>
+        <text x="964" y="101" fill="#5c636a" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">DB</text>
+        <text x="1060" y="120" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">MariaDB 10.11</text>
+        <text x="1060" y="136" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">52 tablas · 127 FK · estricto</text>
+
+        <!-- Nodo: Archivos privados -->
+        <rect x="944" y="228" width="232" height="64" rx="6" fill="#f8f9fa"/>
+        <rect x="944" y="228" width="232" height="64" rx="6" fill="rgba(33,37,41,0.05)" stroke="#5c636a" stroke-width="1"/>
+        <rect x="952" y="236" width="24" height="12" rx="2" fill="transparent" stroke="rgba(92,99,106,0.50)" stroke-width="0.8"/>
+        <text x="964" y="245" fill="#5c636a" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">FS</text>
+        <text x="1060" y="264" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Archivos privados</text>
+        <text x="1060" y="280" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">sesiones · soportes · fotos</text>
+
+        <!-- Nota editorial en la zona de datos -->
+        <text x="912" y="324" fill="#5c636a" font-size="14" font-style="italic" font-family="'Instrument Serif', serif">Una base para todos los conjuntos;</text>
+        <text x="912" y="344" fill="#5c636a" font-size="14" font-style="italic" font-family="'Instrument Serif', serif">cada fila lleva su tenant_id y</text>
+        <text x="912" y="364" fill="#5c636a" font-size="14" font-style="italic" font-family="'Instrument Serif', serif">34 llaves compuestas impiden</text>
+        <text x="912" y="384" fill="#5c636a" font-size="14" font-style="italic" font-family="'Instrument Serif', serif">mezclar datos entre ellos.</text>
+
+        <!-- Nodo: Pasarelas de pago (externo) -->
+        <rect x="576" y="440" width="168" height="64" rx="6" fill="#f8f9fa"/>
+        <rect x="576" y="440" width="168" height="64" rx="6" fill="rgba(33,37,41,0.03)" stroke="rgba(33,37,41,0.30)" stroke-width="1"/>
+        <rect x="584" y="448" width="28" height="12" rx="2" fill="transparent" stroke="rgba(33,37,41,0.22)" stroke-width="0.8"/>
+        <text x="598" y="457" fill="#5f6b78" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EXT</text>
+        <text x="660" y="476" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">Bold · Wompi</text>
+        <text x="660" y="492" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">pagos + webhooks</text>
+
+        <!-- Nodo: Correo (externo) -->
+        <rect x="768" y="440" width="200" height="64" rx="6" fill="#f8f9fa"/>
+        <rect x="768" y="440" width="200" height="64" rx="6" fill="rgba(33,37,41,0.03)" stroke="rgba(33,37,41,0.30)" stroke-width="1"/>
+        <rect x="776" y="448" width="28" height="12" rx="2" fill="transparent" stroke="rgba(33,37,41,0.22)" stroke-width="0.8"/>
+        <text x="790" y="457" fill="#5f6b78" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EXT</text>
+        <text x="868" y="476" fill="#212529" font-size="12" font-weight="600" font-family="'Inter', sans-serif" text-anchor="middle">SMTP · Google · Microsoft</text>
+        <text x="868" y="492" fill="#5c636a" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">OAuth 2.0 + PKCE</text>
+
+        <!-- Leyenda -->
+        <line x1="40" y1="564" x2="1240" y2="564" stroke="rgba(33,37,41,0.10)" stroke-width="0.8"/>
+        <text x="40" y="580" fill="#5c636a" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEYENDA</text>
+
+        <rect x="40" y="596" width="14" height="10" rx="2" fill="rgba(11,105,246,0.08)" stroke="#0b69f6" stroke-width="1"/>
+        <text x="60" y="604" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Núcleo de la aplicación</text>
+
+        <rect x="196" y="596" width="14" height="10" rx="2" fill="#ffffff" stroke="#212529" stroke-width="1"/>
+        <text x="216" y="604" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Servidor</text>
+
+        <rect x="288" y="596" width="14" height="10" rx="2" fill="rgba(33,37,41,0.05)" stroke="#5c636a" stroke-width="1"/>
+        <text x="308" y="604" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Almacén / caché</text>
+
+        <rect x="420" y="596" width="14" height="10" rx="2" fill="rgba(33,37,41,0.03)" stroke="rgba(33,37,41,0.30)" stroke-width="1"/>
+        <text x="440" y="604" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Servicio externo</text>
+
+        <rect x="552" y="596" width="14" height="10" rx="2" fill="rgba(92,99,106,0.10)" stroke="#5f6b78" stroke-width="1"/>
+        <text x="572" y="604" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Usuario</text>
+
+        <rect x="640" y="596" width="14" height="10" rx="2" fill="rgba(33,37,41,0.02)" stroke="rgba(33,37,41,0.20)" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="660" y="604" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Desactivado</text>
+
+        <line x1="760" y1="602" x2="788" y2="602" stroke="#0b69f6" stroke-width="1.4" marker-end="url(#arrow-accent)"/>
+        <text x="796" y="604" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Flujo principal</text>
+
+        <line x1="904" y1="602" x2="932" y2="602" stroke="#1d4e89" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <text x="940" y="604" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">HTTPS</text>
+
+        <line x1="1012" y1="602" x2="1040" y2="602" stroke="#5c636a" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <text x="1048" y="604" fill="#5c636a" font-size="9" font-family="'Inter', sans-serif">Caché / opcional</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>
